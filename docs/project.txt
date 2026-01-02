@@ -1,0 +1,977 @@
+StageOneInAction Back Office – Web Platform Requirements
+
+User Roles: Administrators & Coaches
+
+1. Platform Overview
+
+The StageOneInAction Back Office is a web-based platform that:
+
+Gives Coaches a structured way to:
+
+Complete onboarding and compliance.
+
+Manage ambassadors.
+
+Track Business Excellence (CRM, website readiness, marketing outreach).
+
+Set weekly goals and track income-generating activities.
+
+Progress toward events and Resource Center ownership.
+
+Request sponsorships and communicate with HQ.
+
+Gives Administrators tools to:
+
+Manage coaches and ambassadors.
+
+Configure onboarding, courses, events, and Business Excellence.
+
+Review sponsorship and Resource Center applications.
+
+Track program performance and generate reports.
+
+This platform supports StageOneInAction’s four pillars:
+
+Personal Development
+
+Professional Development
+
+Talent Development
+
+Community Involvement
+
+2. Roles & Permissions
+2.1 Administrators
+
+Capabilities:
+
+Secure login to admin dashboard.
+
+Create, edit, deactivate Coach accounts.
+
+Create and manage Ambassador records (no ambassador login).
+
+Configure:
+
+Onboarding checklists.
+
+Courses and quizzes (e.g., anti-human trafficking, workbook training).
+
+Events and qualification settings.
+
+Business Excellence defaults (CRM, website content, outreach targets).
+
+Review and decide on:
+
+Sponsorship/funding requests.
+
+Resource Center applications.
+
+View global stats and export reports.
+
+Send and reply to messages with coaches.
+
+2.2 Coaches
+
+Capabilities:
+
+Secure login to coach dashboard.
+
+Complete onboarding checklist (including training).
+
+View and manage assigned ambassadors (pending/approved).
+
+Use Business Excellence tools:
+
+CRM status tracking.
+
+Website content submission progress.
+
+Marketing Outreach targets vs actuals.
+
+Set and review weekly goals.
+
+Access the Ambassador Workbook course and materials.
+
+Log and review income-generating activities.
+
+Track progress toward:
+
+Active Coach status.
+
+Event qualification.
+
+Resource Center eligibility.
+
+Submit sponsorship and project funding requests.
+
+Message Administrators for support.
+
+If approved as Resource Center Owner, manage Resource Center activities.
+
+3. Authentication & Access Control
+3.1 Login
+
+No public self sign-up.
+
+Admins create Coach accounts.
+
+Login via email/username + password.
+
+Password reset via “Forgot Password” link and email reset flow.
+
+3.2 Role-Based Access
+
+Enforce permissions server-side:
+
+Admin access to admin views only.
+
+Coach sees only their own profile, ambassadors, metrics, and communications.
+
+4. Coach Experience – Functional Requirements
+4.1 Coach Dashboard
+
+On login, coach sees a dashboard with:
+
+Onboarding progress bar.
+
+“Pending Ambassadors” notification.
+
+Business Excellence summary (CRM, website, outreach snapshot).
+
+Weekly goals overview.
+
+Recent income entries summary.
+
+Events & qualification status.
+
+Messages/notifications from Admin.
+
+4.2 Coach Onboarding Checklist
+
+Purpose: Guide a coach from “new” to “Active Coach.”
+
+Checklist items (configurable, but minimally include):
+
+Upload profile photo.
+
+Complete coach profile (bio, contact, location).
+
+Watch Anti–Human Trafficking course.
+
+Pass Anti–Human Trafficking assessment.
+
+Complete Mental Fitness assessment.
+
+Confirm receipt of Coach Workbook.
+
+Complete coach interview (status updated by Admin).
+
+Confirm coach fee ($1,500) paid/approved.
+
+Have at least 2 Approved ambassadors assigned.
+
+Functionality:
+
+Each item shows:
+
+Status: Not Started / In Progress / Submitted / Approved.
+
+Action button/link where relevant.
+
+Overall completion percentage.
+
+Display a clear Coach Status:
+
+Onboarding Incomplete / Active Coach.
+
+4.3 Anti–Human Trafficking Course & Assessment
+
+Course:
+
+Dedicated page within portal.
+
+Embedded or linked training video.
+
+“Mark as Watched” action (minimum) or auto-complete after viewing.
+
+Assessment (Quiz):
+
+Multiple-choice questions configured by Admin.
+
+Passing score threshold (e.g., 80%).
+
+Allow retakes until passed.
+
+Store:
+
+Score.
+
+Completion date.
+
+Pass/fail status.
+
+Requirement:
+
+Must be passed for:
+
+Onboarding completion.
+
+Event eligibility (if configured).
+
+4.4 Ambassador Management (Coach View Only)
+
+Coaches do not log in as ambassadors but see their assigned ambassadors.
+
+Ambassador List:
+
+Columns:
+
+Name
+
+Status: Pending / Approved / Inactive / Completed / On Hold
+
+Region
+
+Assessment status (e.g., Not Submitted / Submitted / Reviewed)
+
+Pending Ambassadors Widget:
+
+Top of dashboard:
+
+“You have X pending ambassadors.”
+
+Button: “View Pending Ambassadors.”
+
+When Admin updates an ambassador to Approved, coach sees status updated.
+
+Tie to Onboarding:
+
+Count of “Approved ambassadors” contributes to coach onboarding requirement (≥ 2).
+
+4.5 Weekly Goals & Reflection
+
+Weekly Goals:
+
+Coach can define goals such as:
+
+Number of ambassador check-ins.
+
+Classes taught.
+
+New contacts made.
+
+Follow-ups.
+
+Fields:
+
+Week (auto or selectable).
+
+Goal title.
+
+Target value.
+
+Optional notes.
+
+Tracking Results:
+
+End of week:
+
+Coach enters “Actual” value.
+
+Marks goal as:
+
+Completed / Partially / Not.
+
+UI:
+
+Weekly summary with % of goals completed.
+
+History page of past weeks.
+
+4.6 Ambassador Workbook Course Access
+
+Course Module:
+
+“Ambassador Workbook Course” section includes:
+
+Training videos for coaches on how to use the workbook.
+
+Download links:
+
+Ambassador Workbook PDF.
+
+Implementation/teacher guide.
+
+Tracking:
+
+Status per coach:
+
+Not Started / In Progress / Completed.
+
+Admin may mark completion as required for certain teaching roles or events.
+
+4.7 Income Tracking (Coach)
+
+Purpose: Help coaches see how SOIA-related activities contribute to income.
+
+Income Entry Form:
+
+Fields:
+
+Date.
+
+Activity Type (dropdown):
+
+Own services.
+
+Teaching personal development classes (with at least 4 ambassadors).
+
+Fundraising.
+
+Other (with text description).
+
+Description / notes.
+
+Amount (numeric, no negatives).
+
+Summary View:
+
+Total income:
+
+This month.
+
+Year-to-date.
+
+Breakdown by Activity Type.
+
+Optional simple chart (per month).
+
+4.8 Business Excellence (Coach)
+
+The Business Excellence section sits prominently in the coach dashboard with three main components:
+
+CRM Activation & Subscription
+
+Website Content Submission
+
+Marketing Outreach (Targets vs Actuals)
+
+4.8.1 CRM Activation & Subscription
+
+For each coach, track:
+
+CRM Activated: Yes / No
+
+CRM Subscription Active: Yes / No
+
+CRM Provider: text or dropdown (optional).
+
+Activation Date: date.
+
+Last Login Date: date (if data available or manually maintained).
+
+UI:
+
+A card such as:
+
+CRM Status
+
+Activation: ✅ / ❌
+
+Subscription: ✅ / ❌
+
+Provider: [text]
+
+Activated on: [date]
+
+Last login: [date or “Unknown”]
+
+Admin can update these fields; deeper integration can be added later.
+
+4.8.2 Website Content Submission Checklist
+
+Track the coach’s website-readiness content. Each item has:
+
+Boolean status (Submitted Yes/No).
+
+Content field (text/file).
+
+Items:
+
+Logo
+
+Logo Submitted: Yes/No
+
+File upload or URL.
+
+Services
+
+Services Description Submitted: Yes/No
+
+Text: list/description of services.
+
+Products (if applicable)
+
+Products Info Submitted: Yes/No
+
+Text: list/description.
+
+Pricing
+
+Pricing Submitted: Yes/No
+
+Text: pricing structure/packages.
+
+Target Audience
+
+Target Audience Defined: Yes/No
+
+Text: who they serve (age, region, type of client).
+
+Business Contact
+
+Contact Info Submitted: Yes/No
+
+Fields: email, phone, city/country, social/website (optional).
+
+About
+
+About Section Submitted: Yes/No
+
+Text: brief about the business.
+
+Vision & Mission
+
+Vision/Mission Submitted: Yes/No
+
+Text: vision and mission statements.
+
+Bio
+
+Bio Submitted: Yes/No
+
+Text: coach’s personal/professional bio.
+
+UI:
+
+Show a progress bar for Website Content:
+
+e.g., “7 of 9 items submitted (78%).”
+
+List each item with:
+
+Status toggle or icon.
+
+“Edit” / “Update” button.
+
+4.8.3 Marketing Outreach – Targets & Actuals
+
+Outreach Categories (recommended default):
+
+New Contacts / Conversations.
+
+Follow-Ups.
+
+Invitations/Presentations.
+
+Social Media Posts (intentional promotion).
+
+Referrals / Introductions Requested.
+
+Collaboration / Partnership Outreach (schools, churches, NGOs, etc.).
+
+Targets:
+
+Coach can set Daily / Weekly / Monthly targets (or Admin can pre-load defaults).
+
+Example default targets (for guidance):
+
+Daily:
+
+3 New Contacts
+
+5 Follow-Ups
+
+Weekly:
+
+15 New Contacts
+
+25 Follow-Ups
+
+3 Invitations/Presentations
+
+5 Referrals Requested
+
+2 Collaboration Outreach attempts
+
+3–5 Social Posts
+
+Monthly:
+
+60 New Contacts
+
+100 Follow-Ups
+
+4+ Presentations
+
+8–10 Collaboration Outreach attempts
+
+12–20 Social Posts
+
+Logging Actuals:
+
+“Quick Add Activity” form with:
+
+Date.
+
+Activity Type.
+
+Quantity (e.g., 1 presentation, 3 new contacts).
+
+Short note (optional).
+
+Summary View:
+
+For a given week/month:
+
+This Week – Outreach Summary
+
+New Contacts: Actual / Target
+
+Follow-Ups: Actual / Target
+
+Invitations/Presentations: Actual / Target
+
+Social Posts: Actual / Target
+
+Referrals Requested: Actual / Target
+
+Collaboration Outreach: Actual / Target
+
+Use visual indicators:
+
+Green if Actual ≥ Target.
+
+Yellow if close.
+
+Red if significantly below.
+
+4.9 Resource Center Eligibility & Management
+4.9.1 Eligibility Tracking
+
+For each coach, track number of coaches they’ve recruited.
+
+Display in dashboard:
+
+“Coaches Recruited: X / 5”
+
+When X ≥ 5:
+
+Show a message: “You are eligible to apply as a Resource Center Owner.”
+
+Enable “Apply to Become Resource Center Owner” button.
+
+4.9.2 Resource Center Application
+
+Application form fields:
+
+Proposed location (city, region).
+
+Community description.
+
+Vision & goals for the Resource Center.
+
+Capacity info (spaces, facilities if any).
+
+Status:
+
+Not Submitted / Under Review / Approved / Declined (with reason).
+
+4.9.3 Resource Center Management (for approved owners)
+
+If coach is approved as Resource Center Owner:
+
+Unlock Resource Center tab for that coach.
+
+Features:
+
+List of classes/workshops hosted by the center:
+
+Title, date, audience type (ambassadors/adults), attendance count.
+
+Ability to:
+
+Propose new classes (topic, date, audience).
+
+Record attendance after each class.
+
+“Impact Summary”:
+
+Total classes taught.
+
+Total participants served.
+
+4.10 Sponsorship & Project Funding Requests
+
+Coaches initiate these requests from within their portal.
+
+Types:
+
+Coach Sponsorship (e.g., fee, travel).
+
+Ambassador Sponsorship (program fees, travel, resources).
+
+Project Funding (community or business projects).
+
+Fields:
+
+Request Type.
+
+Beneficiary:
+
+Coach self / Ambassador (selected from their list) / Project.
+
+Amount requested.
+
+Amount they can contribute (optional).
+
+Reason (text).
+
+Urgency: Urgent / Normal / Flexible.
+
+Status:
+
+Submitted / Under Review / Approved (full) / Approved (partial) / Payment Plan / Not Approved.
+
+Admin decision and notes displayed to coach.
+
+4.11 Events & Qualification (Coach View)
+
+Events include at least:
+
+Leadership Conference (mid-year).
+
+Youth Convention (after Thanksgiving).
+
+Coach view:
+
+Event name, dates, location, description.
+
+Qualification requirements list (e.g., onboarding complete, certain # of ambassadors, Business Excellence basics).
+
+Coach’s progress:
+
+Requirement-level view: each requirement marked Yes/No.
+
+Event qualification status:
+
+Not Qualified / Almost Qualified / Qualified.
+
+RSVP controls for qualified coaches:
+
+Yes / No / Maybe.
+
+Option to connect to sponsorship request for travel support.
+
+4.12 Messaging & Support
+
+Message Center:
+
+Coaches can:
+
+Create new message threads to Admin.
+
+Select a category (Onboarding, Ambassadors, Sponsorship, Events, Technical, Other).
+
+View replies and full history.
+
+Admin can:
+
+View all threads from coaches.
+
+Reply via portal (coach sees response in portal; optional email alert).
+
+Set status per thread: Open / In Progress / Resolved.
+
+5. Administrator – Functional Requirements
+5.1 Admin Dashboard
+
+Admin sees:
+
+Total coaches; Active vs Inactive.
+
+Onboarding completion summary (e.g., X coaches incomplete).
+
+Total ambassadors; status breakdown.
+
+Pending sponsorship requests count.
+
+Pending Resource Center applications count.
+
+Upcoming events and number qualified.
+
+Quick links to messaging queue.
+
+5.2 User Management
+
+Coaches:
+
+Create new coach:
+
+Name, email, region, initial role.
+
+Recruiter coach (if applicable).
+
+Edit coach profile & status (Active/Inactive/Suspended).
+
+Update onboarding fields (interview done, fee confirmed).
+
+Delete/deactivate account.
+
+Ambassadors:
+
+Create or import ambassador records.
+
+Assign ambassadors to coaches.
+
+Update statuses & key fields.
+
+5.3 Onboarding Configuration
+
+Define coach onboarding tasks:
+
+For each task:
+
+Label.
+
+Description.
+
+Type (manual status, video, quiz, upload, boolean).
+
+Required: Yes/No.
+
+Change rules such as:
+
+“Coach is Active when all required items = Approved.”
+
+“Coach must have ≥ 2 Approved ambassadors to be Active.”
+
+5.4 Course & Quiz Configuration
+
+For each course (e.g., Anti–Human Trafficking, Ambassador Workbook):
+
+Define:
+
+Course name, description.
+
+Video URL or embed code.
+
+Configure assessment:
+
+Questions, options, correct answers.
+
+Passing score.
+
+View:
+
+Per-coach course completion and quiz results.
+
+5.5 Business Excellence Configuration & Reporting
+
+Admin can:
+
+Configure default outreach targets (daily/weekly/monthly).
+
+Adjust outreach categories.
+
+View reports on:
+
+CRM activation/subscription across coaches.
+
+Website content completeness (how many are “fully submitted”).
+
+Outreach activity vs targets (e.g., which coaches consistently hit targets).
+
+5.6 Events & Qualification
+
+Admin can:
+
+Create/edit events:
+
+Name, date(s), location, description.
+
+Configure basic qualification flags:
+
+“Require onboarding complete.”
+
+“Require ≥ X approved ambassadors.”
+
+Other simple conditions.
+
+View:
+
+List of coaches and their qualification status per event.
+
+RSVP responses.
+
+5.7 Sponsorship & Project Funding Requests
+
+Admin interface:
+
+Queue of all requests with filters:
+
+Type, coach, region, status.
+
+View details of each request:
+
+Beneficiary, amount, reason, urgency.
+
+Set decision and notes:
+
+Approved (full/partial), payment plan, Not Approved.
+
+Status and notes surfaced to coach.
+
+5.8 Resource Center Applications
+
+Admin can:
+
+View list of Resource Center applications.
+
+Open each application and see:
+
+Coach details, recruited coaches count.
+
+Location, vision, community details.
+
+Approve or decline:
+
+Update coach record as Resource Center Owner if approved.
+
+5.9 Reporting & Exports
+
+Initial report capabilities:
+
+Coaches:
+
+Total, Active vs Inactive, onboarding completion.
+
+Ambassadors:
+
+Total, by coach, status counts.
+
+Sponsorship:
+
+Requests and decisions summary.
+
+Events:
+
+Qualification and RSVP lists.
+
+Business Excellence:
+
+CRM activation stats.
+
+Website content completeness.
+
+Outreach performance (roll-up).
+
+Export as CSV for further processing.
+
+5.10 Messaging Management
+
+Admin tools:
+
+Inbox of all coach messages.
+
+Filter by category and status.
+
+Reply, update thread status.
+
+Optionally assign messages to specific Admin staff (not required in v1, but nice-to-have).
+
+6. Data Model (High-Level Entities)
+
+User (Coach/Admin)
+
+CoachProfile
+
+Ambassador
+
+OnboardingTask, CoachOnboardingProgress
+
+Course, QuizQuestion, QuizAnswer, QuizResult
+
+WeeklyGoal
+
+IncomeEntry
+
+BusinessExcellenceCRM (fields for CRM status)
+
+WebsiteContentStatus
+
+OutreachActivityTarget, OutreachActivityLog
+
+ResourceCenterApplication
+
+Event, EventQualificationStatus, EventRSVP
+
+SponsorshipRequest
+
+MessageThread, Message
+
+(Exact schema to be finalized by dev team, but these are the core entities.)
+
+7. Non-Functional Requirements
+7.1 Security
+
+HTTPS for all connections.
+
+Secure password hashing.
+
+Role-based access control enforced server-side.
+
+Careful handling of youth-related data (ambassadors).
+
+7.2 Usability
+
+Simple, clear UI; non-technical language.
+
+Works on mobile (responsive design).
+
+Clear buttons & labels: “Start Onboarding,” “Request Sponsorship,” etc.
+
+7.3 Performance
+
+Reasonable load times under normal usage.
+
+Scales to hundreds/thousands of users without major redesign.
+
+7.4 Logging & Audit
+
+Log:
+
+Onboarding task completions.
+
+Sponsorship decisions.
+
+Role changes (e.g., Resource Center Owner).
+
+Maintain timestamps and responsible Admin IDs.
+
+7.5 Notifications
+
+Email notifications for:
+
+New coach account.
+
+Password reset.
+
+Sponsorship decisions.
+
+Resource Center decisions.
+
+New messages (optional).
+
+SMS can be added later; design should not block it.

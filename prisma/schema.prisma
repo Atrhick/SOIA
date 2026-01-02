@@ -1,0 +1,716 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+enum UserRole {
+  ADMIN
+  COACH
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  password      String
+  role          UserRole   @default(COACH)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  coachProfile  CoachProfile?
+  sentMessages  Message[]     @relation("SentMessages")
+  messageThreads MessageThread[] @relation("ThreadParticipants")
+
+  @@map("users")
+}
+
+// ============================================
+// COACH PROFILE & RELATED
+// ============================================
+
+enum CoachStatus {
+  ONBOARDING_INCOMPLETE
+  ACTIVE_COACH
+}
+
+model CoachProfile {
+  id                    String      @id @default(cuid())
+  userId                String      @unique
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Profile Info
+  firstName             String
+  lastName              String
+  bio                   String?     @db.Text
+  photoUrl              String?
+  phone                 String?
+  city                  String?
+  region                String?
+  country               String?
+
+  // Coach Status
+  coachStatus           CoachStatus @default(ONBOARDING_INCOMPLETE)
+
+  // Recruiter relationship
+  recruiterId           String?
+  recruiter             CoachProfile? @relation("RecruitedCoaches", fields: [recruiterId], references: [id])
+  recruitedCoaches      CoachProfile[] @relation("RecruitedCoaches")
+
+  // Resource Center Owner status
+  isResourceCenterOwner Boolean     @default(false)
+
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  ambassadors           Ambassador[]
+  onboardingProgress    CoachOnboardingProgress[]
+  quizResults           QuizResult[]
+  weeklyGoals           WeeklyGoal[]
+  incomeEntries         IncomeEntry[]
+  businessExcellenceCRM BusinessExcellenceCRM?
+  websiteContentStatus  WebsiteContentStatus?
+  outreachTargets       OutreachActivityTarget[]
+  outreachLogs          OutreachActivityLog[]
+  resourceCenterApp     ResourceCenterApplication?
+  resourceCenter        ResourceCenter?
+  eventQualifications   EventQualificationStatus[]
+  eventRSVPs            EventRSVP[]
+  sponsorshipRequests   SponsorshipRequest[]
+
+  @@map("coach_profiles")
+}
+
+// ============================================
+// AMBASSADORS
+// ============================================
+
+enum AmbassadorStatus {
+  PENDING
+  APPROVED
+  INACTIVE
+  COMPLETED
+  ON_HOLD
+}
+
+enum AssessmentStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  REVIEWED
+}
+
+model Ambassador {
+  id               String           @id @default(cuid())
+  coachId          String
+  coach            CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  region           String?
+
+  // Status
+  status           AmbassadorStatus @default(PENDING)
+  assessmentStatus AssessmentStatus @default(NOT_SUBMITTED)
+
+  notes            String?          @db.Text
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  // Relations
+  sponsorshipRequests SponsorshipRequest[]
+
+  @@map("ambassadors")
+}
+
+// ============================================
+// ONBOARDING
+// ============================================
+
+enum OnboardingTaskType {
+  MANUAL_STATUS
+  VIDEO
+  QUIZ
+  UPLOAD
+  BOOLEAN
+}
+
+enum OnboardingItemStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+}
+
+model OnboardingTask {
+  id          String             @id @default(cuid())
+  label       String
+  description String?            @db.Text
+  type        OnboardingTaskType
+  isRequired  Boolean            @default(true)
+  sortOrder   Int                @default(0)
+  isActive    Boolean            @default(true)
+
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  // Relations
+  progress    CoachOnboardingProgress[]
+
+  @@map("onboarding_tasks")
+}
+
+model CoachOnboardingProgress {
+  id          String              @id @default(cuid())
+  coachId     String
+  coach       CoachProfile        @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  taskId      String
+  task        OnboardingTask      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  status      OnboardingItemStatus @default(NOT_STARTED)
+  completedAt DateTime?
+  notes       String?             @db.Text
+
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([coachId, taskId])
+  @@map("coach_onboarding_progress")
+}
+
+// ============================================
+// COURSES & QUIZZES
+// ============================================
+
+model Course {
+  id          String    @id @default(cuid())
+  name        String
+  description String?   @db.Text
+  videoUrl    String?
+  embedCode   String?   @db.Text
+  isRequired  Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  questions   QuizQuestion[]
+  results     QuizResult[]
+
+  @@map("courses")
+}
+
+model QuizQuestion {
+  id            String       @id @default(cuid())
+  courseId      String
+  course        Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  questionText  String       @db.Text
+  sortOrder     Int          @default(0)
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  options       QuizOption[]
+
+  @@map("quiz_questions")
+}
+
+model QuizOption {
+  id          String       @id @default(cuid())
+  questionId  String
+  question    QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  optionText  String
+  isCorrect   Boolean      @default(false)
+  sortOrder   Int          @default(0)
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("quiz_options")
+}
+
+model QuizResult {
+  id          String       @id @default(cuid())
+  coachId     String
+  coach       CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  score       Float
+  passed      Boolean
+  completedAt DateTime     @default(now())
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("quiz_results")
+}
+
+// ============================================
+// WEEKLY GOALS
+// ============================================
+
+enum GoalStatus {
+  PENDING
+  COMPLETED
+  PARTIALLY_COMPLETED
+  NOT_COMPLETED
+}
+
+model WeeklyGoal {
+  id          String       @id @default(cuid())
+  coachId     String
+  coach       CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  weekStart   DateTime
+  weekEnd     DateTime
+  title       String
+  targetValue Int
+  actualValue Int?
+  status      GoalStatus   @default(PENDING)
+  notes       String?      @db.Text
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("weekly_goals")
+}
+
+// ============================================
+// INCOME TRACKING
+// ============================================
+
+enum IncomeActivityType {
+  OWN_SERVICES
+  TEACHING_CLASSES
+  FUNDRAISING
+  OTHER
+}
+
+model IncomeEntry {
+  id           String             @id @default(cuid())
+  coachId      String
+  coach        CoachProfile       @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  date         DateTime
+  activityType IncomeActivityType
+  description  String?            @db.Text
+  amount       Decimal            @db.Decimal(10, 2)
+
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@map("income_entries")
+}
+
+// ============================================
+// BUSINESS EXCELLENCE
+// ============================================
+
+model BusinessExcellenceCRM {
+  id                    String       @id @default(cuid())
+  coachId               String       @unique
+  coach                 CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  crmActivated          Boolean      @default(false)
+  crmSubscriptionActive Boolean      @default(false)
+  crmProvider           String?
+  activationDate        DateTime?
+  lastLoginDate         DateTime?
+
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@map("business_excellence_crm")
+}
+
+model WebsiteContentStatus {
+  id                      String       @id @default(cuid())
+  coachId                 String       @unique
+  coach                   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  // Logo
+  logoSubmitted           Boolean      @default(false)
+  logoUrl                 String?
+
+  // Services
+  servicesSubmitted       Boolean      @default(false)
+  servicesDescription     String?      @db.Text
+
+  // Products
+  productsSubmitted       Boolean      @default(false)
+  productsDescription     String?      @db.Text
+
+  // Pricing
+  pricingSubmitted        Boolean      @default(false)
+  pricingDescription      String?      @db.Text
+
+  // Target Audience
+  targetAudienceSubmitted Boolean      @default(false)
+  targetAudienceDescription String?    @db.Text
+
+  // Business Contact
+  contactSubmitted        Boolean      @default(false)
+  contactEmail            String?
+  contactPhone            String?
+  contactCity             String?
+  contactCountry          String?
+  contactSocialMedia      String?
+  contactWebsite          String?
+
+  // About
+  aboutSubmitted          Boolean      @default(false)
+  aboutDescription        String?      @db.Text
+
+  // Vision & Mission
+  visionMissionSubmitted  Boolean      @default(false)
+  visionStatement         String?      @db.Text
+  missionStatement        String?      @db.Text
+
+  // Bio
+  bioSubmitted            Boolean      @default(false)
+  bioContent              String?      @db.Text
+
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  @@map("website_content_status")
+}
+
+enum OutreachCategory {
+  NEW_CONTACTS
+  FOLLOW_UPS
+  INVITATIONS_PRESENTATIONS
+  SOCIAL_MEDIA_POSTS
+  REFERRALS_INTRODUCTIONS
+  COLLABORATION_OUTREACH
+}
+
+enum TargetPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model OutreachActivityTarget {
+  id        String           @id @default(cuid())
+  coachId   String
+  coach     CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  category  OutreachCategory
+  period    TargetPeriod
+  target    Int
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([coachId, category, period])
+  @@map("outreach_activity_targets")
+}
+
+model OutreachActivityLog {
+  id        String           @id @default(cuid())
+  coachId   String
+  coach     CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  date      DateTime
+  category  OutreachCategory
+  quantity  Int
+  notes     String?          @db.Text
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@map("outreach_activity_logs")
+}
+
+// ============================================
+// RESOURCE CENTER
+// ============================================
+
+enum ResourceCenterAppStatus {
+  NOT_SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  DECLINED
+}
+
+model ResourceCenterApplication {
+  id                  String                   @id @default(cuid())
+  coachId             String                   @unique
+  coach               CoachProfile             @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  proposedLocation    String
+  communityDescription String?                 @db.Text
+  visionAndGoals      String?                  @db.Text
+  capacityInfo        String?                  @db.Text
+
+  status              ResourceCenterAppStatus  @default(NOT_SUBMITTED)
+  declineReason       String?                  @db.Text
+  reviewedAt          DateTime?
+
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@map("resource_center_applications")
+}
+
+model ResourceCenter {
+  id          String       @id @default(cuid())
+  ownerId     String       @unique
+  owner       CoachProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name        String
+  location    String
+  description String?      @db.Text
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  classes     ResourceCenterClass[]
+
+  @@map("resource_centers")
+}
+
+enum AudienceType {
+  AMBASSADORS
+  ADULTS
+  MIXED
+}
+
+model ResourceCenterClass {
+  id               String         @id @default(cuid())
+  resourceCenterId String
+  resourceCenter   ResourceCenter @relation(fields: [resourceCenterId], references: [id], onDelete: Cascade)
+
+  title            String
+  date             DateTime
+  audienceType     AudienceType
+  attendanceCount  Int            @default(0)
+  notes            String?        @db.Text
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@map("resource_center_classes")
+}
+
+// ============================================
+// EVENTS
+// ============================================
+
+model Event {
+  id          String    @id @default(cuid())
+  name        String
+  description String?   @db.Text
+  location    String?
+  startDate   DateTime
+  endDate     DateTime?
+
+  // Qualification Requirements
+  requireOnboardingComplete   Boolean @default(false)
+  requiredApprovedAmbassadors Int     @default(0)
+
+  isActive    Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  qualifications EventQualificationStatus[]
+  rsvps          EventRSVP[]
+
+  @@map("events")
+}
+
+enum QualificationStatus {
+  NOT_QUALIFIED
+  ALMOST_QUALIFIED
+  QUALIFIED
+}
+
+model EventQualificationStatus {
+  id        String              @id @default(cuid())
+  eventId   String
+  event     Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  coachId   String
+  coach     CoachProfile        @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  status    QualificationStatus @default(NOT_QUALIFIED)
+
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([eventId, coachId])
+  @@map("event_qualification_status")
+}
+
+enum RSVPStatus {
+  YES
+  NO
+  MAYBE
+}
+
+model EventRSVP {
+  id        String       @id @default(cuid())
+  eventId   String
+  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  coachId   String
+  coach     CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  status    RSVPStatus
+  notes     String?      @db.Text
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([eventId, coachId])
+  @@map("event_rsvps")
+}
+
+// ============================================
+// SPONSORSHIP REQUESTS
+// ============================================
+
+enum SponsorshipRequestType {
+  COACH_SPONSORSHIP
+  AMBASSADOR_SPONSORSHIP
+  PROJECT_FUNDING
+}
+
+enum SponsorshipUrgency {
+  URGENT
+  NORMAL
+  FLEXIBLE
+}
+
+enum SponsorshipStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED_FULL
+  APPROVED_PARTIAL
+  PAYMENT_PLAN
+  NOT_APPROVED
+}
+
+model SponsorshipRequest {
+  id              String                 @id @default(cuid())
+  coachId         String
+  coach           CoachProfile           @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  requestType     SponsorshipRequestType
+
+  // Beneficiary - either coach themselves or an ambassador
+  beneficiaryType String                 // "SELF" or "AMBASSADOR" or "PROJECT"
+  ambassadorId    String?
+  ambassador      Ambassador?            @relation(fields: [ambassadorId], references: [id])
+  projectName     String?
+
+  amountRequested Decimal                @db.Decimal(10, 2)
+  amountContributing Decimal?            @db.Decimal(10, 2)
+  reason          String                 @db.Text
+  urgency         SponsorshipUrgency     @default(NORMAL)
+
+  status          SponsorshipStatus      @default(SUBMITTED)
+  adminNotes      String?                @db.Text
+  decidedAt       DateTime?
+
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@map("sponsorship_requests")
+}
+
+// ============================================
+// MESSAGING
+// ============================================
+
+enum MessageCategory {
+  ONBOARDING
+  AMBASSADORS
+  SPONSORSHIP
+  EVENTS
+  TECHNICAL
+  OTHER
+}
+
+enum ThreadStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+model MessageThread {
+  id          String          @id @default(cuid())
+  subject     String
+  category    MessageCategory
+  status      ThreadStatus    @default(OPEN)
+
+  participants User[]         @relation("ThreadParticipants")
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  messages    Message[]
+
+  @@map("message_threads")
+}
+
+model Message {
+  id        String        @id @default(cuid())
+  threadId  String
+  thread    MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  content   String        @db.Text
+  isRead    Boolean       @default(false)
+
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("messages")
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  entityType  String
+  entityId    String?
+  details     String?  @db.Text
+  ipAddress   String?
+
+  createdAt   DateTime @default(now())
+
+  @@map("audit_logs")
+}
