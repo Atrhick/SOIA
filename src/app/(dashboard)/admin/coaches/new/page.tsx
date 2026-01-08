@@ -93,7 +93,7 @@ export default function NewCoachPage() {
                 name="email"
                 label="Email Address"
                 type="email"
-                placeholder="coach@example.com"
+                placeholder="name@example.com"
                 required
               />
               <div>

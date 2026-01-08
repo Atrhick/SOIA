@@ -8,6 +8,89 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Play, CheckCircle2, FileText } from 'lucide-react'
 import { MarkAsWatchedButton } from './mark-watched-button'
 
+// Helper function to extract YouTube video ID from various URL formats
+function getYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([^#&?/\s]+)/,
+    /^([a-zA-Z0-9_-]{11})$/, // Just the video ID
+  ]
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match && match[1]) {
+      return match[1]
+    }
+  }
+  return null
+}
+
+// Helper function to extract Vimeo video ID
+function getVimeoVideoId(url: string): string | null {
+  const match = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+  return match ? match[1] : null
+}
+
+// Video embed component that supports YouTube and Vimeo
+function VideoEmbed({ url, title }: { url: string; title: string }) {
+  const youtubeId = getYouTubeVideoId(url)
+  const vimeoId = getVimeoVideoId(url)
+
+  if (youtubeId) {
+    return (
+      <iframe
+        className="w-full h-full"
+        src={`https://www.youtube.com/embed/${youtubeId}?rel=0`}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    )
+  }
+
+  if (vimeoId) {
+    return (
+      <iframe
+        className="w-full h-full"
+        src={`https://player.vimeo.com/video/${vimeoId}`}
+        title={title}
+        allow="autoplay; fullscreen; picture-in-picture"
+        allowFullScreen
+      />
+    )
+  }
+
+  // Fallback for direct video URLs (mp4, webm, etc.)
+  if (url.match(/\.(mp4|webm|ogg)(\?|$)/i)) {
+    return (
+      <video className="w-full h-full" controls>
+        <source src={url} />
+        Your browser does not support the video tag.
+      </video>
+    )
+  }
+
+  // Unknown video format - show error
+  return (
+    <div className="w-full h-full flex items-center justify-center text-white">
+      <div className="text-center">
+        <Play className="h-16 w-16 mx-auto mb-4 opacity-50" />
+        <p className="text-lg">Unable to load video</p>
+        <p className="text-sm text-gray-400 mt-2">
+          Unsupported video URL format
+        </p>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm"
+        >
+          Open video in new tab
+        </a>
+      </div>
+    </div>
+  )
+}
+
 async function getCourse(courseId: string) {
   return prisma.course.findUnique({
     where: { id: courseId },
@@ -83,15 +166,9 @@ export default async function CoursePage({
         <CardContent>
           {course.videoUrl ? (
             <div className="space-y-4">
-              {/* Video embed placeholder */}
-              <div className="aspect-video bg-gray-900 rounded-lg flex items-center justify-center">
-                <div className="text-center text-white">
-                  <Play className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg">Training Video</p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    Video URL: {course.videoUrl}
-                  </p>
-                </div>
+              {/* Video embed */}
+              <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden">
+                <VideoEmbed url={course.videoUrl} title={course.name} />
               </div>
 
               {/* Mark as Watched Button */}

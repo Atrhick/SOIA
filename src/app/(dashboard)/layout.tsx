@@ -14,11 +14,20 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  // Cast to the supported role types
+  const role = session.user.role as 'ADMIN' | 'COACH' | 'AMBASSADOR'
+  const isImpersonating = session.user.isImpersonating || false
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar role={session.user.role} />
-      <Header user={{ email: session.user.email, role: session.user.role }} />
-      <main className="ml-64 pt-16 p-6">
+      <Sidebar role={role} />
+      <Header user={{
+        email: session.user.email,
+        role: session.user.role,
+        isImpersonating,
+        originalAdminId: session.user.originalAdminId
+      }} />
+      <main className={`ml-64 ${isImpersonating ? 'pt-24' : 'pt-16'} p-6`}>
         {children}
       </main>
     </div>

@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, OnboardingTaskType } from '@prisma/client'
+import { PrismaClient, UserRole, OnboardingTaskType, AmbassadorOnboardingTaskType } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -46,6 +46,163 @@ async function main() {
     },
   })
   console.log('Created demo coach:', coachUser.email)
+
+  // Create Ambassador Onboarding Tasks
+  const ambassadorOnboardingTasks = [
+    {
+      id: 'interview',
+      label: 'Complete Interview',
+      description: 'Schedule and complete your interview with a director or admin staff.',
+      type: AmbassadorOnboardingTaskType.INTERVIEW,
+      isRequired: true,
+      sortOrder: 1,
+    },
+    {
+      id: 'whatsapp-team',
+      label: 'WhatsApp Support Team',
+      description: 'Your support team WhatsApp group will be created by admin.',
+      type: AmbassadorOnboardingTaskType.WHATSAPP_TEAM,
+      isRequired: true,
+      sortOrder: 2,
+    },
+    {
+      id: 'business-idea',
+      label: 'Submit Business Idea',
+      description: 'Submit your business idea for review by the admin team.',
+      type: AmbassadorOnboardingTaskType.BUSINESS_IDEA,
+      isRequired: true,
+      sortOrder: 3,
+    },
+    {
+      id: 'power-team',
+      label: 'Join Power Team',
+      description: 'Get invited to the Power Team group after your business idea is approved.',
+      type: AmbassadorOnboardingTaskType.POWER_TEAM,
+      isRequired: true,
+      sortOrder: 4,
+    },
+    {
+      id: 'class-selection',
+      label: 'Enroll in a Class',
+      description: 'Browse and enroll in at least one class offered by coaches.',
+      type: AmbassadorOnboardingTaskType.CLASS_SELECTION,
+      isRequired: true,
+      sortOrder: 5,
+    },
+  ]
+
+  for (const task of ambassadorOnboardingTasks) {
+    await prisma.ambassadorOnboardingTask.upsert({
+      where: { id: task.id },
+      update: task,
+      create: task,
+    })
+  }
+  console.log('Created ambassador onboarding tasks')
+
+  // Create Demo Ambassador User
+  const ambassadorPassword = await bcrypt.hash('ambassador123', 12)
+  const ambassadorUser = await prisma.user.upsert({
+    where: { email: 'ambassador@stageoneinaction.com' },
+    update: {},
+    create: {
+      email: 'ambassador@stageoneinaction.com',
+      password: ambassadorPassword,
+      role: UserRole.AMBASSADOR,
+    },
+  })
+
+  // Create Ambassador Profile
+  const ambassador = await prisma.ambassador.upsert({
+    where: { userId: ambassadorUser.id },
+    update: {},
+    create: {
+      userId: ambassadorUser.id,
+      coachId: coachProfile.id,
+      firstName: 'Demo',
+      lastName: 'Ambassador',
+      email: 'ambassador@stageoneinaction.com',
+      dateOfBirth: new Date('2008-05-15'), // 16 years old
+      region: 'Georgia',
+      status: 'PENDING',
+    },
+  })
+  console.log('Created demo ambassador:', ambassadorUser.email)
+
+  // Create onboarding progress for the ambassador (interview as first step)
+  const interviewTask = await prisma.ambassadorOnboardingTask.findFirst({
+    where: { type: AmbassadorOnboardingTaskType.INTERVIEW },
+  })
+  if (interviewTask) {
+    await prisma.ambassadorOnboardingProgress.upsert({
+      where: {
+        ambassadorId_taskId: {
+          ambassadorId: ambassador.id,
+          taskId: interviewTask.id,
+        },
+      },
+      update: {},
+      create: {
+        ambassadorId: ambassador.id,
+        taskId: interviewTask.id,
+        status: 'NOT_STARTED',
+      },
+    })
+  }
+  console.log('Created ambassador onboarding progress')
+
+  // Create Sample Classes from Coach
+  const sampleClasses = [
+    {
+      id: 'business-basics',
+      coachId: coachProfile.id,
+      title: 'Business Basics 101',
+      description: 'Learn the fundamentals of starting and running a business. Perfect for young entrepreneurs!',
+      date: new Date('2025-02-15T10:00:00'),
+      duration: 60,
+      location: 'Community Center Room A',
+      isOnline: false,
+      isFree: true,
+      maxCapacity: 20,
+      isActive: true,
+    },
+    {
+      id: 'marketing-essentials',
+      coachId: coachProfile.id,
+      title: 'Marketing Essentials',
+      description: 'Discover how to market your business effectively using social media and other channels.',
+      date: new Date('2025-02-22T14:00:00'),
+      duration: 90,
+      isOnline: true,
+      meetingLink: 'https://zoom.us/j/example',
+      isFree: false,
+      price: 25.00,
+      maxCapacity: 15,
+      isActive: true,
+    },
+    {
+      id: 'financial-literacy',
+      coachId: coachProfile.id,
+      title: 'Financial Literacy for Young Entrepreneurs',
+      description: 'Understanding money management, budgeting, and basic accounting for your business.',
+      date: new Date('2025-03-01T11:00:00'),
+      duration: 75,
+      location: 'Online via Zoom',
+      isOnline: true,
+      isFree: true,
+      maxCapacity: 30,
+      isActive: true,
+    },
+  ]
+
+  for (const classData of sampleClasses) {
+    await prisma.coachClass.upsert({
+      where: { id: classData.id },
+      update: classData,
+      create: classData,
+    })
+  }
+  console.log('Created sample classes')
 
   // Create Onboarding Tasks
   const onboardingTasks = [
@@ -232,6 +389,143 @@ async function main() {
     })
   }
   console.log('Created events')
+
+  // Create Feature Configurations
+  const featureConfigs = [
+    {
+      feature: 'CRM',
+      isEnabled: true,
+      enabledForCoaches: true,
+      enabledForAmbassadors: false,
+    },
+    {
+      feature: 'PROJECT_MANAGEMENT',
+      isEnabled: true,
+      enabledForCoaches: true,
+      enabledForAmbassadors: false,
+    },
+    {
+      feature: 'COLLABORATION',
+      isEnabled: true,
+      enabledForCoaches: true,
+      enabledForAmbassadors: true,
+    },
+    {
+      feature: 'TIME_CLOCK',
+      isEnabled: true,
+      enabledForCoaches: true,
+      enabledForAmbassadors: true,
+    },
+    {
+      feature: 'SCHEDULING',
+      isEnabled: true,
+      enabledForCoaches: true,
+      enabledForAmbassadors: true,
+    },
+    {
+      feature: 'KNOWLEDGE_BASE',
+      isEnabled: true,
+      enabledForCoaches: true,
+      enabledForAmbassadors: true,
+    },
+  ]
+
+  for (const config of featureConfigs) {
+    await prisma.featureConfig.upsert({
+      where: { feature: config.feature },
+      update: config,
+      create: config,
+    })
+  }
+  console.log('Created feature configurations')
+
+  // Create sample CRM Pipeline Stages
+  const pipelineStages = [
+    { id: 'lead', name: 'Lead', color: '#6B7280', sortOrder: 1 },
+    { id: 'contacted', name: 'Contacted', color: '#3B82F6', sortOrder: 2 },
+    { id: 'qualified', name: 'Qualified', color: '#8B5CF6', sortOrder: 3 },
+    { id: 'proposal', name: 'Proposal', color: '#F59E0B', sortOrder: 4 },
+    { id: 'negotiation', name: 'Negotiation', color: '#EF4444', sortOrder: 5 },
+    { id: 'won', name: 'Won', color: '#10B981', sortOrder: 6 },
+    { id: 'lost', name: 'Lost', color: '#6B7280', sortOrder: 7 },
+  ]
+
+  for (const stage of pipelineStages) {
+    await prisma.cRMPipelineStage.upsert({
+      where: { id: stage.id },
+      update: stage,
+      create: stage,
+    })
+  }
+  console.log('Created CRM pipeline stages')
+
+  // Create sample Knowledge Base Categories
+  const kbCategories = [
+    {
+      id: 'getting-started',
+      name: 'Getting Started',
+      slug: 'getting-started',
+      description: 'Everything you need to know to get started',
+      sortOrder: 1,
+      allowedRoles: ['ADMIN', 'COACH', 'AMBASSADOR'],
+    },
+    {
+      id: 'coaching-resources',
+      name: 'Coaching Resources',
+      slug: 'coaching-resources',
+      description: 'Resources for coaches',
+      sortOrder: 2,
+      allowedRoles: ['ADMIN', 'COACH'],
+    },
+    {
+      id: 'ambassador-guides',
+      name: 'Ambassador Guides',
+      slug: 'ambassador-guides',
+      description: 'Guides for ambassadors',
+      sortOrder: 3,
+      allowedRoles: ['ADMIN', 'COACH', 'AMBASSADOR'],
+    },
+  ]
+
+  for (const category of kbCategories) {
+    await prisma.kBCategory.upsert({
+      where: { id: category.id },
+      update: category,
+      create: category,
+    })
+  }
+  console.log('Created knowledge base categories')
+
+  // Create sample Knowledge Base Article
+  await prisma.kBArticle.upsert({
+    where: { slug: 'welcome-to-stageoneinaction' },
+    update: {},
+    create: {
+      categoryId: 'getting-started',
+      authorId: admin.id,
+      title: 'Welcome to StageOneInAction',
+      slug: 'welcome-to-stageoneinaction',
+      content: `# Welcome to StageOneInAction
+
+Welcome to our platform! This guide will help you get started.
+
+## Getting Started
+
+1. Complete your profile
+2. Review the onboarding checklist
+3. Connect with your team
+
+## Need Help?
+
+Contact your coach or administrator for assistance.`,
+      excerpt: 'Get started with StageOneInAction platform.',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+      tags: ['welcome', 'getting-started'],
+      allowedRoles: ['ADMIN', 'COACH', 'AMBASSADOR'],
+    },
+  })
+  console.log('Created sample knowledge base article')
 
   console.log('Seeding completed!')
 }

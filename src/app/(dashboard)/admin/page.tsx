@@ -5,16 +5,21 @@ import prisma from '@/lib/prisma'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { StatsCard } from '@/components/ui/stats-card'
+import { AlertBanner } from '@/components/ui/alert-banner'
+import { WelcomeHeader, SectionHeader } from '@/components/ui/page-header'
+import { EmptyState, InlineEmptyState } from '@/components/ui/empty-state'
 import {
   Users,
   UserCheck,
-  UserX,
   HandCoins,
   Building2,
   Calendar,
   MessageSquare,
   ArrowRight,
   TrendingUp,
+  Plus,
+  BarChart3,
 } from 'lucide-react'
 
 async function getDashboardStats() {
@@ -105,167 +110,145 @@ export default async function AdminDashboard() {
     getRecentActivity(),
   ])
 
+  // Build alerts array
+  const alerts = []
+  if (stats.pendingSponsorships > 0) {
+    alerts.push({
+      variant: 'warning' as const,
+      icon: HandCoins,
+      message: `${stats.pendingSponsorships} pending sponsorship request${stats.pendingSponsorships > 1 ? 's' : ''} awaiting review`,
+      action: { label: 'Review', href: '/admin/sponsorship' },
+    })
+  }
+  if (stats.pendingResourceCenters > 0) {
+    alerts.push({
+      variant: 'info' as const,
+      icon: Building2,
+      message: `${stats.pendingResourceCenters} Resource Center application${stats.pendingResourceCenters > 1 ? 's' : ''} under review`,
+      action: { label: 'Review', href: '/admin/resource-centers' },
+    })
+  }
+  if (stats.openMessages > 0) {
+    alerts.push({
+      variant: 'info' as const,
+      icon: MessageSquare,
+      message: `${stats.openMessages} open message thread${stats.openMessages > 1 ? 's' : ''} need attention`,
+      action: { label: 'View', href: '/admin/messages' },
+    })
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600">Overview of the StageOneInAction platform</p>
-      </div>
+    <div className="space-y-8">
+      {/* Welcome Header */}
+      <WelcomeHeader
+        name="Admin"
+        message="Here's an overview of your platform"
+        actions={
+          <Link href="/admin/coaches/new">
+            <Button variant="gradient">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Coach
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Alerts */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {stats.pendingSponsorships > 0 && (
-          <Card className="border-yellow-200 bg-yellow-50">
-            <CardContent className="flex items-center justify-between py-4">
-              <div className="flex items-center gap-3">
-                <HandCoins className="h-5 w-5 text-yellow-600" />
-                <span className="text-yellow-800">
-                  <strong>{stats.pendingSponsorships}</strong> pending sponsorship request(s)
-                </span>
-              </div>
-              <Link href="/admin/sponsorship">
-                <Button variant="outline" size="sm">Review</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-        {stats.pendingResourceCenters > 0 && (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="flex items-center justify-between py-4">
-              <div className="flex items-center gap-3">
-                <Building2 className="h-5 w-5 text-blue-600" />
-                <span className="text-blue-800">
-                  <strong>{stats.pendingResourceCenters}</strong> Resource Center application(s)
-                </span>
-              </div>
-              <Link href="/admin/resource-centers">
-                <Button variant="outline" size="sm">Review</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-        {stats.openMessages > 0 && (
-          <Card className="border-purple-200 bg-purple-50">
-            <CardContent className="flex items-center justify-between py-4">
-              <div className="flex items-center gap-3">
-                <MessageSquare className="h-5 w-5 text-purple-600" />
-                <span className="text-purple-800">
-                  <strong>{stats.openMessages}</strong> open message thread(s)
-                </span>
-              </div>
-              <Link href="/admin/messages">
-                <Button variant="outline" size="sm">View</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {alerts.length > 0 && (
+        <div className="space-y-3">
+          {alerts.map((alert, index) => (
+            <AlertBanner key={index} {...alert} />
+          ))}
+        </div>
+      )}
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Total Coaches
-            </CardTitle>
-            <Users className="h-4 w-4 text-primary-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCoaches}</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="success" className="text-xs">
-                {stats.activeCoaches} active
-              </Badge>
-              <Badge variant="secondary" className="text-xs">
-                {stats.onboardingIncomplete} onboarding
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title="Total Coaches"
+          value={stats.totalCoaches}
+          icon={Users}
+          iconColor="primary"
+          footer={{
+            label: `${stats.activeCoaches} active`,
+            value: stats.onboardingIncomplete > 0 ? `${stats.onboardingIncomplete} onboarding` : undefined,
+            variant: 'secondary',
+            href: '/admin/coaches',
+          }}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Total Ambassadors
-            </CardTitle>
-            <UserCheck className="h-4 w-4 text-primary-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalAmbassadors}</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="success" className="text-xs">
-                {stats.approvedAmbassadors} approved
-              </Badge>
-              <Badge variant="warning" className="text-xs">
-                {stats.pendingAmbassadors} pending
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Total Ambassadors"
+          value={stats.totalAmbassadors}
+          icon={UserCheck}
+          iconColor="green"
+          footer={{
+            label: `${stats.approvedAmbassadors} approved`,
+            value: stats.pendingAmbassadors > 0 ? `${stats.pendingAmbassadors} pending` : undefined,
+            variant: stats.pendingAmbassadors > 0 ? 'warning' : 'success',
+            href: '/admin/ambassadors',
+          }}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Sponsorship Requests
-            </CardTitle>
-            <HandCoins className="h-4 w-4 text-primary-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingSponsorships}</div>
-            <p className="text-xs text-gray-500 mt-2">
-              Awaiting review
-            </p>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Sponsorship Requests"
+          value={stats.pendingSponsorships}
+          icon={HandCoins}
+          iconColor="yellow"
+          footer={{
+            label: 'Awaiting review',
+            href: '/admin/sponsorship',
+          }}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Resource Center Apps
-            </CardTitle>
-            <Building2 className="h-4 w-4 text-primary-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingResourceCenters}</div>
-            <p className="text-xs text-gray-500 mt-2">
-              Under review
-            </p>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Resource Center Apps"
+          value={stats.pendingResourceCenters}
+          icon={Building2}
+          iconColor="purple"
+          footer={{
+            label: 'Under review',
+            href: '/admin/resource-centers',
+          }}
+        />
       </div>
 
       {/* Events & Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Upcoming Events */}
-        <Card>
+        <Card variant="default">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Upcoming Events
-              </CardTitle>
-              <Link href="/admin/events">
-                <Button variant="ghost" size="sm">
-                  Manage <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
+            <SectionHeader
+              title="Upcoming Events"
+              actions={
+                <Link href="/admin/events">
+                  <Button variant="ghost" size="sm">
+                    Manage <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              }
+            />
           </CardHeader>
           <CardContent>
             {upcomingEvents.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {upcomingEvents.map((event) => (
-                  <div
+                  <Link
                     key={event.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    href={`/admin/events/${event.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-150"
                   >
-                    <div>
-                      <p className="font-medium text-gray-900">{event.name}</p>
-                      <p className="text-sm text-gray-500">{event.location}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-primary-50 flex items-center justify-center">
+                        <Calendar className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{event.name}</p>
+                        <p className="text-sm text-gray-500">{event.location}</p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-primary-600">
+                      <p className="text-sm font-semibold text-primary-600">
                         {new Date(event.startDate).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -275,43 +258,44 @@ export default async function AdminDashboard() {
                         {event._count.qualifications} qualified
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 text-center py-4">
-                No upcoming events
-              </p>
+              <InlineEmptyState
+                icon={Calendar}
+                message="No upcoming events scheduled"
+              />
             )}
           </CardContent>
         </Card>
 
         {/* Recent Coaches */}
-        <Card>
+        <Card variant="default">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Recent Coaches
-              </CardTitle>
-              <Link href="/admin/coaches">
-                <Button variant="ghost" size="sm">
-                  View All <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
+            <SectionHeader
+              title="Recent Coaches"
+              actions={
+                <Link href="/admin/coaches">
+                  <Button variant="ghost" size="sm">
+                    View All <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              }
+            />
           </CardHeader>
           <CardContent>
             {recentActivity.recentCoaches.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {recentActivity.recentCoaches.map((coach) => (
-                  <div
+                  <Link
                     key={coach.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    href={`/admin/coaches/${coach.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-150"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary-700">
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-sm">
+                        <span className="text-sm font-semibold text-white">
                           {coach.firstName[0]}{coach.lastName[0]}
                         </span>
                       </div>
@@ -324,51 +308,57 @@ export default async function AdminDashboard() {
                     </div>
                     <Badge
                       variant={coach.coachStatus === 'ACTIVE_COACH' ? 'success' : 'warning'}
+                      dot
+                      dotColor={coach.coachStatus === 'ACTIVE_COACH' ? 'green' : 'yellow'}
                     >
                       {coach.coachStatus === 'ACTIVE_COACH' ? 'Active' : 'Onboarding'}
                     </Badge>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 text-center py-4">
-                No coaches yet
-              </p>
+              <InlineEmptyState
+                icon={Users}
+                message="No coaches registered yet"
+              />
             )}
           </CardContent>
         </Card>
       </div>
 
       {/* Quick Actions */}
-      <Card>
+      <Card variant="default">
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-gray-400" />
+            Quick Actions
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Link href="/admin/coaches/new">
-              <Button variant="outline" className="w-full justify-start">
-                <Users className="mr-2 h-4 w-4" />
+            <Link href="/admin/coaches/new" className="quick-action group">
+              <Users className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
                 Add New Coach
-              </Button>
+              </span>
             </Link>
-            <Link href="/admin/events/new">
-              <Button variant="outline" className="w-full justify-start">
-                <Calendar className="mr-2 h-4 w-4" />
+            <Link href="/admin/events/new" className="quick-action group">
+              <Calendar className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
                 Create Event
-              </Button>
+              </span>
             </Link>
-            <Link href="/admin/reports">
-              <Button variant="outline" className="w-full justify-start">
-                <TrendingUp className="mr-2 h-4 w-4" />
+            <Link href="/admin/reports" className="quick-action group">
+              <BarChart3 className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
                 View Reports
-              </Button>
+              </span>
             </Link>
-            <Link href="/admin/messages">
-              <Button variant="outline" className="w-full justify-start">
-                <MessageSquare className="mr-2 h-4 w-4" />
+            <Link href="/admin/messages" className="quick-action group">
+              <MessageSquare className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
                 Message Center
-              </Button>
+              </span>
             </Link>
           </div>
         </CardContent>

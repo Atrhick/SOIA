@@ -84,7 +84,7 @@ export default function NewAmbassadorPage() {
                 name="email"
                 label="Email (optional)"
                 type="email"
-                placeholder="john@example.com"
+                placeholder="name@example.com"
               />
               <Input
                 id="phone"

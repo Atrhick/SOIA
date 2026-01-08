@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Users } from 'lucide-react'
 import { AdminAmbassadorTable } from './ambassador-table'
 
@@ -19,6 +18,22 @@ async function getAmbassadors() {
   })
 }
 
+async function getCoaches() {
+  return prisma.coachProfile.findMany({
+    where: {
+      user: {
+        status: 'ACTIVE',
+      },
+    },
+    include: {
+      user: {
+        select: { email: true },
+      },
+    },
+    orderBy: { firstName: 'asc' },
+  })
+}
+
 export default async function AdminAmbassadorsPage() {
   const session = await auth()
 
@@ -26,7 +41,10 @@ export default async function AdminAmbassadorsPage() {
     redirect('/login')
   }
 
-  const ambassadors = await getAmbassadors()
+  const [ambassadors, coaches] = await Promise.all([
+    getAmbassadors(),
+    getCoaches(),
+  ])
 
   // Stats
   const stats = {
@@ -106,7 +124,14 @@ export default async function AdminAmbassadorsPage() {
           <CardTitle>All Ambassadors</CardTitle>
         </CardHeader>
         <CardContent>
-          <AdminAmbassadorTable ambassadors={ambassadors} />
+          <AdminAmbassadorTable
+            ambassadors={ambassadors}
+            coaches={coaches.map(c => ({
+              id: c.id,
+              name: `${c.firstName} ${c.lastName}`,
+              email: c.user.email,
+            }))}
+          />
         </CardContent>
       </Card>
     </div>

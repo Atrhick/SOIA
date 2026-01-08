@@ -149,6 +149,7 @@ export function AmbassadorDetail({ ambassador }: AmbassadorDetailProps) {
                   name="email"
                   label="Email"
                   type="email"
+                  placeholder="name@example.com"
                   defaultValue={ambassador.email || ''}
                 />
                 <Input

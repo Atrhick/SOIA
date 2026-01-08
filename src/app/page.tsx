@@ -12,5 +12,9 @@ export default async function Home() {
     redirect('/admin')
   }
 
+  if (session.user.role === 'AMBASSADOR') {
+    redirect('/ambassador')
+  }
+
   redirect('/coach')
 }

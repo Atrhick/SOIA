@@ -6,6 +6,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
+import { StatsCard } from '@/components/ui/stats-card'
+import { AlertBanner } from '@/components/ui/alert-banner'
+import { WelcomeHeader, SectionHeader } from '@/components/ui/page-header'
+import { InlineEmptyState } from '@/components/ui/empty-state'
 import {
   Users,
   CheckSquare,
@@ -15,6 +19,8 @@ import {
   MessageSquare,
   ArrowRight,
   Briefcase,
+  TrendingUp,
+  HandCoins,
 } from 'lucide-react'
 
 async function getCoachData(userId: string) {
@@ -125,147 +131,148 @@ export default async function CoachDashboard() {
       ].filter(Boolean).length
     : 0
 
-  return (
-    <div className="space-y-6">
-      {/* Welcome & Status */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Welcome, {coachData.firstName}!
-          </h1>
-          <p className="text-gray-600">Here&apos;s your dashboard overview</p>
-        </div>
-        <Badge
-          variant={coachData.coachStatus === 'ACTIVE_COACH' ? 'success' : 'warning'}
-          className="text-sm px-3 py-1"
-        >
-          {coachData.coachStatus === 'ACTIVE_COACH' ? 'Active Coach' : 'Onboarding Incomplete'}
-        </Badge>
-      </div>
+  // Build alerts array
+  const alerts = []
+  if (pendingAmbassadors > 0) {
+    alerts.push({
+      variant: 'warning' as const,
+      icon: Users,
+      message: `You have ${pendingAmbassadors} pending ambassador${pendingAmbassadors > 1 ? 's' : ''} awaiting approval`,
+      action: { label: 'Review', href: '/coach/ambassadors' },
+    })
+  }
+  if (coachData.coachStatus === 'ONBOARDING_INCOMPLETE' && onboardingPercentage < 100) {
+    alerts.push({
+      variant: 'info' as const,
+      icon: CheckSquare,
+      message: `Complete your onboarding to become an active coach (${Math.round(onboardingPercentage)}% complete)`,
+      action: { label: 'Continue', href: '/coach/onboarding' },
+    })
+  }
 
-      {/* Pending Ambassadors Alert */}
-      {pendingAmbassadors > 0 && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              <Users className="h-5 w-5 text-yellow-600" />
-              <span className="text-yellow-800">
-                You have <strong>{pendingAmbassadors}</strong> pending ambassador(s)
-              </span>
-            </div>
-            <Link href="/coach/ambassadors">
-              <Button variant="outline" size="sm">
-                View Pending <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+  return (
+    <div className="space-y-8">
+      {/* Welcome Header */}
+      <WelcomeHeader
+        name={coachData.firstName}
+        message="Here's your dashboard overview"
+        actions={
+          <Badge
+            variant={coachData.coachStatus === 'ACTIVE_COACH' ? 'success' : 'warning'}
+            size="lg"
+            dot
+            dotColor={coachData.coachStatus === 'ACTIVE_COACH' ? 'green' : 'yellow'}
+          >
+            {coachData.coachStatus === 'ACTIVE_COACH' ? 'Active Coach' : 'Onboarding'}
+          </Badge>
+        }
+      />
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div className="space-y-3">
+          {alerts.map((alert, index) => (
+            <AlertBanner key={index} {...alert} />
+          ))}
+        </div>
       )}
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Onboarding Progress
-            </CardTitle>
-            <CheckSquare className="h-4 w-4 text-primary-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Math.round(onboardingPercentage)}%</div>
-            <Progress value={onboardingPercentage} className="mt-2" />
-            <p className="text-xs text-gray-500 mt-2">
-              {completedTasks} of {totalTasks} tasks completed
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title="Onboarding Progress"
+          value={`${Math.round(onboardingPercentage)}%`}
+          icon={CheckSquare}
+          iconColor="primary"
+          footer={{
+            label: `${completedTasks} of ${totalTasks} tasks`,
+            href: '/coach/onboarding',
+          }}
+        >
+          <Progress value={onboardingPercentage} className="mt-2" />
+        </StatsCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Ambassadors
-            </CardTitle>
-            <Users className="h-4 w-4 text-primary-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{approvedAmbassadors}</div>
-            <p className="text-xs text-gray-500 mt-2">
-              {pendingAmbassadors} pending approval
-            </p>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Ambassadors"
+          value={approvedAmbassadors}
+          icon={Users}
+          iconColor="green"
+          footer={{
+            label: `${approvedAmbassadors} approved`,
+            value: pendingAmbassadors > 0 ? `${pendingAmbassadors} pending` : undefined,
+            variant: pendingAmbassadors > 0 ? 'warning' : 'success',
+            href: '/coach/ambassadors',
+          }}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Weekly Goals
-            </CardTitle>
-            <Target className="h-4 w-4 text-primary-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {completedGoals}/{totalGoals}
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Goals completed this week
-            </p>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Weekly Goals"
+          value={`${completedGoals}/${totalGoals}`}
+          icon={Target}
+          iconColor="yellow"
+          trend={
+            totalGoals > 0
+              ? {
+                  value: Math.round((completedGoals / totalGoals) * 100),
+                  label: 'completed',
+                  direction: completedGoals === totalGoals ? 'up' : undefined,
+                }
+              : undefined
+          }
+          footer={{
+            label: 'Goals completed this week',
+            href: '/coach/income-goals',
+          }}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Monthly Income
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-primary-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${monthlyIncome.toLocaleString()}
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              This month&apos;s tracked income
-            </p>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Monthly Income"
+          value={`$${monthlyIncome.toLocaleString()}`}
+          icon={DollarSign}
+          iconColor="green"
+          footer={{
+            label: 'Tracked this month',
+            href: '/coach/income-goals',
+          }}
+        />
       </div>
 
       {/* Business Excellence & Events */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Business Excellence Summary */}
-        <Card>
+        <Card variant="default">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5" />
-                Business Excellence
-              </CardTitle>
-              <Link href="/coach/business-excellence">
-                <Button variant="ghost" size="sm">
-                  View Details <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
+            <SectionHeader
+              title="Business Excellence"
+              icon={Briefcase}
+              actions={
+                <Link href="/coach/business-excellence">
+                  <Button variant="ghost" size="sm">
+                    View Details <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              }
+            />
           </CardHeader>
           <CardContent className="space-y-4">
             {/* CRM Status */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">CRM Activated</span>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+              <span className="text-sm font-medium text-gray-700">CRM Activated</span>
               <Badge variant={coachData.businessExcellenceCRM?.crmActivated ? 'success' : 'secondary'}>
                 {coachData.businessExcellenceCRM?.crmActivated ? 'Yes' : 'No'}
               </Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">CRM Subscription</span>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+              <span className="text-sm font-medium text-gray-700">CRM Subscription</span>
               <Badge variant={coachData.businessExcellenceCRM?.crmSubscriptionActive ? 'success' : 'secondary'}>
                 {coachData.businessExcellenceCRM?.crmSubscriptionActive ? 'Active' : 'Inactive'}
               </Badge>
             </div>
             {/* Website Content */}
-            <div>
+            <div className="p-3 rounded-lg bg-gray-50">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Website Content</span>
-                <span className="text-sm font-medium">{websiteItems}/9 items</span>
+                <span className="text-sm font-medium text-gray-700">Website Content</span>
+                <span className="text-sm font-semibold text-primary-600">{websiteItems}/9 items</span>
               </div>
               <Progress value={(websiteItems / 9) * 100} />
             </div>
@@ -273,82 +280,92 @@ export default async function CoachDashboard() {
         </Card>
 
         {/* Upcoming Events */}
-        <Card>
+        <Card variant="default">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Upcoming Events
-              </CardTitle>
-              <Link href="/coach/events">
-                <Button variant="ghost" size="sm">
-                  View All <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
+            <SectionHeader
+              title="Upcoming Events"
+              icon={Calendar}
+              actions={
+                <Link href="/coach/events">
+                  <Button variant="ghost" size="sm">
+                    View All <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              }
+            />
           </CardHeader>
           <CardContent>
             {upcomingEvents.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {upcomingEvents.map((event) => (
-                  <div
+                  <Link
                     key={event.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    href={`/coach/events/${event.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-150"
                   >
-                    <div>
-                      <p className="font-medium text-gray-900">{event.name}</p>
-                      <p className="text-sm text-gray-500">{event.location}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-primary-50 flex items-center justify-center">
+                        <Calendar className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{event.name}</p>
+                        <p className="text-sm text-gray-500">{event.location}</p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-primary-600">
+                      <p className="text-sm font-semibold text-primary-600">
                         {new Date(event.startDate).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                         })}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 text-center py-4">
-                No upcoming events
-              </p>
+              <InlineEmptyState
+                icon={Calendar}
+                message="No upcoming events scheduled"
+              />
             )}
           </CardContent>
         </Card>
       </div>
 
       {/* Quick Actions */}
-      <Card>
+      <Card variant="default">
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-gray-400" />
+            Quick Actions
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Link href="/coach/weekly-goals">
-              <Button variant="outline" className="w-full justify-start">
-                <Target className="mr-2 h-4 w-4" />
+            <Link href="/coach/income-goals" className="quick-action group">
+              <Target className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
                 Set Weekly Goals
-              </Button>
+              </span>
             </Link>
-            <Link href="/coach/income">
-              <Button variant="outline" className="w-full justify-start">
-                <DollarSign className="mr-2 h-4 w-4" />
+            <Link href="/coach/income-goals" className="quick-action group">
+              <DollarSign className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
                 Log Income
-              </Button>
+              </span>
             </Link>
-            <Link href="/coach/sponsorship">
-              <Button variant="outline" className="w-full justify-start">
-                <Users className="mr-2 h-4 w-4" />
+            <Link href="/coach/sponsorship" className="quick-action group">
+              <HandCoins className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
                 Request Sponsorship
-              </Button>
+              </span>
             </Link>
-            <Link href="/coach/messages">
-              <Button variant="outline" className="w-full justify-start">
-                <MessageSquare className="mr-2 h-4 w-4" />
+            <Link href="/coach/messages" className="quick-action group">
+              <MessageSquare className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
                 Contact Admin
-              </Button>
+              </span>
             </Link>
           </div>
         </CardContent>
