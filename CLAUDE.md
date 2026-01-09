@@ -499,3 +499,124 @@ await reorderQuestions(surveyId, ['questionId1', 'questionId2', ...])
 | LIKERT_SCALE | Rating scale (e.g., 1-5) | Not scored |
 | TEXT_SHORT | Single line text | Not scored |
 | TEXT_LONG | Paragraph text | Not scored |
+
+## Business Ideas
+
+Ambassador business idea submission and admin review workflow:
+
+**Key files:**
+- `src/lib/actions/business-idea.ts` - Server actions for save, submit, review
+- `src/app/(dashboard)/ambassador/business-idea/page.tsx` - Status/list page
+- `src/app/(dashboard)/ambassador/business-idea/edit/page.tsx` - Edit form page
+- `src/app/(dashboard)/admin/business-ideas/business-ideas-client.tsx` - Admin review page
+
+**Ambassador workflow:**
+1. Navigate to Business Idea from sidebar
+2. Status page shows current status and links to edit
+3. Click "Create" or "Edit" to go to edit page
+4. Fill in title, description, target market, resources
+5. Save as draft or submit for review
+6. After save/submit, redirects to status page with toast notification
+
+**Admin review workflow:**
+1. Navigate to Admin → Business Ideas
+2. Click on an idea to view full details in modal
+3. Review dialog shows: title, ambassador, coach, status, submission date
+4. Full details: business description, target market, resources needed
+5. Status options: Mark In Progress, Approve, Request Revision, Reject
+6. "UNDER_REVIEW" status indicates admin is actively reviewing
+
+**Status values:**
+- `DRAFT` - Ambassador is editing, not yet submitted
+- `SUBMITTED` - Ambassador submitted, awaiting review
+- `UNDER_REVIEW` - Admin marked as "In Progress"
+- `APPROVED` - Business idea approved
+- `NEEDS_REVISION` - Sent back to ambassador for changes
+- `REJECTED` - Not approved
+
+## Sidebar Navigation
+
+Collapsible accordion-style sidebar navigation:
+
+**Key file:** `src/components/dashboard/sidebar.tsx`
+
+**Behavior:**
+- Menu items organized into collapsible sections
+- Only one section open at a time (accordion behavior)
+- Clicking a section closes any other open section
+- Clicking top-level items (Dashboard, Onboarding) closes all sections
+- Active section auto-expands on navigation
+
+**Ambassador sections:**
+- Learning (Classes, Surveys & Quizzes, Knowledge Base)
+- Business (Business Idea)
+- Tools (Time Clock, Schedule, Collaboration)
+- Account (Profile)
+
+**Coach sections:**
+- People (Ambassadors)
+- Business (CRM, Projects, Business Excellence, Income & Goals)
+- Content (My Classes, Courses, Surveys & Quizzes, Knowledge Base)
+- Communication (Collaboration, Messages)
+- Tools (Time, Schedule, Events, Sponsorship, Resource Center)
+
+**Admin sections:**
+- People (User Management, Coaches, Ambassadors)
+- Onboarding & Training (Onboarding Config, Amb. Onboarding, Courses & Quizzes, Surveys, Business Ideas)
+- Content (All Classes, Knowledge Base, Resource Centers)
+- Events & Finance (Events, Sponsorship Requests, Business Excellence)
+- Communication (Collaboration, Messages)
+- System (Feature Config, Reports, Audit Logs, Settings)
+
+## Onboarding Journey Component
+
+Visual progress tracking component for onboarding:
+
+**Key file:** `src/components/ui/onboarding-journey.tsx`
+
+**Components:**
+- `OnboardingJourney` - Full horizontal stepper with progress bar
+- `OnboardingJourneyCompact` - Compact version for sidebars
+
+**Features:**
+- Visual stepper with icons for each step
+- Color-coded status: green (completed), amber (current), gray (pending)
+- Animated "You are here" marker on current step
+- Progress percentage indicator
+- "Next step" pill showing upcoming task
+- Responsive design (scrollable on mobile)
+
+**Usage:**
+```typescript
+import { OnboardingJourney, OnboardingStep } from '@/components/ui/onboarding-journey'
+
+const steps: OnboardingStep[] = [
+  { id: '1', title: 'Step 1', description: '...', icon: CheckIcon, status: 'completed' },
+  { id: '2', title: 'Step 2', description: '...', icon: FileIcon, status: 'current', link: '/path' },
+  { id: '3', title: 'Step 3', description: '...', icon: StarIcon, status: 'pending' },
+]
+
+<OnboardingJourney steps={steps} completedCount={1} totalCount={3} />
+```
+
+## Toast Notifications
+
+Custom toast notification pattern used in business idea forms:
+
+**Pattern (in component):**
+```typescript
+const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+const showToast = useCallback((message: string, type: 'success' | 'error') => {
+  setToast({ message, type })
+}, [])
+
+// In JSX:
+{toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+```
+
+**Toast component features:**
+- Auto-dismiss after 4 seconds
+- Green (success) or red (error) styling
+- Slide-in animation from bottom-right
+- Close button for manual dismiss

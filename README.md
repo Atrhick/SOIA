@@ -353,6 +353,7 @@ test_app/
 │   │       ├── dropdown-menu.tsx
 │   │       ├── input.tsx
 │   │       ├── label.tsx
+│   │       ├── onboarding-journey.tsx  # Visual progress stepper
 │   │       ├── password-input.tsx  # Password with generator
 │   │       ├── phone-input.tsx     # Phone with country codes
 │   │       ├── progress.tsx
@@ -384,6 +385,7 @@ test_app/
 │       │   ├── resource-center.ts # Resource center apps
 │       │   ├── scheduling.ts    # Calendar events
 │       │   ├── sponsorship.ts   # Sponsorship requests
+│       │   ├── surveys.ts       # Surveys & quizzes
 │       │   ├── time-clock.ts    # Time clock & entries
 │       │   └── users.ts         # User management & permissions
 │       ├── auth.ts              # NextAuth configuration
@@ -623,11 +625,22 @@ Ambassadors (ages 10-24) complete a structured onboarding journey. For ambassado
 5. **Class Enrollment** - Ambassador enrolls in at least one class
 
 **Business Idea Workflow:**
-1. Ambassador creates draft business idea
-2. Ambassador submits for review
-3. Admin reviews and approves, requests revision, or rejects
-4. If revision needed, ambassador can edit and resubmit
-5. Approved ideas unlock Power Team step
+1. Ambassador creates draft business idea on status page
+2. Ambassador fills details on edit page (title, description, target market, resources)
+3. Ambassador saves draft or submits for review
+4. System shows toast notification and redirects to status page
+5. Admin views full details in review modal
+6. Admin can mark as "In Progress", approve, request revision, or reject
+7. If revision needed, ambassador can edit and resubmit
+8. Approved ideas unlock Power Team step
+
+**Business Idea Status Values:**
+- Draft - Ambassador is editing, not yet submitted
+- Submitted - Awaiting admin review
+- Under Review - Admin actively reviewing (marked as "In Progress")
+- Approved - Business idea approved
+- Needs Revision - Sent back for changes with feedback
+- Rejected - Not approved
 
 **Class System:**
 - Coaches create classes (free or paid)
@@ -791,6 +804,37 @@ Create and manage quizzes (scored) and surveys (feedback collection):
 - Individual Responses tab: View each submission with answers
 - Export to CSV for further analysis
 
+### Sidebar Navigation
+
+The dashboard uses an accordion-style collapsible navigation:
+
+**Behavior:**
+- Menu items organized into collapsible sections by category
+- Only one section open at a time (accordion pattern)
+- Clicking a section closes any other open section
+- Top-level items (Dashboard, Onboarding) close all sections
+- Active section auto-expands based on current route
+
+**Section Organization:**
+| Role | Sections |
+|------|----------|
+| Ambassador | Learning, Business, Tools, Account |
+| Coach | People, Business, Content, Communication, Tools |
+| Admin | People, Onboarding & Training, Content, Events & Finance, Communication, System |
+
+### Onboarding Journey Component
+
+Visual progress tracking for ambassador and coach onboarding:
+
+**Features:**
+- Horizontal stepper with icons for each step
+- Color-coded status: green (completed), amber (current), gray (pending)
+- Animated "You are here" marker
+- Progress percentage indicator
+- "Next step" pill showing upcoming task
+- Responsive (scrollable on mobile)
+- Compact version available for sidebars
+
 ---
 
 ## Development
@@ -930,4 +974,4 @@ Proprietary - StageOneInAction
 
 ---
 
-**Total Routes:** 40+ | **User Roles:** 3 (Admin, Coach, Ambassador) | **Build Status:** Passing
+**Total Routes:** 50+ | **User Roles:** 4 (Admin, Coach, Ambassador, Parent) | **Build Status:** Passing
