@@ -23,6 +23,13 @@ const createReplySchema = z.object({
   content: z.string().min(1, 'Content is required'),
 })
 
+// Helper to revalidate all collaboration paths
+function revalidateCollaboration() {
+  revalidatePath('/admin/collaboration')
+  revalidatePath('/coach/collaboration')
+  revalidatePath('/ambassador/collaboration')
+}
+
 // ============ CHANNELS ============
 
 export async function getChannels() {
@@ -33,9 +40,12 @@ export async function getChannels() {
 
   try {
     const channels = await prisma.collaborationChannel.findMany({
-      where: session.user.role === 'ADMIN'
-        ? {}
-        : { allowedRoles: { has: session.user.role } },
+      where: {
+        type: 'CHANNEL',
+        ...(session.user.role === 'ADMIN'
+          ? {}
+          : { allowedRoles: { has: session.user.role } }),
+      },
       include: {
         _count: {
           select: { posts: true, members: true }
@@ -142,6 +152,7 @@ export async function createChannel(formData: FormData) {
     const channel = await prisma.collaborationChannel.create({
       data: {
         ...validated.data,
+        type: 'CHANNEL',
         createdById: session.user.id,
       },
     })
@@ -535,12 +546,377 @@ export async function leaveChannel(channelId: string) {
       },
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true }
   } catch (error) {
     console.error('Error leaving channel:', error)
     return { error: 'Failed to leave channel' }
+  }
+}
+
+// ============ DIRECT MESSAGES ============
+
+export async function getDirectMessages() {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Get all DM conversations where user is a member
+    const dms = await prisma.collaborationChannel.findMany({
+      where: {
+        type: 'DIRECT_MESSAGE',
+        members: {
+          some: { userId: session.user.id }
+        }
+      },
+      include: {
+        members: {
+          include: {
+            // We need to get user info - but ChannelMember doesn't have direct user relation
+            // So we'll fetch separately
+          }
+        },
+        posts: {
+          orderBy: { createdAt: 'desc' },
+          take: 1, // Get last message for preview
+        },
+        _count: {
+          select: { posts: true }
+        }
+      },
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    // Get user info for each DM's members
+    const memberUserIds = dms.flatMap(dm => dm.members.map(m => m.userId))
+    const users = await prisma.user.findMany({
+      where: { id: { in: memberUserIds } },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        coachProfile: { select: { firstName: true, lastName: true } },
+        ambassador: { select: { firstName: true, lastName: true } },
+      }
+    })
+
+    const userMap = new Map(users.map(u => [u.id, u]))
+
+    return {
+      directMessages: dms.map(dm => {
+        // Get other participants (exclude current user)
+        const otherMembers = dm.members
+          .filter(m => m.userId !== session.user.id)
+          .map(m => {
+            const user = userMap.get(m.userId)
+            if (!user) return null
+            const name = user.coachProfile
+              ? `${user.coachProfile.firstName} ${user.coachProfile.lastName}`
+              : user.ambassador
+                ? `${user.ambassador.firstName} ${user.ambassador.lastName}`
+                : user.email
+            return {
+              userId: m.userId,
+              name,
+              email: user.email,
+              role: user.role,
+            }
+          })
+          .filter(Boolean)
+
+        return {
+          id: dm.id,
+          participants: otherMembers,
+          lastMessage: dm.posts[0] ? {
+            content: dm.posts[0].content,
+            createdAt: dm.posts[0].createdAt.toISOString(),
+            authorId: dm.posts[0].authorId,
+          } : null,
+          messageCount: dm._count.posts,
+          createdAt: dm.createdAt.toISOString(),
+          updatedAt: dm.updatedAt.toISOString(),
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Error fetching direct messages:', error)
+    return { error: 'Failed to fetch direct messages' }
+  }
+}
+
+export async function getOrCreateDirectMessage(otherUserId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  if (otherUserId === session.user.id) {
+    return { error: 'Cannot create DM with yourself' }
+  }
+
+  try {
+    // Check if DM already exists between these two users
+    const existingDM = await prisma.collaborationChannel.findFirst({
+      where: {
+        type: 'DIRECT_MESSAGE',
+        AND: [
+          { members: { some: { userId: session.user.id } } },
+          { members: { some: { userId: otherUserId } } },
+        ],
+        members: {
+          every: {
+            userId: { in: [session.user.id, otherUserId] }
+          }
+        }
+      },
+      include: {
+        members: true,
+        _count: { select: { members: true } }
+      }
+    })
+
+    // If exists and has exactly 2 members, return it
+    if (existingDM && existingDM._count.members === 2) {
+      return { channelId: existingDM.id, isNew: false }
+    }
+
+    // Create new DM
+    const dm = await prisma.collaborationChannel.create({
+      data: {
+        type: 'DIRECT_MESSAGE',
+        name: null,
+        isPrivate: true,
+        createdById: session.user.id,
+        allowedRoles: [],
+        members: {
+          create: [
+            { userId: session.user.id },
+            { userId: otherUserId },
+          ]
+        }
+      },
+    })
+
+    revalidateCollaboration()
+    return { channelId: dm.id, isNew: true }
+  } catch (error) {
+    console.error('Error creating direct message:', error)
+    return { error: 'Failed to create direct message' }
+  }
+}
+
+export async function sendDirectMessage(channelId: string, content: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  if (!content.trim()) {
+    return { error: 'Message cannot be empty' }
+  }
+
+  try {
+    // Verify user is a member of this DM
+    const dm = await prisma.collaborationChannel.findFirst({
+      where: {
+        id: channelId,
+        type: 'DIRECT_MESSAGE',
+        members: { some: { userId: session.user.id } }
+      }
+    })
+
+    if (!dm) {
+      return { error: 'Conversation not found or access denied' }
+    }
+
+    // Create message (using post model)
+    const message = await prisma.channelPost.create({
+      data: {
+        channelId,
+        authorId: session.user.id,
+        content: content.trim(),
+      }
+    })
+
+    // Update DM timestamp
+    await prisma.collaborationChannel.update({
+      where: { id: channelId },
+      data: { updatedAt: new Date() }
+    })
+
+    revalidateCollaboration()
+    return {
+      success: true,
+      message: {
+        id: message.id,
+        content: message.content,
+        authorId: message.authorId,
+        createdAt: message.createdAt.toISOString(),
+      }
+    }
+  } catch (error) {
+    console.error('Error sending direct message:', error)
+    return { error: 'Failed to send message' }
+  }
+}
+
+export async function getDirectMessageHistory(channelId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Verify access
+    const dm = await prisma.collaborationChannel.findFirst({
+      where: {
+        id: channelId,
+        type: 'DIRECT_MESSAGE',
+        members: { some: { userId: session.user.id } }
+      },
+      include: {
+        members: true,
+        posts: {
+          orderBy: { createdAt: 'asc' },
+          take: 100, // Last 100 messages
+        }
+      }
+    })
+
+    if (!dm) {
+      return { error: 'Conversation not found or access denied' }
+    }
+
+    // Get user info for participants
+    const memberUserIds = dm.members.map(m => m.userId)
+    const users = await prisma.user.findMany({
+      where: { id: { in: memberUserIds } },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        coachProfile: { select: { firstName: true, lastName: true } },
+        ambassador: { select: { firstName: true, lastName: true } },
+      }
+    })
+
+    const userMap = new Map(users.map(u => [u.id, u]))
+
+    const getUserName = (userId: string) => {
+      const user = userMap.get(userId)
+      if (!user) return 'Unknown'
+      return user.coachProfile
+        ? `${user.coachProfile.firstName} ${user.coachProfile.lastName}`
+        : user.ambassador
+          ? `${user.ambassador.firstName} ${user.ambassador.lastName}`
+          : user.email
+    }
+
+    return {
+      conversation: {
+        id: dm.id,
+        participants: dm.members.map(m => ({
+          userId: m.userId,
+          name: getUserName(m.userId),
+          email: userMap.get(m.userId)?.email || '',
+          role: userMap.get(m.userId)?.role || '',
+          isCurrentUser: m.userId === session.user.id,
+        })),
+        messages: dm.posts.map(p => ({
+          id: p.id,
+          content: p.content,
+          authorId: p.authorId,
+          authorName: getUserName(p.authorId),
+          isCurrentUser: p.authorId === session.user.id,
+          createdAt: p.createdAt.toISOString(),
+        }))
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching DM history:', error)
+    return { error: 'Failed to fetch messages' }
+  }
+}
+
+export async function getUsersForDM() {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Get users based on role
+    // Admin can message anyone
+    // Coach can message admins and their ambassadors
+    // Ambassador can message their coach and admins
+
+    let whereClause: any = {}
+
+    if (session.user.role === 'ADMIN') {
+      // Admin can message coaches and ambassadors
+      whereClause = {
+        role: { in: ['COACH', 'AMBASSADOR', 'ADMIN'] },
+        id: { not: session.user.id }
+      }
+    } else if (session.user.role === 'COACH') {
+      // Coach can message admins and ambassadors assigned to them
+      const coach = await prisma.coachProfile.findUnique({
+        where: { userId: session.user.id },
+        include: { ambassadors: { select: { userId: true } } }
+      })
+      const ambassadorUserIds = coach?.ambassadors.map(a => a.userId).filter(Boolean) || []
+
+      whereClause = {
+        OR: [
+          { role: 'ADMIN' },
+          { id: { in: ambassadorUserIds } }
+        ],
+        id: { not: session.user.id }
+      }
+    } else if (session.user.role === 'AMBASSADOR') {
+      // Ambassador can message their coach and admins
+      const ambassador = await prisma.ambassador.findUnique({
+        where: { userId: session.user.id },
+        include: { coach: { select: { userId: true } } }
+      })
+
+      whereClause = {
+        OR: [
+          { role: 'ADMIN' },
+          ...(ambassador?.coach?.userId ? [{ id: ambassador.coach.userId }] : [])
+        ],
+        id: { not: session.user.id }
+      }
+    }
+
+    const users = await prisma.user.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        coachProfile: { select: { firstName: true, lastName: true } },
+        ambassador: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { email: 'asc' }
+    })
+
+    return {
+      users: users.map(u => ({
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        name: u.coachProfile
+          ? `${u.coachProfile.firstName} ${u.coachProfile.lastName}`
+          : u.ambassador
+            ? `${u.ambassador.firstName} ${u.ambassador.lastName}`
+            : u.email,
+      }))
+    }
+  } catch (error) {
+    console.error('Error fetching users for DM:', error)
+    return { error: 'Failed to fetch users' }
   }
 }

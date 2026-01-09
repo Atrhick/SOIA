@@ -123,7 +123,6 @@ const coachNavSections: NavSection[] = [
     icon: MessageSquare,
     items: [
       { href: '/coach/collaboration', label: 'Collaboration', icon: MessageSquare },
-      { href: '/coach/messages', label: 'Messages', icon: MessageSquare },
     ],
   },
   {
@@ -184,7 +183,6 @@ const adminNavSections: NavSection[] = [
     icon: Megaphone,
     items: [
       { href: '/admin/collaboration', label: 'Collaboration', icon: MessageSquare },
-      { href: '/admin/messages', label: 'Messages', icon: MessageSquare },
     ],
   },
   {

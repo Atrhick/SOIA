@@ -1145,14 +1145,20 @@ model Task {
 // COLLABORATION
 // ============================================
 
+enum ChannelType {
+  CHANNEL         // Group discussion channel
+  DIRECT_MESSAGE  // Private conversation between users
+}
+
 model CollaborationChannel {
   id           String          @id @default(cuid())
-  name         String
+  type         ChannelType     @default(CHANNEL)
+  name         String?         // Optional for DMs (auto-generated from participants)
   description  String?
   isPrivate    Boolean         @default(false)
   createdById  String          // User ID
 
-  // Access control - which roles can access
+  // Access control - which roles can access (for channels only)
   allowedRoles String[]        // ["ADMIN", "COACH", "AMBASSADOR"]
 
   posts        ChannelPost[]
