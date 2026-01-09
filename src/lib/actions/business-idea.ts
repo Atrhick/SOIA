@@ -146,7 +146,7 @@ export async function submitBusinessIdea() {
 
 export async function reviewBusinessIdea(
   businessIdeaId: string,
-  status: 'APPROVED' | 'NEEDS_REVISION' | 'REJECTED',
+  status: 'UNDER_REVIEW' | 'APPROVED' | 'NEEDS_REVISION' | 'REJECTED',
   feedback?: string
 ) {
   const session = await auth()
@@ -155,14 +155,22 @@ export async function reviewBusinessIdea(
   }
 
   try {
+    // For UNDER_REVIEW, don't set reviewedAt yet - just mark as in progress
+    const updateData = status === 'UNDER_REVIEW'
+      ? {
+          status,
+          reviewedBy: session.user.id,
+        }
+      : {
+          status,
+          feedback,
+          reviewedBy: session.user.id,
+          reviewedAt: new Date(),
+        }
+
     const businessIdea = await prisma.businessIdea.update({
       where: { id: businessIdeaId },
-      data: {
-        status,
-        feedback,
-        reviewedBy: session.user.id,
-        reviewedAt: new Date(),
-      },
+      data: updateData,
     })
 
     // Update onboarding progress if approved

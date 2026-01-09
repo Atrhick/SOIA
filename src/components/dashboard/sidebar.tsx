@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -32,6 +32,7 @@ import {
   Megaphone,
   Shield,
   TrendingUp,
+  FileQuestion,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -52,17 +53,40 @@ interface NavSection {
   defaultOpen?: boolean
 }
 
-// Ambassador navigation - flat list (simpler for their needs)
-const ambassadorNavItems: NavItem[] = [
-  { href: '/ambassador', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/ambassador/onboarding', label: 'Onboarding', icon: ClipboardList },
-  { href: '/ambassador/business-idea', label: 'Business Idea', icon: Lightbulb },
-  { href: '/ambassador/classes', label: 'Classes', icon: GraduationCap },
-  { href: '/ambassador/time', label: 'Time Clock', icon: Clock },
-  { href: '/ambassador/collaboration', label: 'Collaboration', icon: MessageSquare },
-  { href: '/ambassador/schedule', label: 'Schedule', icon: Calendar },
-  { href: '/ambassador/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
-  { href: '/ambassador/profile', label: 'Profile', icon: User },
+// Ambassador navigation - organized into sections
+const ambassadorNavSections: NavSection[] = [
+  {
+    title: 'Learning',
+    icon: GraduationCap,
+    items: [
+      { href: '/ambassador/classes', label: 'Classes', icon: GraduationCap },
+      { href: '/ambassador/surveys', label: 'Surveys & Quizzes', icon: FileQuestion },
+      { href: '/ambassador/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
+    ],
+  },
+  {
+    title: 'Business',
+    icon: Lightbulb,
+    items: [
+      { href: '/ambassador/business-idea', label: 'Business Idea', icon: Lightbulb },
+    ],
+  },
+  {
+    title: 'Tools',
+    icon: Settings,
+    items: [
+      { href: '/ambassador/time', label: 'Time Clock', icon: Clock },
+      { href: '/ambassador/schedule', label: 'Schedule', icon: Calendar },
+      { href: '/ambassador/collaboration', label: 'Collaboration', icon: MessageSquare },
+    ],
+  },
+  {
+    title: 'Account',
+    icon: User,
+    items: [
+      { href: '/ambassador/profile', label: 'Profile', icon: User },
+    ],
+  },
 ]
 
 // Coach navigation - organized into sections
@@ -70,7 +94,6 @@ const coachNavSections: NavSection[] = [
   {
     title: 'People',
     icon: Users,
-    defaultOpen: true,
     items: [
       { href: '/coach/ambassadors', label: 'Ambassadors', icon: Users },
     ],
@@ -78,7 +101,6 @@ const coachNavSections: NavSection[] = [
   {
     title: 'Business',
     icon: TrendingUp,
-    defaultOpen: true,
     items: [
       { href: '/coach/crm', label: 'CRM', icon: UserCheck },
       { href: '/coach/projects', label: 'Projects', icon: FolderKanban },
@@ -89,17 +111,16 @@ const coachNavSections: NavSection[] = [
   {
     title: 'Content',
     icon: BookOpen,
-    defaultOpen: true,
     items: [
       { href: '/coach/classes', label: 'My Classes', icon: BookOpen },
       { href: '/coach/courses', label: 'Courses', icon: GraduationCap },
+      { href: '/coach/surveys', label: 'Surveys & Quizzes', icon: FileQuestion },
       { href: '/coach/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
     ],
   },
   {
     title: 'Communication',
     icon: MessageSquare,
-    defaultOpen: false,
     items: [
       { href: '/coach/collaboration', label: 'Collaboration', icon: MessageSquare },
       { href: '/coach/messages', label: 'Messages', icon: MessageSquare },
@@ -108,7 +129,6 @@ const coachNavSections: NavSection[] = [
   {
     title: 'Tools',
     icon: Settings,
-    defaultOpen: false,
     items: [
       { href: '/coach/time', label: 'Time', icon: Clock },
       { href: '/coach/schedule', label: 'Schedule', icon: Calendar },
@@ -124,7 +144,6 @@ const adminNavSections: NavSection[] = [
   {
     title: 'People',
     icon: Users,
-    defaultOpen: true,
     items: [
       { href: '/admin/users', label: 'User Management', icon: UserCog },
       { href: '/admin/coaches', label: 'Coaches', icon: Users },
@@ -134,29 +153,26 @@ const adminNavSections: NavSection[] = [
   {
     title: 'Onboarding & Training',
     icon: GraduationCap,
-    defaultOpen: true,
     items: [
       { href: '/admin/onboarding', label: 'Onboarding Config', icon: CheckSquare },
       { href: '/admin/ambassador-onboarding', label: 'Amb. Onboarding', icon: ClipboardList },
       { href: '/admin/courses', label: 'Courses & Quizzes', icon: GraduationCap },
+      { href: '/admin/surveys', label: 'Surveys', icon: FileQuestion },
       { href: '/admin/business-ideas', label: 'Business Ideas', icon: Lightbulb },
     ],
   },
   {
     title: 'Content',
     icon: BookOpen,
-    defaultOpen: true,
     items: [
       { href: '/admin/classes', label: 'All Classes', icon: BookOpen },
       { href: '/admin/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
-      { href: '/admin/collaboration', label: 'Collaboration', icon: MessageSquare },
       { href: '/admin/resource-centers', label: 'Resource Centers', icon: Building2 },
     ],
   },
   {
     title: 'Events & Finance',
     icon: Calendar,
-    defaultOpen: false,
     items: [
       { href: '/admin/events', label: 'Events', icon: Calendar },
       { href: '/admin/sponsorship', label: 'Sponsorship Requests', icon: HandCoins },
@@ -166,15 +182,14 @@ const adminNavSections: NavSection[] = [
   {
     title: 'Communication',
     icon: Megaphone,
-    defaultOpen: false,
     items: [
+      { href: '/admin/collaboration', label: 'Collaboration', icon: MessageSquare },
       { href: '/admin/messages', label: 'Messages', icon: MessageSquare },
     ],
   },
   {
     title: 'System',
     icon: Shield,
-    defaultOpen: false,
     items: [
       { href: '/admin/features', label: 'Feature Config', icon: Settings2 },
       { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
@@ -184,30 +199,33 @@ const adminNavSections: NavSection[] = [
   },
 ]
 
-// Collapsible section component
+// Collapsible section component (controlled by parent for accordion behavior)
 function NavSectionComponent({
   section,
   pathname,
   basePath,
   accentColor = 'primary',
+  isOpen,
+  onToggle,
 }: {
   section: NavSection
   pathname: string
   basePath: string
   accentColor?: 'primary' | 'amber'
+  isOpen: boolean
+  onToggle: () => void
 }) {
   // Check if any item in section is active
   const hasActiveItem = section.items.some(
     (item) => pathname === item.href || (item.href !== basePath && pathname.startsWith(item.href))
   )
 
-  const [isOpen, setIsOpen] = useState(section.defaultOpen || hasActiveItem)
   const SectionIcon = section.icon
 
   return (
     <div className="mb-1">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={onToggle}
         className={cn(
           'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
           hasActiveItem
@@ -265,6 +283,16 @@ function NavSectionComponent({
   )
 }
 
+// Helper to find which section contains the active item
+function findActiveSectionIndex(sections: NavSection[], pathname: string, basePath: string): number | null {
+  const index = sections.findIndex(section =>
+    section.items.some(item =>
+      pathname === item.href || (item.href !== basePath && pathname.startsWith(item.href))
+    )
+  )
+  return index >= 0 ? index : null
+}
+
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
 
@@ -287,43 +315,95 @@ export function Sidebar({ role }: SidebarProps) {
   const basePath = getHomeLink()
   const accentColor = role === 'AMBASSADOR' ? 'amber' : 'primary'
 
-  // Render flat navigation for Ambassador
-  const renderFlatNav = (items: NavItem[]) => (
-    <ul className="space-y-1">
-      {items.map((item) => {
-        const isActive =
-          pathname === item.href ||
-          (item.href !== basePath && pathname.startsWith(item.href))
-        const Icon = item.icon
+  // Get the sections for the current role
+  const getSections = () => {
+    switch (role) {
+      case 'ADMIN': return adminNavSections
+      case 'AMBASSADOR': return ambassadorNavSections
+      default: return coachNavSections
+    }
+  }
 
-        return (
-          <li key={item.href}>
-            <Link
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
-                isActive
-                  ? accentColor === 'amber'
-                    ? 'bg-amber-50 text-amber-700 shadow-sm'
-                    : 'bg-primary-50 text-primary-700 shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              )}
-            >
-              <Icon className="h-5 w-5" />
-              {item.label}
-            </Link>
-          </li>
-        )
-      })}
-    </ul>
+  const sections = getSections()
+
+  // Accordion state: track which section index is open (null = none)
+  const [openSectionIndex, setOpenSectionIndex] = useState<number | null>(() =>
+    findActiveSectionIndex(sections, pathname, basePath)
   )
 
-  // Render sectioned navigation for Admin and Coach
-  const renderSectionedNav = (sections: NavSection[]) => (
+  // Sync open section when pathname changes
+  useEffect(() => {
+    const activeIndex = findActiveSectionIndex(sections, pathname, basePath)
+    if (activeIndex !== null) {
+      setOpenSectionIndex(activeIndex)
+    }
+  }, [pathname, basePath, sections])
+
+  // Toggle a section - if it's already open, close it; otherwise open it and close others
+  const handleSectionToggle = (index: number) => {
+    setOpenSectionIndex(prev => prev === index ? null : index)
+  }
+
+  // Close all sections when clicking a top-level item
+  const handleTopLevelClick = () => {
+    setOpenSectionIndex(null)
+  }
+
+  // Render sectioned navigation for Ambassador (with amber accent)
+  const renderAmbassadorNav = () => (
     <div className="space-y-1">
       {/* Dashboard - always at top, not in a section */}
       <Link
         href={basePath}
+        onClick={handleTopLevelClick}
+        className={cn(
+          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-2',
+          pathname === basePath
+            ? 'bg-amber-50 text-amber-700 shadow-sm'
+            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+        )}
+      >
+        <LayoutDashboard className="h-5 w-5" />
+        Dashboard
+      </Link>
+
+      {/* Onboarding for Ambassador */}
+      <Link
+        href="/ambassador/onboarding"
+        onClick={handleTopLevelClick}
+        className={cn(
+          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',
+          pathname === '/ambassador/onboarding' || pathname.startsWith('/ambassador/onboarding/')
+            ? 'bg-amber-50 text-amber-700 shadow-sm'
+            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+        )}
+      >
+        <ClipboardList className="h-5 w-5" />
+        Onboarding
+      </Link>
+
+      {/* Collapsible sections */}
+      {ambassadorNavSections.map((section, index) => (
+        <NavSectionComponent
+          key={section.title}
+          section={section}
+          pathname={pathname}
+          basePath={basePath}
+          accentColor="amber"
+          isOpen={openSectionIndex === index}
+          onToggle={() => handleSectionToggle(index)}
+        />
+      ))}
+    </div>
+  )
+
+  // Render sectioned navigation for Admin and Coach
+  const renderSectionedNav = (navSections: NavSection[]) => (
+    <div className="space-y-1">
+      {/* Dashboard - always at top, not in a section */}
+      <Link
+        href={basePath}
+        onClick={handleTopLevelClick}
         className={cn(
           'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',
           pathname === basePath
@@ -339,6 +419,7 @@ export function Sidebar({ role }: SidebarProps) {
       {role === 'COACH' && (
         <Link
           href="/coach/onboarding"
+          onClick={handleTopLevelClick}
           className={cn(
             'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',
             pathname === '/coach/onboarding' || pathname.startsWith('/coach/onboarding/')
@@ -352,13 +433,15 @@ export function Sidebar({ role }: SidebarProps) {
       )}
 
       {/* Collapsible sections */}
-      {sections.map((section) => (
+      {navSections.map((section, index) => (
         <NavSectionComponent
           key={section.title}
           section={section}
           pathname={pathname}
           basePath={basePath}
           accentColor="primary"
+          isOpen={openSectionIndex === index}
+          onToggle={() => handleSectionToggle(index)}
         />
       ))}
     </div>
@@ -391,7 +474,7 @@ export function Sidebar({ role }: SidebarProps) {
             ? renderSectionedNav(adminNavSections)
             : role === 'COACH'
               ? renderSectionedNav(coachNavSections)
-              : renderFlatNav(ambassadorNavItems)}
+              : renderAmbassadorNav()}
         </nav>
 
         {/* Footer */}

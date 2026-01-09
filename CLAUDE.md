@@ -432,3 +432,70 @@ Articles and documentation for coaches and ambassadors:
 - Categories with hierarchy (parentId)
 - Role-based access (allowedRoles array)
 - View count tracking
+
+## Surveys & Quizzes
+
+Unified survey builder for creating quizzes and surveys:
+
+**Key files:**
+- `src/lib/actions/surveys.ts` - All survey server actions
+- `src/app/(dashboard)/admin/surveys/new/` - New survey builder page
+- `src/app/(dashboard)/admin/surveys/[id]/` - Survey editor page
+- `src/app/(dashboard)/admin/surveys/[id]/results/` - Results analytics
+- `src/app/(dashboard)/coach/surveys/` - Coach survey list and taking
+- `src/app/(dashboard)/ambassador/surveys/` - Ambassador survey list and taking
+
+**Database models:**
+- `Survey` - Quiz or Survey with settings (passingScore, allowRetake, showResults, isAnonymous)
+- `SurveyQuestion` - Question with type (MULTIPLE_CHOICE, MULTIPLE_SELECT, LIKERT_SCALE, TEXT_SHORT, TEXT_LONG)
+- `SurveyOption` - Options for choice questions (with isCorrect for quizzes)
+- `SurveySubmission` - User submission with score/pass status
+- `SurveyAnswer` - Individual question answers
+
+**Creating a survey (Admin workflow):**
+1. Navigate to Admin → Surveys & Quizzes
+2. Click "Add Quiz" or "Add Survey" → goes to `/admin/surveys/new`
+3. Configure settings (title, type, roles, passing score, etc.)
+4. Click "Create & Add Questions"
+5. Add questions inline with the question form
+6. Questions support: Multiple Choice, Multiple Select, Likert Scale, Short Text, Long Text
+7. Reorder questions with up/down arrows
+8. Duplicate questions with copy button
+9. Publish when ready
+
+**Survey editor features:**
+- Optimistic UI updates (no page refresh)
+- Question reordering with arrow buttons
+- Question duplication
+- Inline settings editing
+- Live preview for Likert scales
+
+**Server actions:**
+```typescript
+import {
+  createSurvey,
+  addQuestion,
+  updateQuestion,
+  deleteQuestion,
+  reorderQuestions,
+  duplicateQuestion,
+  submitSurvey,
+  getSurveyResults
+} from '@/lib/actions/surveys'
+
+// Duplicate a question
+const result = await duplicateQuestion(questionId)
+// Returns: { success: true, question: { id, questionText, ... } }
+
+// Reorder questions
+await reorderQuestions(surveyId, ['questionId1', 'questionId2', ...])
+```
+
+**Question types:**
+| Type | Description | Quiz scoring |
+|------|-------------|--------------|
+| MULTIPLE_CHOICE | Single answer from options | 1 correct answer |
+| MULTIPLE_SELECT | Multiple answers from options | All correct, no incorrect |
+| LIKERT_SCALE | Rating scale (e.g., 1-5) | Not scored |
+| TEXT_SHORT | Single line text | Not scored |
+| TEXT_LONG | Paragraph text | Not scored |

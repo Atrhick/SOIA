@@ -40,7 +40,15 @@ export async function getAllFeatureConfigs() {
     orderBy: { feature: 'asc' },
   })
 
-  return { configs }
+  return {
+    configs: configs.map(c => ({
+      id: c.id,
+      feature: c.feature,
+      isEnabled: c.isEnabled,
+      enabledForCoaches: c.enabledForCoaches,
+      enabledForAmbassadors: c.enabledForAmbassadors,
+    }))
+  }
 }
 
 export async function updateFeatureConfig(

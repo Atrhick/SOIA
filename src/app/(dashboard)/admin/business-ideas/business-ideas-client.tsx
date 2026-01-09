@@ -67,7 +67,7 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedIdea, setSelectedIdea] = useState<BusinessIdea | null>(null)
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
-  const [reviewStatus, setReviewStatus] = useState<'APPROVED' | 'NEEDS_REVISION' | 'REJECTED'>('APPROVED')
+  const [reviewStatus, setReviewStatus] = useState<'UNDER_REVIEW' | 'APPROVED' | 'NEEDS_REVISION' | 'REJECTED'>('UNDER_REVIEW')
   const [feedback, setFeedback] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -221,69 +221,119 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
 
       {/* View Dialog */}
       <Dialog open={!!selectedIdea && !reviewDialogOpen} onOpenChange={(open) => { if (!open) setSelectedIdea(null) }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lightbulb className="w-5 h-5 text-amber-500" />
-              {selectedIdea?.title}
-            </DialogTitle>
-            <DialogDescription>
-              By {selectedIdea?.ambassador.firstName} {selectedIdea?.ambassador.lastName}
-            </DialogDescription>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4 border-b">
+            <div className="flex items-start justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Lightbulb className="w-6 h-6 text-amber-500" />
+                  {selectedIdea?.title}
+                </DialogTitle>
+                <DialogDescription className="mt-2">
+                  <span className="text-gray-600">
+                    By <span className="font-medium text-gray-900">{selectedIdea?.ambassador.firstName} {selectedIdea?.ambassador.lastName}</span>
+                  </span>
+                  <span className="mx-2 text-gray-400">•</span>
+                  <span className="text-gray-600">
+                    Coach: <span className="font-medium text-gray-900">{selectedIdea?.ambassador.coach.firstName} {selectedIdea?.ambassador.coach.lastName}</span>
+                  </span>
+                </DialogDescription>
+              </div>
+              {selectedIdea && getStatusBadge(selectedIdea.status)}
+            </div>
           </DialogHeader>
 
           {selectedIdea && (
             <div className="space-y-6 py-4">
-              <div className="flex items-center justify-between">
-                {getStatusBadge(selectedIdea.status)}
+              {/* Submission Info */}
+              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
                 {selectedIdea.submittedAt && (
-                  <span className="text-sm text-gray-500">
-                    Submitted: {new Date(selectedIdea.submittedAt).toLocaleDateString()}
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    Submitted: {new Date(selectedIdea.submittedAt).toLocaleDateString()} at {new Date(selectedIdea.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+                {selectedIdea.reviewedAt && (
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Reviewed: {new Date(selectedIdea.reviewedAt).toLocaleDateString()}
                   </span>
                 )}
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                    <FileText className="w-4 h-4" />
-                    Description
+              {/* Business Idea Details */}
+              <div className="space-y-5">
+                {/* Description - Full Detail */}
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
+                    <FileText className="w-4 h-4 text-primary-500" />
+                    Business Description
                   </div>
-                  <p className="text-gray-600 whitespace-pre-wrap">{selectedIdea.description}</p>
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{selectedIdea.description}</p>
                 </div>
 
-                {selectedIdea.targetMarket && (
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                      <Target className="w-4 h-4" />
-                      Target Market
-                    </div>
-                    <p className="text-gray-600 whitespace-pre-wrap">{selectedIdea.targetMarket}</p>
+                {/* Target Market */}
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
+                    <Target className="w-4 h-4 text-blue-500" />
+                    Target Market
                   </div>
-                )}
+                  {selectedIdea.targetMarket ? (
+                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{selectedIdea.targetMarket}</p>
+                  ) : (
+                    <p className="text-gray-400 italic">Not provided</p>
+                  )}
+                </div>
 
-                {selectedIdea.resources && (
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                      <Package className="w-4 h-4" />
-                      Resources Needed
-                    </div>
-                    <p className="text-gray-600 whitespace-pre-wrap">{selectedIdea.resources}</p>
+                {/* Resources Needed */}
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
+                    <Package className="w-4 h-4 text-green-500" />
+                    Resources Needed
                   </div>
-                )}
+                  {selectedIdea.resources ? (
+                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{selectedIdea.resources}</p>
+                  ) : (
+                    <p className="text-gray-400 italic">Not provided</p>
+                  )}
+                </div>
 
+                {/* Previous Feedback */}
                 {selectedIdea.feedback && (
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm font-medium text-gray-700 mb-1">Previous Feedback</div>
-                    <p className="text-gray-600">{selectedIdea.feedback}</p>
+                  <div className={`p-4 rounded-lg border-2 ${
+                    selectedIdea.status === 'APPROVED' ? 'bg-green-50 border-green-200' :
+                    selectedIdea.status === 'NEEDS_REVISION' ? 'bg-orange-50 border-orange-200' :
+                    selectedIdea.status === 'REJECTED' ? 'bg-red-50 border-red-200' :
+                    'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="text-sm font-semibold text-gray-900 mb-2">Previous Feedback</div>
+                    <p className="text-gray-700">{selectedIdea.feedback}</p>
                   </div>
                 )}
               </div>
 
+              {/* Action Buttons */}
               {(selectedIdea.status === 'SUBMITTED' || selectedIdea.status === 'UNDER_REVIEW') && (
-                <div className="pt-4 border-t">
-                  <Button onClick={() => setReviewDialogOpen(true)} className="w-full">
-                    Review This Idea
+                <div className="pt-4 border-t flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setReviewStatus('UNDER_REVIEW')
+                      setReviewDialogOpen(true)
+                    }}
+                    className="flex-1"
+                  >
+                    <Clock className="w-4 h-4 mr-2" />
+                    Mark In Progress
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setReviewStatus('APPROVED')
+                      setReviewDialogOpen(true)
+                    }}
+                    className="flex-1 bg-primary-600 hover:bg-primary-700"
+                  >
+                    Review & Decide
                   </Button>
                 </div>
               )}
@@ -310,6 +360,12 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="UNDER_REVIEW">
+                    <span className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-500" />
+                      Mark as In Progress
+                    </span>
+                  </SelectItem>
                   <SelectItem value="APPROVED">
                     <span className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -334,15 +390,17 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
 
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                Feedback {reviewStatus !== 'APPROVED' && <span className="text-red-500">*</span>}
+                Feedback {(reviewStatus !== 'APPROVED' && reviewStatus !== 'UNDER_REVIEW') && <span className="text-red-500">*</span>}
               </label>
               <Textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
                 placeholder={
-                  reviewStatus === 'APPROVED'
-                    ? 'Add optional feedback for the ambassador...'
-                    : 'Explain what needs to be improved...'
+                  reviewStatus === 'UNDER_REVIEW'
+                    ? 'Add optional notes about the review...'
+                    : reviewStatus === 'APPROVED'
+                      ? 'Add optional feedback for the ambassador...'
+                      : 'Explain what needs to be improved...'
                 }
                 rows={4}
               />
@@ -355,15 +413,18 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
             </Button>
             <Button
               onClick={handleReview}
-              disabled={isSubmitting || (reviewStatus !== 'APPROVED' && !feedback)}
+              disabled={isSubmitting || (reviewStatus !== 'APPROVED' && reviewStatus !== 'UNDER_REVIEW' && !feedback)}
               className={
+                reviewStatus === 'UNDER_REVIEW' ? 'bg-blue-600 hover:bg-blue-700' :
                 reviewStatus === 'APPROVED' ? 'bg-green-600 hover:bg-green-700' :
                 reviewStatus === 'REJECTED' ? 'bg-red-600 hover:bg-red-700' :
                 'bg-orange-600 hover:bg-orange-700'
               }
             >
               {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              {reviewStatus === 'APPROVED' ? 'Approve' : reviewStatus === 'REJECTED' ? 'Reject' : 'Request Revision'}
+              {reviewStatus === 'UNDER_REVIEW' ? 'Mark In Progress' :
+               reviewStatus === 'APPROVED' ? 'Approve' :
+               reviewStatus === 'REJECTED' ? 'Reject' : 'Request Revision'}
             </Button>
           </DialogFooter>
         </DialogContent>

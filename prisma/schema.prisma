@@ -1396,3 +1396,164 @@ model KBArticle {
 
   @@map("kb_articles")
 }
+
+// ============================================
+// STANDALONE QUIZZES & SURVEYS
+// ============================================
+
+enum SurveyType {
+  QUIZ
+  SURVEY
+}
+
+enum SurveyQuestionType {
+  MULTIPLE_CHOICE      // Single answer - radio buttons
+  MULTIPLE_SELECT      // Multiple answers - checkboxes
+  LIKERT_SCALE         // 1-5 scale with labels
+  TEXT_SHORT           // Short text response
+  TEXT_LONG            // Long text response (textarea)
+}
+
+enum SurveyPublishStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+
+enum QuizScoreMode {
+  NO_SCORING    // Practice mode - no scores calculated or shown
+  SCORE_ONLY    // Show score but no pass/fail judgment
+  PASS_FAIL     // Score with passing threshold required
+}
+
+model Survey {
+  id              String              @id @default(cuid())
+
+  title           String
+  description     String?             @db.Text
+  type            SurveyType          // QUIZ or SURVEY
+  status          SurveyPublishStatus @default(DRAFT)
+
+  // Audience Configuration
+  allowedRoles    String[]            // ["COACH", "AMBASSADOR"]
+
+  // Survey-specific options
+  isAnonymous     Boolean             @default(false)
+
+  // Quiz-specific options
+  scoreMode       QuizScoreMode       @default(SCORE_ONLY)  // How to handle quiz scoring
+  passingScore    Int?                // Percentage required to pass (only for PASS_FAIL mode)
+  showResults     Boolean             @default(true)
+  allowRetake     Boolean             @default(true)
+
+  // Scheduling
+  publishedAt     DateTime?
+  closesAt        DateTime?
+
+  createdBy       String              // Admin user ID
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  questions       SurveyQuestion[]
+  submissions     SurveySubmission[]
+
+  @@map("surveys")
+}
+
+model SurveyQuestion {
+  id              String              @id @default(cuid())
+  surveyId        String
+  survey          Survey              @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  questionText    String              @db.Text
+  questionType    SurveyQuestionType
+  isRequired      Boolean             @default(true)
+  sortOrder       Int                 @default(0)
+
+  // Likert scale configuration (JSON)
+  // e.g., { "minLabel": "Strongly Disagree", "maxLabel": "Strongly Agree", "minValue": 1, "maxValue": 5 }
+  likertConfig    Json?
+
+  // For text questions - character limits
+  minLength       Int?
+  maxLength       Int?
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  options         SurveyOption[]
+  answers         SurveyAnswer[]
+
+  @@map("survey_questions")
+}
+
+model SurveyOption {
+  id              String            @id @default(cuid())
+  questionId      String
+  question        SurveyQuestion    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  optionText      String
+  isCorrect       Boolean           @default(false)  // Only relevant for quizzes
+  sortOrder       Int               @default(0)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  selectedBy      SurveyAnswer[]    @relation("SelectedSurveyOptions")
+
+  @@map("survey_options")
+}
+
+model SurveySubmission {
+  id              String            @id @default(cuid())
+  surveyId        String
+  survey          Survey            @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  // Responder info (null for anonymous surveys)
+  userId          String?
+  userRole        String?           // Role at time of submission
+
+  // Quiz scoring (null for surveys)
+  score           Float?
+  passed          Boolean?
+
+  submittedAt     DateTime          @default(now())
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  answers         SurveyAnswer[]
+
+  @@map("survey_submissions")
+}
+
+model SurveyAnswer {
+  id              String              @id @default(cuid())
+  submissionId    String
+  submission      SurveySubmission    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId      String
+  question        SurveyQuestion      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  // For MULTIPLE_CHOICE / MULTIPLE_SELECT - selected option IDs
+  selectedOptions SurveyOption[]      @relation("SelectedSurveyOptions")
+
+  // For LIKERT_SCALE - numeric value
+  likertValue     Int?
+
+  // For TEXT_SHORT / TEXT_LONG - text response
+  textResponse    String?             @db.Text
+
+  // Was this answer correct? (for quiz scoring)
+  isCorrect       Boolean?
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([submissionId, questionId])
+  @@map("survey_answers")
+}

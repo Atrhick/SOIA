@@ -41,6 +41,23 @@ interface Coach {
   email: string
 }
 
+interface FeatureConfig {
+  id: string
+  feature: string
+  isEnabled: boolean
+  enabledForCoaches: boolean
+  enabledForAmbassadors: boolean
+}
+
+const FEATURE_INFO: Record<string, { label: string; description: string }> = {
+  CRM: { label: 'CRM', description: 'Manage contacts, deals, and sales pipeline' },
+  PROJECT_MANAGEMENT: { label: 'Project Management', description: 'Create and track projects and tasks' },
+  COLLABORATION: { label: 'Collaboration', description: 'Team discussions and document sharing' },
+  TIME_CLOCK: { label: 'Time Clock', description: 'Clock in/out and time tracking' },
+  SCHEDULING: { label: 'Scheduling', description: 'Calendar events and appointments' },
+  KNOWLEDGE_BASE: { label: 'Knowledge Base', description: 'Articles and documentation' },
+}
+
 const statusVariants = {
   PENDING: 'warning',
   APPROVED: 'success',
@@ -60,6 +77,7 @@ const statusOptions = [
 interface AdminAmbassadorTableProps {
   ambassadors: AmbassadorWithCoach[]
   coaches: Coach[]
+  features: FeatureConfig[]
 }
 
 function calculateAgeFromDate(dateString: string): number | null {
@@ -74,11 +92,12 @@ function calculateAgeFromDate(dateString: string): number | null {
   return age
 }
 
-export function AdminAmbassadorTable({ ambassadors, coaches }: AdminAmbassadorTableProps) {
+export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAmbassadorTableProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [featurePermissions, setFeaturePermissions] = useState<Record<string, boolean | null>>({})
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -150,6 +169,15 @@ export function AdminAmbassadorTable({ ambassadors, coaches }: AdminAmbassadorTa
       form.set('parentRelationship', formData.parentRelationship)
     }
 
+    // Feature permissions (filter out nulls = use default)
+    const permissionsToSet = Object.entries(featurePermissions)
+      .filter(([_, value]) => value !== null)
+      .map(([feature, granted]) => ({ feature, granted: granted as boolean }))
+
+    if (permissionsToSet.length > 0) {
+      form.set('featurePermissions', JSON.stringify(permissionsToSet))
+    }
+
     const result = await createAmbassadorAccount(form)
 
     if (result.error) {
@@ -180,6 +208,7 @@ export function AdminAmbassadorTable({ ambassadors, coaches }: AdminAmbassadorTa
         parentPhoneCountryCode: 'US',
         parentRelationship: '',
       })
+      setFeaturePermissions({})
     }
     setIsSubmitting(false)
   }
@@ -392,6 +421,59 @@ export function AdminAmbassadorTable({ ambassadors, coaches }: AdminAmbassadorTa
               </div>
             </div>
           )}
+
+          {/* Feature Permissions Section */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">Feature Permissions</h3>
+            <p className="text-sm text-gray-500">
+              Customize which features this ambassador can access. &quot;Default&quot; uses the role-based setting.
+            </p>
+
+            <div className="border rounded-lg divide-y">
+              {(features || []).filter(f => f.isEnabled).map((feature) => {
+                const info = FEATURE_INFO[feature.feature] || { label: feature.feature, description: '' }
+                const roleDefault = feature.enabledForAmbassadors
+                const currentValue = featurePermissions[feature.feature]
+
+                return (
+                  <div key={feature.id} className="p-3 flex items-center justify-between">
+                    <div className="flex-1">
+                      <span className="font-medium text-sm">{info.label}</span>
+                      <p className="text-xs text-gray-400">
+                        Role default: {roleDefault ? 'Allowed' : 'Not allowed'}
+                      </p>
+                    </div>
+                    <Select
+                      value={currentValue === null || currentValue === undefined ? 'default' : (currentValue ? 'granted' : 'denied')}
+                      onValueChange={(value) => {
+                        if (value === 'default') {
+                          const updated = { ...featurePermissions }
+                          delete updated[feature.feature]
+                          setFeaturePermissions(updated)
+                        } else {
+                          setFeaturePermissions({
+                            ...featurePermissions,
+                            [feature.feature]: value === 'granted'
+                          })
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">
+                          Default ({roleDefault ? 'Allow' : 'Deny'})
+                        </SelectItem>
+                        <SelectItem value="granted">Grant Access</SelectItem>
+                        <SelectItem value="denied">Deny Access</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>

@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Users } from 'lucide-react'
 import { AdminAmbassadorTable } from './ambassador-table'
+import { getAllFeatureConfigs } from '@/lib/actions/feature-config'
 
 async function getAmbassadors() {
   return prisma.ambassador.findMany({
@@ -41,10 +42,13 @@ export default async function AdminAmbassadorsPage() {
     redirect('/login')
   }
 
-  const [ambassadors, coaches] = await Promise.all([
+  const [ambassadors, coaches, featuresResult] = await Promise.all([
     getAmbassadors(),
     getCoaches(),
+    getAllFeatureConfigs(),
   ])
+
+  const features = featuresResult.configs || []
 
   // Stats
   const stats = {
@@ -131,6 +135,7 @@ export default async function AdminAmbassadorsPage() {
               name: `${c.firstName} ${c.lastName}`,
               email: c.user.email,
             }))}
+            features={features}
           />
         </CardContent>
       </Card>

@@ -136,7 +136,7 @@ export default async function CoachDashboard() {
   if (pendingAmbassadors > 0) {
     alerts.push({
       variant: 'warning' as const,
-      icon: Users,
+      iconName: 'Users',
       message: `You have ${pendingAmbassadors} pending ambassador${pendingAmbassadors > 1 ? 's' : ''} awaiting approval`,
       action: { label: 'Review', href: '/coach/ambassadors' },
     })
@@ -144,7 +144,7 @@ export default async function CoachDashboard() {
   if (coachData.coachStatus === 'ONBOARDING_INCOMPLETE' && onboardingPercentage < 100) {
     alerts.push({
       variant: 'info' as const,
-      icon: CheckSquare,
+      iconName: 'CheckSquare',
       message: `Complete your onboarding to become an active coach (${Math.round(onboardingPercentage)}% complete)`,
       action: { label: 'Continue', href: '/coach/onboarding' },
     })

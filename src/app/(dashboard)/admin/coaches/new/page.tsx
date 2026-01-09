@@ -6,8 +6,33 @@ import Link from 'next/link'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { createCoach } from '@/lib/actions/coaches'
+import { getAllFeatureConfigs } from '@/lib/actions/feature-config'
 import { ArrowLeft, Save, UserPlus, Eye, EyeOff } from 'lucide-react'
+
+type FeatureConfig = {
+  id: string
+  feature: string
+  isEnabled: boolean
+  enabledForCoaches: boolean
+  enabledForAmbassadors: boolean
+}
+
+const FEATURE_INFO: Record<string, { label: string; description: string }> = {
+  CRM: { label: 'CRM', description: 'Manage contacts, deals, and sales pipeline' },
+  PROJECT_MANAGEMENT: { label: 'Project Management', description: 'Create and track projects and tasks' },
+  COLLABORATION: { label: 'Collaboration', description: 'Team discussions and document sharing' },
+  TIME_CLOCK: { label: 'Time Clock', description: 'Clock in/out and time tracking' },
+  SCHEDULING: { label: 'Scheduling', description: 'Calendar events and appointments' },
+  KNOWLEDGE_BASE: { label: 'Knowledge Base', description: 'Articles and documentation' },
+}
 
 export default function NewCoachPage() {
   const router = useRouter()
@@ -15,13 +40,22 @@ export default function NewCoachPage() {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [coaches, setCoaches] = useState<{ id: string; name: string }[]>([])
+  const [features, setFeatures] = useState<FeatureConfig[]>([])
+  const [featurePermissions, setFeaturePermissions] = useState<Record<string, boolean | null>>({})
 
-  // Fetch existing coaches for recruiter dropdown
+  // Fetch existing coaches for recruiter dropdown and features
   useEffect(() => {
     fetch('/api/coaches/list')
       .then((res) => res.json())
       .then((data) => setCoaches(data.coaches || []))
       .catch(() => {})
+
+    // Fetch feature configs
+    getAllFeatureConfigs().then((result) => {
+      if (result.configs) {
+        setFeatures(result.configs)
+      }
+    })
   }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -30,6 +64,16 @@ export default function NewCoachPage() {
     setError('')
 
     const formData = new FormData(e.currentTarget)
+
+    // Add feature permissions (filter out nulls = use default)
+    const permissionsToSet = Object.entries(featurePermissions)
+      .filter(([_, value]) => value !== null)
+      .map(([feature, granted]) => ({ feature, granted: granted as boolean }))
+
+    if (permissionsToSet.length > 0) {
+      formData.set('featurePermissions', JSON.stringify(permissionsToSet))
+    }
+
     const result = await createCoach(formData)
 
     if (result.error) {
@@ -198,6 +242,59 @@ export default function NewCoachPage() {
                 <p className="text-sm text-gray-500 mt-1">
                   Select if this coach was recruited by another coach
                 </p>
+              </div>
+            </div>
+
+            {/* Feature Permissions */}
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="font-medium text-gray-900">Feature Permissions</h3>
+              <p className="text-sm text-gray-500">
+                Customize which features this coach can access. &quot;Default&quot; uses the role-based setting.
+              </p>
+
+              <div className="border rounded-lg divide-y">
+                {features.filter(f => f.isEnabled).map((feature) => {
+                  const info = FEATURE_INFO[feature.feature] || { label: feature.feature, description: '' }
+                  const roleDefault = feature.enabledForCoaches
+                  const currentValue = featurePermissions[feature.feature]
+
+                  return (
+                    <div key={feature.id} className="p-3 flex items-center justify-between">
+                      <div className="flex-1">
+                        <span className="font-medium text-sm">{info.label}</span>
+                        <p className="text-xs text-gray-400">
+                          Role default: {roleDefault ? 'Allowed' : 'Not allowed'}
+                        </p>
+                      </div>
+                      <Select
+                        value={currentValue === null || currentValue === undefined ? 'default' : (currentValue ? 'granted' : 'denied')}
+                        onValueChange={(value) => {
+                          if (value === 'default') {
+                            const updated = { ...featurePermissions }
+                            delete updated[feature.feature]
+                            setFeaturePermissions(updated)
+                          } else {
+                            setFeaturePermissions({
+                              ...featurePermissions,
+                              [feature.feature]: value === 'granted'
+                            })
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">
+                            Default ({roleDefault ? 'Allow' : 'Deny'})
+                          </SelectItem>
+                          <SelectItem value="granted">Grant Access</SelectItem>
+                          <SelectItem value="denied">Deny Access</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )
+                })}
               </div>
             </div>
 

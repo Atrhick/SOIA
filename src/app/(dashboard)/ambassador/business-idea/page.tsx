@@ -1,26 +1,23 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import {
   Lightbulb,
-  Save,
-  Send,
   CheckCircle2,
   Clock,
   AlertCircle,
   Loader2,
   FileText,
-  Target,
-  Package
+  ArrowRight,
+  Plus,
+  Eye,
+  Edit3
 } from 'lucide-react'
-import { saveBusinessIdea, submitBusinessIdea } from '@/lib/actions/business-idea'
-import { useRouter } from 'next/navigation'
 
 interface BusinessIdea {
   id: string
@@ -44,15 +41,6 @@ export default function BusinessIdeaPage() {
   const router = useRouter()
   const [ambassador, setAmbassador] = useState<AmbassadorWithIdea | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [targetMarket, setTargetMarket] = useState('')
-  const [resources, setResources] = useState('')
 
   useEffect(() => {
     fetchBusinessIdea()
@@ -64,76 +52,12 @@ export default function BusinessIdeaPage() {
       if (response.ok) {
         const data = await response.json()
         setAmbassador(data.ambassador)
-        if (data.ambassador?.businessIdea) {
-          const idea = data.ambassador.businessIdea
-          setTitle(idea.title || '')
-          setDescription(idea.description || '')
-          setTargetMarket(idea.targetMarket || '')
-          setResources(idea.resources || '')
-        }
       }
     } catch (err) {
-      setError('Failed to load business idea')
+      console.error('Failed to load business idea')
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleSave = async () => {
-    setError(null)
-    setSuccessMessage(null)
-    setIsSaving(true)
-
-    const formData = new FormData()
-    formData.set('title', title)
-    formData.set('description', description)
-    formData.set('targetMarket', targetMarket)
-    formData.set('resources', resources)
-
-    const result = await saveBusinessIdea(formData)
-    if (result.error) {
-      setError(result.error)
-    } else {
-      setSuccessMessage('Business idea saved as draft')
-      fetchBusinessIdea()
-    }
-    setIsSaving(false)
-  }
-
-  const handleSubmit = async () => {
-    if (!title || !description) {
-      setError('Title and description are required')
-      return
-    }
-
-    setError(null)
-    setSuccessMessage(null)
-    setIsSubmitting(true)
-
-    // First save
-    const formData = new FormData()
-    formData.set('title', title)
-    formData.set('description', description)
-    formData.set('targetMarket', targetMarket)
-    formData.set('resources', resources)
-
-    const saveResult = await saveBusinessIdea(formData)
-    if (saveResult.error) {
-      setError(saveResult.error)
-      setIsSubmitting(false)
-      return
-    }
-
-    // Then submit
-    const submitResult = await submitBusinessIdea()
-    if (submitResult.error) {
-      setError(submitResult.error)
-    } else {
-      setSuccessMessage('Business idea submitted for review!')
-      fetchBusinessIdea()
-      router.refresh()
-    }
-    setIsSubmitting(false)
   }
 
   const getStatusConfig = (status: string) => {
@@ -141,38 +65,48 @@ export default function BusinessIdeaPage() {
       case 'APPROVED':
         return {
           color: 'bg-green-100 text-green-700 border-green-200',
+          bgColor: 'bg-green-50 border-green-200',
           icon: CheckCircle2,
           iconColor: 'text-green-500',
           label: 'Approved',
+          description: 'Your business idea has been approved! You can now move forward with your plan.',
         }
       case 'SUBMITTED':
       case 'UNDER_REVIEW':
         return {
           color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+          bgColor: 'bg-yellow-50 border-yellow-200',
           icon: Clock,
           iconColor: 'text-yellow-500',
           label: status === 'SUBMITTED' ? 'Submitted' : 'Under Review',
+          description: 'Your business idea is being reviewed by your coach. You will receive feedback soon.',
         }
       case 'NEEDS_REVISION':
         return {
           color: 'bg-orange-100 text-orange-700 border-orange-200',
+          bgColor: 'bg-orange-50 border-orange-200',
           icon: AlertCircle,
           iconColor: 'text-orange-500',
           label: 'Needs Revision',
+          description: 'Your coach has provided feedback. Please review and update your business idea.',
         }
       case 'REJECTED':
         return {
           color: 'bg-red-100 text-red-700 border-red-200',
+          bgColor: 'bg-red-50 border-red-200',
           icon: AlertCircle,
           iconColor: 'text-red-500',
           label: 'Rejected',
+          description: 'Your business idea was not approved. Please review the feedback and try a different approach.',
         }
       default:
         return {
           color: 'bg-gray-100 text-gray-700 border-gray-200',
+          bgColor: 'bg-gray-50 border-gray-200',
           icon: FileText,
           iconColor: 'text-gray-500',
           label: 'Draft',
+          description: 'Your business idea is saved as a draft. Complete and submit it when ready.',
         }
     }
   }
@@ -186,9 +120,77 @@ export default function BusinessIdeaPage() {
   }
 
   const idea = ambassador?.businessIdea
-  const status = idea?.status || 'DRAFT'
+  const status = idea?.status || 'NONE'
   const statusConfig = getStatusConfig(status)
   const canEdit = status === 'DRAFT' || status === 'NEEDS_REVISION'
+
+  // No business idea yet
+  if (!idea) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Business Idea</h1>
+          <p className="text-gray-600 mt-1">
+            Share your business idea as part of your ambassador journey
+          </p>
+        </div>
+
+        {/* Empty State */}
+        <Card className="border-2 border-dashed">
+          <CardContent className="py-12">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lightbulb className="w-8 h-8 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                Create Your Business Idea
+              </h2>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Every great business starts with an idea. Share yours and get feedback from your coach to help you succeed.
+              </p>
+              <Link href="/ambassador/business-idea/edit">
+                <Button className="bg-amber-500 hover:bg-amber-600">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Business Idea
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tips Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Tips for a Great Business Idea</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3 text-sm text-gray-600">
+              <li className="flex items-start gap-2">
+                <span className="text-amber-500 font-bold">1.</span>
+                <span><strong>Solve a problem:</strong> Think about challenges you or people around you face.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-500 font-bold">2.</span>
+                <span><strong>Know your customer:</strong> Be specific about who would buy from you.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-500 font-bold">3.</span>
+                <span><strong>Start small:</strong> You don&apos;t need a huge idea. Many successful businesses started simple.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-500 font-bold">4.</span>
+                <span><strong>Be passionate:</strong> Choose something you care about.</span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Has a business idea - show status
+  const StatusIcon = statusConfig.icon
 
   return (
     <div className="space-y-6">
@@ -197,207 +199,165 @@ export default function BusinessIdeaPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Business Idea</h1>
           <p className="text-gray-600 mt-1">
-            Share your business idea for review
+            Track the status of your business idea submission
           </p>
         </div>
-        {idea && (
-          <Badge className={statusConfig.color}>
-            <statusConfig.icon className={`w-4 h-4 mr-1 ${statusConfig.iconColor}`} />
-            {statusConfig.label}
-          </Badge>
-        )}
+        <Badge className={statusConfig.color}>
+          <StatusIcon className={`w-4 h-4 mr-1 ${statusConfig.iconColor}`} />
+          {statusConfig.label}
+        </Badge>
       </div>
 
+      {/* Status Card */}
+      <Card className={`border-2 ${statusConfig.bgColor}`}>
+        <CardContent className="py-6">
+          <div className="flex items-start gap-4">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              status === 'APPROVED' ? 'bg-green-100' :
+              status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'bg-yellow-100' :
+              status === 'NEEDS_REVISION' ? 'bg-orange-100' :
+              status === 'REJECTED' ? 'bg-red-100' : 'bg-gray-100'
+            }`}>
+              <StatusIcon className={`w-6 h-6 ${statusConfig.iconColor}`} />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                {statusConfig.label}
+              </h2>
+              <p className="text-gray-600 mb-4">
+                {statusConfig.description}
+              </p>
+
+              {/* Action Button */}
+              <Link href="/ambassador/business-idea/edit">
+                <Button
+                  variant={canEdit ? 'default' : 'outline'}
+                  className={canEdit ? 'bg-amber-500 hover:bg-amber-600' : ''}
+                >
+                  {canEdit ? (
+                    <>
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      {status === 'DRAFT' ? 'Continue Editing' : 'Revise Idea'}
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Details
+                    </>
+                  )}
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Business Idea Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lightbulb className="w-5 h-5 text-amber-500" />
+            {idea.title}
+          </CardTitle>
+          {idea.submittedAt && (
+            <CardDescription>
+              Submitted on {new Date(idea.submittedAt).toLocaleDateString()}
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-700 line-clamp-3">{idea.description}</p>
+
+          {(idea.targetMarket || idea.resources) && (
+            <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
+              {idea.targetMarket && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Target Market</h4>
+                  <p className="text-sm text-gray-700 line-clamp-2">{idea.targetMarket}</p>
+                </div>
+              )}
+              {idea.resources && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Resources Needed</h4>
+                  <p className="text-sm text-gray-700 line-clamp-2">{idea.resources}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 pt-4 border-t">
+            <Link
+              href="/ambassador/business-idea/edit"
+              className="text-amber-600 hover:text-amber-700 text-sm font-medium flex items-center gap-1"
+            >
+              View full details
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Feedback Section */}
-      {idea?.feedback && (
-        <Card className={`border-2 ${status === 'APPROVED' ? 'border-green-200 bg-green-50' : status === 'NEEDS_REVISION' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'}`}>
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <statusConfig.icon className={`w-5 h-5 mt-0.5 ${statusConfig.iconColor}`} />
+      {idea.feedback && (
+        <Card className={`border-2 ${
+          status === 'APPROVED' ? 'border-green-200 bg-green-50' :
+          status === 'NEEDS_REVISION' ? 'border-orange-200 bg-orange-50' :
+          'border-red-200 bg-red-50'
+        }`}>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <StatusIcon className={`w-5 h-5 ${statusConfig.iconColor}`} />
+              Coach Feedback
+            </CardTitle>
+            {idea.reviewedAt && (
+              <CardDescription>
+                Reviewed on {new Date(idea.reviewedAt).toLocaleDateString()}
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700">{idea.feedback}</p>
+
+            {status === 'NEEDS_REVISION' && (
+              <div className="mt-4">
+                <Link href="/ambassador/business-idea/edit">
+                  <Button className="bg-amber-500 hover:bg-amber-600">
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Revise Your Idea
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Next Steps for Approved */}
+      {status === 'APPROVED' && (
+        <Card className="border-2 border-green-200 bg-green-50">
+          <CardContent className="py-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+              </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Feedback from Reviewer</h3>
-                <p className="mt-1 text-gray-700">{idea.feedback}</p>
-                {idea.reviewedAt && (
-                  <p className="mt-2 text-xs text-gray-500">
-                    Reviewed on {new Date(idea.reviewedAt).toLocaleDateString()}
-                  </p>
-                )}
+                <h3 className="font-semibold text-gray-900 mb-1">
+                  Congratulations! Your idea is approved!
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Continue your onboarding journey to learn more about turning your idea into reality.
+                </p>
+                <Link href="/ambassador/onboarding">
+                  <Button className="bg-green-600 hover:bg-green-700">
+                    Continue Onboarding
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Error/Success Messages */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
-        </div>
-      )}
-      {successMessage && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-          {successMessage}
-        </div>
-      )}
-
-      {/* Business Idea Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lightbulb className="w-5 h-5 text-amber-500" />
-            Your Business Idea
-          </CardTitle>
-          <CardDescription>
-            {canEdit
-              ? 'Describe your business idea in detail. You can save as draft and come back later.'
-              : 'Your business idea has been submitted and is being reviewed.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title" className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-gray-500" />
-              Business Name / Title *
-            </Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="What would you call your business?"
-              disabled={!canEdit}
-              className="disabled:bg-gray-50"
-            />
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description" className="flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-gray-500" />
-              Business Description *
-            </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe your business idea in detail. What problem does it solve? What products or services would you offer?"
-              rows={6}
-              disabled={!canEdit}
-              className="disabled:bg-gray-50"
-            />
-          </div>
-
-          {/* Target Market */}
-          <div className="space-y-2">
-            <Label htmlFor="targetMarket" className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-gray-500" />
-              Target Market (Optional)
-            </Label>
-            <Textarea
-              id="targetMarket"
-              value={targetMarket}
-              onChange={(e) => setTargetMarket(e.target.value)}
-              placeholder="Who would be your customers? What age group, location, or interests would they have?"
-              rows={3}
-              disabled={!canEdit}
-              className="disabled:bg-gray-50"
-            />
-          </div>
-
-          {/* Resources */}
-          <div className="space-y-2">
-            <Label htmlFor="resources" className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-gray-500" />
-              Resources Needed (Optional)
-            </Label>
-            <Textarea
-              id="resources"
-              value={resources}
-              onChange={(e) => setResources(e.target.value)}
-              placeholder="What resources, skills, or support would you need to start this business?"
-              rows={3}
-              disabled={!canEdit}
-              className="disabled:bg-gray-50"
-            />
-          </div>
-
-          {/* Actions */}
-          {canEdit && (
-            <div className="flex items-center gap-3 pt-4 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleSave}
-                disabled={isSaving || isSubmitting}
-              >
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
-                )}
-                Save Draft
-              </Button>
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSaving || isSubmitting || !title || !description}
-                className="bg-amber-500 hover:bg-amber-600"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4 mr-2" />
-                )}
-                Submit for Review
-              </Button>
-            </div>
-          )}
-
-          {!canEdit && status !== 'APPROVED' && (
-            <div className="pt-4 border-t">
-              <p className="text-sm text-gray-500">
-                Your business idea is currently being reviewed. You will be notified when there is an update.
-              </p>
-            </div>
-          )}
-
-          {status === 'APPROVED' && (
-            <div className="pt-4 border-t">
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="font-medium">Your business idea has been approved!</span>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Tips Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Tips for a Great Business Idea</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-3 text-sm text-gray-600">
-            <li className="flex items-start gap-2">
-              <span className="text-amber-500 font-bold">1.</span>
-              <span><strong>Solve a problem:</strong> Think about challenges you or people around you face. Great businesses solve real problems.</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-500 font-bold">2.</span>
-              <span><strong>Know your customer:</strong> Be specific about who would buy from you. The more you understand them, the better.</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-500 font-bold">3.</span>
-              <span><strong>Start small:</strong> You don&apos;t need a huge idea. Many successful businesses started with a simple concept.</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-500 font-bold">4.</span>
-              <span><strong>Be passionate:</strong> Choose something you care about. Your enthusiasm will show and help you succeed.</span>
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
     </div>
   )
 }

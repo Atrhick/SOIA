@@ -229,6 +229,25 @@ export async function createAmbassadorAccount(formData: FormData) {
       return { user, ambassador, parentUser }
     })
 
+    // Set feature permissions if provided
+    const featurePermissionsJson = formData.get('featurePermissions') as string
+    if (featurePermissionsJson) {
+      try {
+        const permissions = JSON.parse(featurePermissionsJson) as { feature: string; granted: boolean }[]
+        if (permissions.length > 0) {
+          await prisma.userFeaturePermission.createMany({
+            data: permissions.map(p => ({
+              userId: result.user.id,
+              feature: p.feature,
+              granted: p.granted,
+            }))
+          })
+        }
+      } catch (e) {
+        console.error('Error parsing feature permissions:', e)
+      }
+    }
+
     // Log the action
     await prisma.auditLog.create({
       data: {
@@ -250,7 +269,7 @@ export async function createAmbassadorAccount(formData: FormData) {
 
     revalidatePath('/coach/ambassadors')
     revalidatePath('/admin/ambassadors')
-    return { success: true, ambassadorId: result.ambassador.id }
+    return { success: true, ambassadorId: result.ambassador.id, userId: result.user.id }
   } catch (error) {
     console.error('Error creating ambassador account:', error)
     return { error: 'Failed to create ambassador account' }

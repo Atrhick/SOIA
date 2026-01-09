@@ -134,6 +134,7 @@ The StageOneInAction Back Office provides:
 | Time Clock | ✅ | ✅ | ✅ | Complete |
 | Scheduling & Calendar | ✅ | ✅ | ✅ | Complete |
 | Knowledge Base | ✅ | ✅ | ✅ | Complete |
+| Surveys & Quizzes | ✅ | ✅ | ✅ | Complete |
 
 ### Future Enhancements
 
@@ -295,6 +296,9 @@ test_app/
 │   │   │   │   ├── reports/     # Reports & analytics
 │   │   │   │   ├── resource-centers/ # Resource center applications
 │   │   │   │   ├── sponsorship/ # Sponsorship review
+│   │   │   │   ├── surveys/     # Surveys & quizzes
+│   │   │   │   │   ├── new/     # Survey builder
+│   │   │   │   │   └── [id]/    # Survey editor & results
 │   │   │   │   ├── users/       # User management & permissions
 │   │   │   │   └── page.tsx     # Admin dashboard
 │   │   │   ├── ambassador/      # Ambassador pages
@@ -305,6 +309,7 @@ test_app/
 │   │   │   │   ├── onboarding/  # Onboarding journey checklist
 │   │   │   │   ├── profile/     # Ambassador profile
 │   │   │   │   ├── schedule/    # Calendar view
+│   │   │   │   ├── surveys/     # Take surveys & quizzes
 │   │   │   │   ├── time/        # Time clock
 │   │   │   │   └── page.tsx     # Ambassador dashboard
 │   │   │   ├── coach/           # Coach pages
@@ -323,6 +328,7 @@ test_app/
 │   │   │   │   ├── resource-center/ # Resource center application
 │   │   │   │   ├── schedule/    # Calendar
 │   │   │   │   ├── sponsorship/ # Sponsorship requests
+│   │   │   │   ├── surveys/     # Take surveys & quizzes
 │   │   │   │   ├── time/        # Time tracking
 │   │   │   │   └── page.tsx     # Coach dashboard
 │   │   │   └── layout.tsx       # Dashboard layout with sidebar
@@ -600,6 +606,7 @@ The application primarily uses Next.js Server Actions for data mutations:
 | `time-clock.ts` | clockIn, clockOut, getTimeClockEntries, createTimeEntry, getTimeEntries |
 | `scheduling.ts` | Calendar events and attendee management |
 | `knowledge-base.ts` | getKBCategories, getKBArticles, createKBArticle, updateKBArticle, publishKBArticle |
+| `surveys.ts` | createSurvey, addQuestion, updateQuestion, deleteQuestion, reorderQuestions, duplicateQuestion, submitSurvey, getSurveyResults, exportSurveyResultsCSV |
 
 ---
 
@@ -731,6 +738,58 @@ Admins can create and manage user accounts:
 3. Optionally set feature permissions during creation
 4. Click on existing users to modify permissions
 5. Reset passwords or delete accounts as needed
+
+### Surveys & Quizzes
+
+Create and manage quizzes (scored) and surveys (feedback collection):
+
+**Survey Types:**
+- **Quiz** - Scored assessments with correct answers and passing threshold
+- **Survey** - Feedback collection (can be anonymous)
+
+**Question Types:**
+| Type | Description |
+|------|-------------|
+| Multiple Choice | Single answer from options |
+| Multiple Select | Multiple answers allowed |
+| Likert Scale | Rating scale (e.g., 1-5 with labels) |
+| Short Text | Single line text response |
+| Long Text | Paragraph text response |
+
+**Admin Workflow:**
+1. Navigate to Admin → Surveys & Quizzes
+2. Click "Add Quiz" or "Add Survey"
+3. Configure survey settings:
+   - Title and description
+   - Target audience (Coaches, Ambassadors, or both)
+   - For quizzes: passing score percentage
+   - Options: allow retake, show results, anonymous (surveys only)
+4. Click "Create & Add Questions"
+5. Add questions using the inline question builder
+6. Use up/down arrows to reorder questions
+7. Use copy button to duplicate similar questions
+8. Publish when ready
+
+**Survey Builder Features:**
+- Single-page workflow (create survey + add questions together)
+- Optimistic UI updates (no page refresh)
+- Question reordering with arrow buttons
+- Question duplication
+- Live preview for Likert scales
+- Collapsible settings panel
+
+**Coach/Ambassador Workflow:**
+1. View available surveys in their dashboard
+2. Click "Start" to begin a survey
+3. Answer all required questions
+4. Submit and view results (if enabled)
+5. Retake if allowed
+
+**Results & Analytics (Admin):**
+- Overview tab: Total responses, pass rate (quizzes), role breakdown charts
+- Question Analysis tab: Per-question statistics with charts
+- Individual Responses tab: View each submission with answers
+- Export to CSV for further analysis
 
 ---
 

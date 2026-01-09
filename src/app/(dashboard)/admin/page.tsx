@@ -115,7 +115,7 @@ export default async function AdminDashboard() {
   if (stats.pendingSponsorships > 0) {
     alerts.push({
       variant: 'warning' as const,
-      icon: HandCoins,
+      iconName: 'HandCoins',
       message: `${stats.pendingSponsorships} pending sponsorship request${stats.pendingSponsorships > 1 ? 's' : ''} awaiting review`,
       action: { label: 'Review', href: '/admin/sponsorship' },
     })
@@ -123,7 +123,7 @@ export default async function AdminDashboard() {
   if (stats.pendingResourceCenters > 0) {
     alerts.push({
       variant: 'info' as const,
-      icon: Building2,
+      iconName: 'Building2',
       message: `${stats.pendingResourceCenters} Resource Center application${stats.pendingResourceCenters > 1 ? 's' : ''} under review`,
       action: { label: 'Review', href: '/admin/resource-centers' },
     })
@@ -131,7 +131,7 @@ export default async function AdminDashboard() {
   if (stats.openMessages > 0) {
     alerts.push({
       variant: 'info' as const,
-      icon: MessageSquare,
+      iconName: 'MessageSquare',
       message: `${stats.openMessages} open message thread${stats.openMessages > 1 ? 's' : ''} need attention`,
       action: { label: 'View', href: '/admin/messages' },
     })

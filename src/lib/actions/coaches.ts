@@ -102,6 +102,25 @@ export async function createCoach(formData: FormData) {
       return { user, coachProfile }
     })
 
+    // Set feature permissions if provided
+    const featurePermissionsJson = formData.get('featurePermissions') as string
+    if (featurePermissionsJson) {
+      try {
+        const permissions = JSON.parse(featurePermissionsJson) as { feature: string; granted: boolean }[]
+        if (permissions.length > 0) {
+          await prisma.userFeaturePermission.createMany({
+            data: permissions.map(p => ({
+              userId: result.user.id,
+              feature: p.feature,
+              granted: p.granted,
+            }))
+          })
+        }
+      } catch (e) {
+        console.error('Error parsing feature permissions:', e)
+      }
+    }
+
     // Log the action
     await prisma.auditLog.create({
       data: {
@@ -114,7 +133,7 @@ export async function createCoach(formData: FormData) {
     })
 
     revalidatePath('/admin/coaches')
-    return { success: true, coachId: result.coachProfile.id }
+    return { success: true, coachId: result.coachProfile.id, userId: result.user.id }
   } catch (error) {
     console.error('Error creating coach:', error)
     return { error: 'Failed to create coach' }

@@ -1,16 +1,49 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { type LucideIcon, X, AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react'
+import {
+  X,
+  AlertTriangle,
+  Info,
+  CheckCircle,
+  XCircle,
+  Users,
+  CheckSquare,
+  Calendar,
+  Target,
+  DollarSign,
+  Briefcase,
+  HandCoins,
+  Building2,
+  MessageSquare,
+  type LucideIcon,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { Button } from './button'
 
 type AlertVariant = 'warning' | 'info' | 'success' | 'error'
 
+// Icon map for server-to-client icon passing
+const iconMap: Record<string, LucideIcon> = {
+  Users,
+  CheckSquare,
+  Calendar,
+  Target,
+  DollarSign,
+  Briefcase,
+  AlertTriangle,
+  Info,
+  CheckCircle,
+  XCircle,
+  HandCoins,
+  Building2,
+  MessageSquare,
+}
+
 interface AlertBannerProps {
   variant?: AlertVariant
-  icon?: LucideIcon
+  iconName?: string
   title?: string
   message: string
   action?: {
@@ -67,7 +100,7 @@ const variantStyles: Record<AlertVariant, {
 
 export function AlertBanner({
   variant = 'info',
-  icon,
+  iconName,
   title,
   message,
   action,
@@ -77,7 +110,7 @@ export function AlertBanner({
 }: AlertBannerProps) {
   const [dismissed, setDismissed] = useState(false)
   const styles = variantStyles[variant]
-  const Icon = icon || styles.defaultIcon
+  const Icon = (iconName && iconMap[iconName]) || styles.defaultIcon
 
   const handleDismiss = () => {
     setDismissed(true)

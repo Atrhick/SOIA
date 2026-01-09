@@ -189,21 +189,31 @@ export async function deleteClass(classId: string) {
 
 export async function toggleClassActive(classId: string) {
   const session = await auth()
-  if (!session || session.user.role !== 'COACH') {
+  if (!session || (session.user.role !== 'COACH' && session.user.role !== 'ADMIN')) {
     return { error: 'Unauthorized' }
   }
 
-  const coachProfile = await prisma.coachProfile.findUnique({
-    where: { userId: session.user.id },
-  })
+  let existingClass
 
-  if (!coachProfile) {
-    return { error: 'Coach profile not found' }
+  if (session.user.role === 'ADMIN') {
+    // Admin can toggle any class
+    existingClass = await prisma.coachClass.findUnique({
+      where: { id: classId },
+    })
+  } else {
+    // Coach can only toggle their own classes
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: session.user.id },
+    })
+
+    if (!coachProfile) {
+      return { error: 'Coach profile not found' }
+    }
+
+    existingClass = await prisma.coachClass.findFirst({
+      where: { id: classId, coachId: coachProfile.id },
+    })
   }
-
-  const existingClass = await prisma.coachClass.findFirst({
-    where: { id: classId, coachId: coachProfile.id },
-  })
 
   if (!existingClass) {
     return { error: 'Class not found' }
@@ -216,6 +226,7 @@ export async function toggleClassActive(classId: string) {
     })
 
     revalidatePath('/coach/classes')
+    revalidatePath('/admin/classes')
     return { success: true }
   } catch (error) {
     console.error('Error toggling class status:', error)
@@ -496,6 +507,7 @@ export async function markAttendance(classId: string, ambassadorIds: string[], a
     })
 
     revalidatePath('/coach/classes')
+    revalidatePath('/admin/classes')
     return { success: true }
   } catch (error) {
     console.error('Error marking attendance:', error)
