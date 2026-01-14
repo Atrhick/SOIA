@@ -52,5 +52,5 @@ USER nextjs
 ENV PORT=8080
 EXPOSE 8080
 
-# Start the application
-CMD ["node", "server.js"]
+# Run migrations and start the application
+CMD npx prisma migrate deploy && node server.js
