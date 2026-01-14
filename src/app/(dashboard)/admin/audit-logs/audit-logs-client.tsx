@@ -66,8 +66,8 @@ export function AuditLogsClient({ data }: AuditLogsClientProps) {
     return matchesSearch && matchesAction && matchesEntity
   })
 
-  const uniqueActions = [...new Set(data.logs.map(l => l.action))]
-  const uniqueEntityTypes = [...new Set(data.logs.map(l => l.entityType))]
+  const uniqueActions = Array.from(new Set(data.logs.map(l => l.action)))
+  const uniqueEntityTypes = Array.from(new Set(data.logs.map(l => l.entityType)))
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString())

@@ -16,7 +16,7 @@ async function getAuditLogs(page: number = 1, pageSize: number = 50) {
   ])
 
   // Get unique user IDs to fetch user info
-  const userIds = [...new Set(logs.filter(l => l.userId).map(l => l.userId as string))]
+  const userIds = Array.from(new Set(logs.filter(l => l.userId).map(l => l.userId as string)))
   const users = userIds.length > 0
     ? await prisma.user.findMany({
         where: { id: { in: userIds } },
