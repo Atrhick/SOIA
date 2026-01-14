@@ -15,7 +15,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(gcloud sql instances list:*)"
+      "Bash(gcloud sql instances list:*)",
+      "Bash(openssl rand:*)",
+      "Bash(DATABASE_URL=\"postgresql://SOIAmarsfww_user_dudeman24:KoRdDbJl23idfi7331L@34.30.95.0:5432/SOIAmarsfww\" npx prisma migrate:*)",
+      "Bash(curl:*)",
+      "Bash(DATABASE_URL=\"postgresql://SOIAmarsfww_user_dudeman24:KoRdDbJl23idfi7331L@34.30.95.0:5432/SOIAmarsfww\" npx prisma db push:*)",
+      "Bash(DATABASE_URL=\"postgresql://SOIAmarsfww_user_dudeman24:KoRdDbJl23idfi7331L@34.30.95.0:5432/SOIAmarsfww\" npx prisma db seed:*)"
     ]
   }
 }

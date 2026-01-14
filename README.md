@@ -1045,51 +1045,119 @@ npm run lint         # Run ESLint
 
 ## Deployment
 
+### Local Development
+
+Local development works without Docker:
+
+```bash
+npm run dev
+```
+
+Configure `.env` for local PostgreSQL or Cloud SQL:
+
+```env
+# Local PostgreSQL
+DATABASE_URL="postgresql://stageoneinaction:stageoneinaction_dev_2024@localhost:5432/stageoneinaction"
+
+# Or Cloud SQL (if your IP is authorized)
+DATABASE_URL="postgresql://USER:PASSWORD@CLOUD_SQL_PUBLIC_IP:5432/DATABASE"
+```
+
+### Google Cloud Run Deployment
+
+The application is configured for deployment to Google Cloud Run with Cloud SQL.
+
+#### Prerequisites
+
+- Google Cloud account with billing enabled
+- `gcloud` CLI installed and authenticated
+- Cloud SQL PostgreSQL instance
+
+#### 1. Cloud SQL Setup
+
+1. Create a Cloud SQL PostgreSQL instance in GCP Console
+2. Create a database and user:
+   ```sql
+   CREATE USER your_user WITH PASSWORD 'your_password';
+   CREATE DATABASE your_database OWNER your_user;
+   ```
+3. Note the **Instance Connection Name** (format: `project:region:instance`)
+4. Enable **Cloud SQL Admin API** in your project
+
+#### 2. Environment Variables
+
+Set these in Cloud Run → Edit & Deploy → Variables & Secrets:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `DATABASE_URL` | `postgresql://USER:PASS@localhost/DB?host=/cloudsql/PROJECT:REGION:INSTANCE` | Cloud SQL connection string |
+| `AUTH_TRUST_HOST` | `true` | Required for NextAuth on Cloud Run |
+| `AUTH_SECRET` | `<random-32-char-string>` | Generate with `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | `https://your-service-url.run.app` | Your Cloud Run service URL |
+
+#### 3. Cloud Run Configuration
+
+In Cloud Run service settings:
+
+- **Memory:** 1 GiB (minimum recommended)
+- **CPU:** 1
+- **Connections:** Add Cloud SQL connection with your instance connection name
+- **Port:** 8080
+
+#### 4. Cross-Project Cloud SQL Access
+
+If Cloud SQL is in a different project than Cloud Run:
+
+1. Go to IAM in the Cloud SQL project
+2. Grant **Cloud SQL Client** role to:
+   ```
+   PROJECT_NUMBER-compute@developer.gserviceaccount.com
+   ```
+   (Replace `PROJECT_NUMBER` with your Cloud Run project number)
+
+#### 5. Database Migration
+
+Run migrations against Cloud SQL (authorize your IP first in Cloud SQL → Connections → Authorized Networks):
+
+```bash
+DATABASE_URL="postgresql://USER:PASS@CLOUD_SQL_PUBLIC_IP:5432/DATABASE" npx prisma db push
+DATABASE_URL="postgresql://USER:PASS@CLOUD_SQL_PUBLIC_IP:5432/DATABASE" npx prisma db seed
+```
+
+#### 6. Deploy
+
+The app auto-deploys via Cloud Build when pushing to `main`, or deploy manually:
+
+```bash
+gcloud run deploy SERVICE_NAME \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated
+```
+
+### Docker (Local Testing)
+
+Build and run locally with Docker:
+
+```bash
+docker build -t stageoneinaction .
+docker run -p 8080:8080 -e DATABASE_URL="..." -e AUTH_SECRET="..." stageoneinaction
+```
+
 ### Production Checklist
 
-1. **Environment Variables:**
-   - Set secure `NEXTAUTH_SECRET`
-   - Configure production `DATABASE_URL`
-   - Set `NEXTAUTH_URL` to production domain
-
-2. **Database:**
-   - Use managed PostgreSQL service (e.g., Supabase, Railway, AWS RDS)
-   - Run migrations: `npx prisma migrate deploy`
-
-3. **Build:**
-   ```bash
-   npm run build
-   ```
-
-4. **Hosting Options:**
-   - Vercel (recommended for Next.js)
-   - Railway
-   - DigitalOcean App Platform
-   - AWS/GCP with Docker
-
-### Docker Deployment
-
-A `Dockerfile` can be created for containerized deployment:
-
-```dockerfile
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npx prisma generate
-RUN npm run build
-
-FROM node:18-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV production
-COPY --from=builder /app/next.config.mjs ./
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-EXPOSE 3000
-CMD ["node", "server.js"]
-```
+- [ ] Cloud SQL instance created and configured
+- [ ] Cloud SQL Admin API enabled
+- [ ] Database user and database created
+- [ ] `DATABASE_URL` set in Cloud Run
+- [ ] `AUTH_SECRET` generated and set
+- [ ] `AUTH_TRUST_HOST=true` set
+- [ ] `NEXTAUTH_URL` set to Cloud Run URL
+- [ ] Cloud SQL connection added in Cloud Run
+- [ ] Memory set to 1 GiB+
+- [ ] Cross-project IAM configured (if applicable)
+- [ ] Database migrations run (`prisma db push`)
+- [ ] Database seeded (`prisma db seed`)
 
 ---
 
