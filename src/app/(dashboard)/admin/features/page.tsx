@@ -26,9 +26,6 @@ export default async function AdminFeaturesPage() {
     isEnabled: config.isEnabled,
     enabledForCoaches: config.enabledForCoaches,
     enabledForAmbassadors: config.enabledForAmbassadors,
-    settings: config.settings as Record<string, unknown> | null,
-    createdAt: config.createdAt.toISOString(),
-    updatedAt: config.updatedAt.toISOString(),
   }))
 
   return (

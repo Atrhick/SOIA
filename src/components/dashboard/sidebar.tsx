@@ -33,6 +33,9 @@ import {
   Shield,
   TrendingUp,
   FileQuestion,
+  Hash,
+  Mail,
+  UserPlus,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -77,7 +80,8 @@ const ambassadorNavSections: NavSection[] = [
     items: [
       { href: '/ambassador/time', label: 'Time Clock', icon: Clock },
       { href: '/ambassador/schedule', label: 'Schedule', icon: Calendar },
-      { href: '/ambassador/collaboration', label: 'Collaboration', icon: MessageSquare },
+      { href: '/ambassador/collaboration/channels', label: 'Channels', icon: Hash },
+      { href: '/ambassador/collaboration/messages', label: 'Messages', icon: Mail },
     ],
   },
   {
@@ -122,7 +126,9 @@ const coachNavSections: NavSection[] = [
     title: 'Communication',
     icon: MessageSquare,
     items: [
-      { href: '/coach/collaboration', label: 'Collaboration', icon: MessageSquare },
+      { href: '/coach/collaboration/channels', label: 'Channels', icon: Hash },
+      { href: '/coach/collaboration/messages', label: 'Direct Messages', icon: Mail },
+      { href: '/coach/collaboration/files', label: 'Files', icon: FileText },
     ],
   },
   {
@@ -144,6 +150,7 @@ const adminNavSections: NavSection[] = [
     title: 'People',
     icon: Users,
     items: [
+      { href: '/admin/prospects', label: 'Prospects', icon: UserPlus },
       { href: '/admin/users', label: 'User Management', icon: UserCog },
       { href: '/admin/coaches', label: 'Coaches', icon: Users },
       { href: '/admin/ambassadors', label: 'Ambassadors', icon: Users },
@@ -173,6 +180,7 @@ const adminNavSections: NavSection[] = [
     title: 'Events & Finance',
     icon: Calendar,
     items: [
+      { href: '/admin/calendars', label: 'Calendars', icon: Calendar },
       { href: '/admin/events', label: 'Events', icon: Calendar },
       { href: '/admin/sponsorship', label: 'Sponsorship Requests', icon: HandCoins },
       { href: '/admin/business-excellence', label: 'Business Excellence', icon: Briefcase },
@@ -182,7 +190,9 @@ const adminNavSections: NavSection[] = [
     title: 'Communication',
     icon: Megaphone,
     items: [
-      { href: '/admin/collaboration', label: 'Collaboration', icon: MessageSquare },
+      { href: '/admin/collaboration/channels', label: 'Channels', icon: Hash },
+      { href: '/admin/collaboration/messages', label: 'Direct Messages', icon: Mail },
+      { href: '/admin/collaboration/files', label: 'Files', icon: FileText },
     ],
   },
   {
@@ -260,6 +270,7 @@ function NavSectionComponent({
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  prefetch={true}
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
                     isActive
@@ -353,6 +364,7 @@ export function Sidebar({ role }: SidebarProps) {
       {/* Dashboard - always at top, not in a section */}
       <Link
         href={basePath}
+        prefetch={true}
         onClick={handleTopLevelClick}
         className={cn(
           'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-2',
@@ -368,6 +380,7 @@ export function Sidebar({ role }: SidebarProps) {
       {/* Onboarding for Ambassador */}
       <Link
         href="/ambassador/onboarding"
+        prefetch={true}
         onClick={handleTopLevelClick}
         className={cn(
           'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',
@@ -401,6 +414,7 @@ export function Sidebar({ role }: SidebarProps) {
       {/* Dashboard - always at top, not in a section */}
       <Link
         href={basePath}
+        prefetch={true}
         onClick={handleTopLevelClick}
         className={cn(
           'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',
@@ -417,6 +431,7 @@ export function Sidebar({ role }: SidebarProps) {
       {role === 'COACH' && (
         <Link
           href="/coach/onboarding"
+          prefetch={true}
           onClick={handleTopLevelClick}
           className={cn(
             'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',

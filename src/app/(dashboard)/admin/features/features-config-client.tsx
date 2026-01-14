@@ -22,9 +22,6 @@ type FeatureConfig = {
   isEnabled: boolean
   enabledForCoaches: boolean
   enabledForAmbassadors: boolean
-  settings: Record<string, unknown> | null
-  createdAt: string
-  updatedAt: string
 }
 
 const FEATURE_META: Record<string, {

@@ -30,16 +30,35 @@ export default async function AmbassadorDashboardPage() {
 
   const ambassador = await prisma.ambassador.findUnique({
     where: { userId: session.user.id },
-    include: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      status: true,
       coach: {
         select: { firstName: true, lastName: true },
       },
       onboardingProgress: {
-        include: { task: true },
+        select: {
+          id: true,
+          status: true,
+          task: {
+            select: { label: true, isRequired: true },
+          },
+        },
       },
-      businessIdea: true,
+      businessIdea: {
+        select: {
+          title: true,
+          status: true,
+          feedback: true,
+        },
+      },
       classEnrollments: {
-        include: {
+        take: 3,
+        select: {
+          id: true,
+          status: true,
           class: {
             select: { title: true, date: true },
           },
@@ -237,7 +256,7 @@ export default async function AmbassadorDashboardPage() {
           <CardContent>
             {ambassador.classEnrollments.length > 0 ? (
               <div className="space-y-3">
-                {ambassador.classEnrollments.slice(0, 3).map((enrollment) => (
+                {ambassador.classEnrollments.map((enrollment) => (
                   <div
                     key={enrollment.id}
                     className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all"

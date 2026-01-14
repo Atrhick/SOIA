@@ -278,16 +278,17 @@ export function SurveyEditorClient({ survey }: SurveyEditorClientProps) {
           setError(result.error)
         } else if (result.question) {
           // Add new question to local state
+          const q = result.question as any
           const newQuestion: SurveyQuestion = {
-            id: result.question.id,
-            questionText: result.question.questionText,
-            questionType: result.question.questionType,
-            isRequired: result.question.isRequired,
-            sortOrder: result.question.sortOrder,
-            likertConfig: result.question.likertConfig as any,
-            minLength: result.question.minLength,
-            maxLength: result.question.maxLength,
-            options: result.question.options?.map((o: any) => ({
+            id: q.id,
+            questionText: q.questionText,
+            questionType: q.questionType,
+            isRequired: q.isRequired,
+            sortOrder: q.sortOrder,
+            likertConfig: q.likertConfig as any,
+            minLength: q.minLength,
+            maxLength: q.maxLength,
+            options: q.options?.map((o: any) => ({
               id: o.id,
               optionText: o.optionText,
               isCorrect: o.isCorrect,

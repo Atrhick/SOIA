@@ -26,16 +26,35 @@ import {
 async function getCoachData(userId: string) {
   const coachProfile = await prisma.coachProfile.findUnique({
     where: { userId },
-    include: {
-      ambassadors: true,
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      coachStatus: true,
+      // Use counts instead of loading all ambassadors
+      _count: {
+        select: {
+          ambassadors: true,
+        },
+      },
       onboardingProgress: {
-        include: { task: true },
+        select: {
+          status: true,
+          task: {
+            select: {
+              isRequired: true,
+            },
+          },
+        },
       },
       weeklyGoals: {
         where: {
           weekStart: {
             gte: new Date(new Date().setDate(new Date().getDate() - 7)),
           },
+        },
+        select: {
+          status: true,
         },
       },
       incomeEntries: {
@@ -44,13 +63,42 @@ async function getCoachData(userId: string) {
             gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
           },
         },
+        select: {
+          amount: true,
+        },
       },
-      businessExcellenceCRM: true,
-      websiteContentStatus: true,
+      businessExcellenceCRM: {
+        select: {
+          crmActivated: true,
+          crmSubscriptionActive: true,
+        },
+      },
+      websiteContentStatus: {
+        select: {
+          logoSubmitted: true,
+          servicesSubmitted: true,
+          productsSubmitted: true,
+          pricingSubmitted: true,
+          targetAudienceSubmitted: true,
+          contactSubmitted: true,
+          aboutSubmitted: true,
+          visionMissionSubmitted: true,
+          bioSubmitted: true,
+        },
+      },
     },
   })
 
   return coachProfile
+}
+
+// Get ambassador counts separately for better efficiency
+async function getAmbassadorCounts(coachId: string) {
+  const [pendingCount, approvedCount] = await Promise.all([
+    prisma.ambassador.count({ where: { coachId, status: 'PENDING' } }),
+    prisma.ambassador.count({ where: { coachId, status: 'APPROVED' } }),
+  ])
+  return { pendingCount, approvedCount }
 }
 
 async function getOnboardingTasks() {
@@ -68,6 +116,12 @@ async function getUpcomingEvents() {
     },
     orderBy: { startDate: 'asc' },
     take: 3,
+    select: {
+      id: true,
+      name: true,
+      location: true,
+      startDate: true,
+    },
   })
 }
 
@@ -88,6 +142,9 @@ export default async function CoachDashboard() {
     redirect('/login')
   }
 
+  // Fetch ambassador counts in parallel (only after we have coachData.id)
+  const ambassadorCounts = await getAmbassadorCounts(coachData.id)
+
   // Calculate onboarding progress
   const completedTasks = coachData.onboardingProgress.filter(
     (p) => p.status === 'APPROVED'
@@ -95,13 +152,9 @@ export default async function CoachDashboard() {
   const totalTasks = onboardingTasks.filter((t) => t.isRequired).length
   const onboardingPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
 
-  // Calculate ambassador stats
-  const pendingAmbassadors = coachData.ambassadors.filter(
-    (a) => a.status === 'PENDING'
-  ).length
-  const approvedAmbassadors = coachData.ambassadors.filter(
-    (a) => a.status === 'APPROVED'
-  ).length
+  // Ambassador stats from database counts
+  const pendingAmbassadors = ambassadorCounts.pendingCount
+  const approvedAmbassadors = ambassadorCounts.approvedCount
 
   // Calculate income stats
   const monthlyIncome = coachData.incomeEntries.reduce(

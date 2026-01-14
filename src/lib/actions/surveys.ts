@@ -349,7 +349,7 @@ export async function getSurveyById(surveyId: string) {
           questionType: q.questionType,
           isRequired: q.isRequired,
           sortOrder: q.sortOrder,
-          likertConfig: q.likertConfig,
+          likertConfig: q.likertConfig as { minLabel: string; maxLabel: string; minValue: number; maxValue: number } | null,
           minLength: q.minLength,
           maxLength: q.maxLength,
           options: q.options.map(o => ({
@@ -456,7 +456,7 @@ export async function addQuestion(surveyId: string, data: z.infer<typeof questio
         questionType: validated.data.questionType as SurveyQuestionType,
         isRequired: validated.data.isRequired,
         sortOrder: (maxSortOrder._max.sortOrder || 0) + 1,
-        likertConfig: validated.data.likertConfig || null,
+        likertConfig: validated.data.likertConfig || undefined,
         minLength: validated.data.minLength,
         maxLength: validated.data.maxLength,
         options: validated.data.options ? {
@@ -513,7 +513,7 @@ export async function updateQuestion(questionId: string, data: z.infer<typeof qu
         questionText: validated.data.questionText,
         questionType: validated.data.questionType as SurveyQuestionType,
         isRequired: validated.data.isRequired,
-        likertConfig: validated.data.likertConfig || null,
+        likertConfig: validated.data.likertConfig || undefined,
         minLength: validated.data.minLength,
         maxLength: validated.data.maxLength,
         options: validated.data.options ? {
@@ -621,7 +621,7 @@ export async function duplicateQuestion(questionId: string) {
         questionType: original.questionType,
         isRequired: original.isRequired,
         sortOrder: (maxSortOrder._max.sortOrder || 0) + 1,
-        likertConfig: original.likertConfig,
+        likertConfig: original.likertConfig === null ? undefined : original.likertConfig,
         minLength: original.minLength,
         maxLength: original.maxLength,
         options: original.options.length > 0 ? {
@@ -948,7 +948,7 @@ export async function getSurveyResults(surveyId: string) {
           responseCount: answers.length,
           average: values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0,
           distribution,
-          config,
+          config: config ?? undefined,
         }
       }
 
@@ -1045,6 +1045,375 @@ export async function getIndividualResponses(surveyId: string, page = 1, limit =
   } catch (error) {
     console.error('Error fetching individual responses:', error)
     return { error: 'Failed to fetch responses' }
+  }
+}
+
+// ============================================
+// PUBLIC SURVEY ACCESS (for assessments)
+// ============================================
+
+export async function getPublicSurvey(surveyId: string) {
+  try {
+    const survey = await prisma.survey.findUnique({
+      where: {
+        id: surveyId,
+        isPublic: true,
+        status: 'PUBLISHED',
+      },
+      include: {
+        questions: {
+          include: {
+            options: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    })
+
+    if (!survey) {
+      return { error: 'Survey not found or not available' }
+    }
+
+    return {
+      survey: {
+        id: survey.id,
+        title: survey.title,
+        description: survey.description,
+        type: survey.type,
+        showProgressBar: survey.showProgressBar,
+        requiresProspectInfo: survey.requiresProspectInfo,
+        questions: survey.questions.map(q => ({
+          id: q.id,
+          questionText: q.questionText,
+          questionType: q.questionType,
+          isRequired: q.isRequired,
+          sortOrder: q.sortOrder,
+          likertConfig: q.likertConfig as { minLabel: string; maxLabel: string; minValue: number; maxValue: number } | null,
+          minLength: q.minLength,
+          maxLength: q.maxLength,
+          options: q.options.map(o => ({
+            id: o.id,
+            optionText: o.optionText,
+            sortOrder: o.sortOrder,
+          })),
+        })),
+      },
+    }
+  } catch (error) {
+    console.error('Error fetching public survey:', error)
+    return { error: 'Failed to fetch survey' }
+  }
+}
+
+export async function getPublicSurveyList() {
+  try {
+    const surveys = await prisma.survey.findMany({
+      where: {
+        isPublic: true,
+        status: 'PUBLISHED',
+        OR: [
+          { closesAt: null },
+          { closesAt: { gte: new Date() } },
+        ],
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        _count: {
+          select: { questions: true },
+        },
+      },
+      orderBy: { publishedAt: 'desc' },
+    })
+
+    return {
+      surveys: surveys.map(s => ({
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        questionCount: s._count.questions,
+      })),
+    }
+  } catch (error) {
+    console.error('Error fetching public surveys:', error)
+    return { error: 'Failed to fetch surveys', surveys: [] }
+  }
+}
+
+interface PublicAnswerInput {
+  questionId: string
+  selectedOptionIds?: string[]
+  likertValue?: number
+  textResponse?: string
+}
+
+export async function submitPublicSurvey(
+  surveyId: string,
+  answers: PublicAnswerInput[],
+  prospectData?: {
+    firstName: string
+    lastName: string
+    email: string
+    phone?: string
+    phoneCountryCode?: string
+    referrerName?: string
+  }
+) {
+  try {
+    const survey = await prisma.survey.findUnique({
+      where: {
+        id: surveyId,
+        isPublic: true,
+        status: 'PUBLISHED',
+      },
+      include: {
+        questions: {
+          include: {
+            options: true,
+          },
+        },
+      },
+    })
+
+    if (!survey) {
+      return { error: 'Survey not found or not available' }
+    }
+
+    // If survey requires prospect info, validate it
+    if (survey.requiresProspectInfo) {
+      if (!prospectData?.firstName || !prospectData?.lastName || !prospectData?.email) {
+        return { error: 'Contact information is required for this assessment' }
+      }
+    }
+
+    // Create submission
+    const submission = await prisma.surveySubmission.create({
+      data: {
+        surveyId,
+        userId: null,
+        userRole: 'PROSPECT',
+        answers: {
+          create: answers.map(a => ({
+            questionId: a.questionId,
+            likertValue: a.likertValue,
+            textResponse: a.textResponse,
+            selectedOptions: a.selectedOptionIds ? {
+              connect: a.selectedOptionIds.map(id => ({ id })),
+            } : undefined,
+          })),
+        },
+      },
+    })
+
+    // If prospect data provided, create or update prospect
+    if (prospectData?.email) {
+      // Import the prospect creation logic
+      const existingProspect = await prisma.prospect.findUnique({
+        where: { email: prospectData.email },
+      })
+
+      if (existingProspect) {
+        // Update existing prospect with new submission
+        await prisma.prospect.update({
+          where: { id: existingProspect.id },
+          data: {
+            assessmentSurveyId: surveyId,
+            assessmentSubmissionId: submission.id,
+            assessmentCompletedAt: new Date(),
+          },
+        })
+      } else {
+        // Create new prospect
+        const prospect = await prisma.prospect.create({
+          data: {
+            firstName: prospectData.firstName,
+            lastName: prospectData.lastName,
+            email: prospectData.email,
+            phone: prospectData.phone,
+            phoneCountryCode: prospectData.phoneCountryCode,
+            referrerName: prospectData.referrerName,
+            assessmentSurveyId: surveyId,
+            assessmentSubmissionId: submission.id,
+            status: 'ASSESSMENT_COMPLETED',
+            assessmentCompletedAt: new Date(),
+            statusHistory: {
+              create: {
+                fromStatus: null,
+                toStatus: 'ASSESSMENT_COMPLETED',
+                notes: 'Assessment submitted',
+              },
+            },
+          },
+        })
+
+        // Notify admins
+        const admins = await prisma.user.findMany({
+          where: { role: 'ADMIN', status: 'ACTIVE' },
+          select: { id: true },
+        })
+
+        if (admins.length > 0) {
+          await prisma.adminNotification.createMany({
+            data: admins.map(admin => ({
+              userId: admin.id,
+              type: 'PROSPECT_ASSESSMENT_COMPLETED',
+              title: 'New Assessment Completed',
+              message: `${prospectData.firstName} ${prospectData.lastName} has completed the coach assessment.`,
+              entityType: 'Prospect',
+              entityId: prospect.id,
+              actionUrl: `/admin/prospects/${prospect.id}`,
+            })),
+          })
+        }
+
+        return {
+          success: true,
+          submissionId: submission.id,
+          prospectId: prospect.id,
+        }
+      }
+    }
+
+    return {
+      success: true,
+      submissionId: submission.id,
+    }
+  } catch (error) {
+    console.error('Error submitting public survey:', error)
+    return { error: 'Failed to submit survey' }
+  }
+}
+
+// ============================================
+// COACH ASSESSMENT SURVEY
+// ============================================
+
+const COACH_ASSESSMENT_TITLE = 'Coach Assessment'
+const COACH_ASSESSMENT_QUESTIONS = [
+  {
+    questionText: 'Are you passionate about youth development and in what way(s)?',
+    questionType: 'TEXT_LONG' as const,
+    isRequired: true,
+    sortOrder: 0,
+  },
+  {
+    questionText: 'Are you committed to your personal success? Note: Your success will help mentor our youth.',
+    questionType: 'TEXT_LONG' as const,
+    isRequired: true,
+    sortOrder: 1,
+  },
+  {
+    questionText: 'Are you willing to go through continued transformation in becoming a better version of yourself? Note: SOIA levels the playing field - no one is above another. It\'s not about who you are, what you\'ve achieved...it\'s what you can achieve in this program.',
+    questionType: 'TEXT_LONG' as const,
+    isRequired: true,
+    sortOrder: 2,
+  },
+]
+
+export async function getOrCreateCoachAssessment() {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // First, check if the coach assessment survey already exists
+    let survey = await prisma.survey.findFirst({
+      where: {
+        title: COACH_ASSESSMENT_TITLE,
+        isPublic: true,
+      },
+      include: {
+        questions: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    })
+
+    if (!survey) {
+      // Create the coach assessment survey
+      survey = await prisma.survey.create({
+        data: {
+          title: COACH_ASSESSMENT_TITLE,
+          description: 'Complete this assessment to begin your journey as a SOIA Coach.',
+          type: 'SURVEY',
+          status: 'PUBLISHED',
+          publishedAt: new Date(),
+          isPublic: true,
+          requiresProspectInfo: true,
+          showProgressBar: true,
+          allowedRoles: [],
+          isAnonymous: false,
+          scoreMode: 'NO_SCORING',
+          showResults: false,
+          allowRetake: false,
+          createdBy: session.user.id,
+          questions: {
+            create: COACH_ASSESSMENT_QUESTIONS.map((q, index) => ({
+              questionText: q.questionText,
+              questionType: q.questionType,
+              isRequired: q.isRequired,
+              sortOrder: index,
+            })),
+          },
+        },
+        include: {
+          questions: {
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      })
+
+      await prisma.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: 'CREATE_SURVEY',
+          entityType: 'Survey',
+          entityId: survey.id,
+          details: 'Created Coach Assessment survey',
+        },
+      })
+    }
+
+    return {
+      survey: {
+        id: survey.id,
+        title: survey.title,
+        description: survey.description,
+        status: survey.status,
+        questionCount: survey.questions.length,
+        isPublic: survey.isPublic,
+      },
+    }
+  } catch (error) {
+    console.error('Error getting/creating coach assessment:', error)
+    return { error: 'Failed to get assessment survey' }
+  }
+}
+
+export async function getCoachAssessmentLink() {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Get or create the assessment
+    const result = await getOrCreateCoachAssessment()
+    if (result.error || !result.survey) {
+      return { error: result.error || 'Failed to get assessment' }
+    }
+
+    return {
+      surveyId: result.survey.id,
+      assessmentLink: `/assessment/${result.survey.id}`,
+    }
+  } catch (error) {
+    console.error('Error getting assessment link:', error)
+    return { error: 'Failed to get assessment link' }
   }
 }
 

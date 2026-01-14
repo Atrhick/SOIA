@@ -37,7 +37,7 @@ The StageOneInAction Back Office provides:
 - WhatsApp support team and Power Team integration
 - **Parental consent flow** for ambassadors under 18 (parent/guardian gets their own login)
 - **Time Clock** - Clock in/out for attendance tracking
-- **Collaboration** - Access to team discussion channels
+- **Collaboration** - Access to team channels with @mentions and emoji reactions
 - **Scheduling** - View calendar and RSVP to events
 - **Knowledge Base** - Browse articles and documentation
 
@@ -52,12 +52,13 @@ The StageOneInAction Back Office provides:
 - Direct messaging with administrators
 - **CRM** - Contacts, deals, pipeline stages, and activity tracking
 - **Project Management** - Projects with tasks and milestones
-- **Collaboration** - Team discussions and document sharing
+- **Collaboration** - Slack-like team discussions with channels, DMs, @mentions, emoji reactions, and file sharing
 - **Time Tracking** - Clock in/out and project-based time logging
 - **Scheduling** - Calendar events and meeting management
 - **Knowledge Base** - Browse articles and documentation
 
 **For Administrators:**
+- **Coach Prospect Pipeline** - Track prospective coaches from assessment through payment and account creation
 - Coach and ambassador management
 - **User impersonation** - Login as any coach or ambassador to view their experience (with visual banner indicator)
 - **Create ambassador accounts** - Add ambassadors and assign them to coaches with enhanced form inputs
@@ -129,12 +130,13 @@ The StageOneInAction Back Office provides:
 | Per-User Feature Permissions | - | - | ✅ | Complete |
 | CRM | - | ✅ | ✅ | Complete |
 | Project Management | - | ✅ | - | Complete |
-| Collaboration (Channels) | - | ✅ | ✅ | Complete |
+| Collaboration (Channels, DMs, Reactions, Mentions) | ✅ | ✅ | ✅ | Complete |
 | Shared Documents | - | ✅ | ✅ | Complete |
 | Time Clock | ✅ | ✅ | ✅ | Complete |
 | Scheduling & Calendar | ✅ | ✅ | ✅ | Complete |
 | Knowledge Base | ✅ | ✅ | ✅ | Complete |
 | Surveys & Quizzes | ✅ | ✅ | ✅ | Complete |
+| Coach Prospect Pipeline | - | - | ✅ | Complete |
 
 ### Future Enhancements
 
@@ -280,6 +282,12 @@ test_app/
 │   │   │   ├── ambassador-login/ # Ambassador login portal
 │   │   │   ├── forgot-password/ # Password reset
 │   │   │   └── layout.tsx       # Auth layout with animations
+│   │   ├── (public)/            # Public routes (no auth required)
+│   │   │   ├── layout.tsx       # Minimal public layout
+│   │   │   ├── assessment/[surveyId]/ # Public assessment form
+│   │   │   ├── business-form/[token]/ # Business development form
+│   │   │   ├── acceptance/[token]/    # Acceptance letter with payment
+│   │   │   └── book/[slug]/           # Calendar booking page
 │   │   ├── (dashboard)/         # Dashboard routes (protected)
 │   │   │   ├── admin/           # Admin pages
 │   │   │   │   ├── ambassadors/ # Ambassador management
@@ -293,6 +301,7 @@ test_app/
 │   │   │   │   ├── features/    # Feature toggle configuration
 │   │   │   │   ├── knowledge-base/ # Article management
 │   │   │   │   ├── messages/    # Message threads
+│   │   │   │   ├── prospects/   # Coach prospect pipeline
 │   │   │   │   ├── reports/     # Reports & analytics
 │   │   │   │   ├── resource-centers/ # Resource center applications
 │   │   │   │   ├── sponsorship/ # Sponsorship review
@@ -339,6 +348,15 @@ test_app/
 │   │   ├── layout.tsx           # Root layout
 │   │   └── page.tsx             # Home redirect
 │   ├── components/
+│   │   ├── collaboration/       # Collaboration UI components
+│   │   │   ├── EmojiPicker.tsx  # Emoji reaction picker
+│   │   │   ├── ReactionBar.tsx  # Display reactions with counts
+│   │   │   ├── MentionInput.tsx # Textarea with @mention autocomplete
+│   │   │   ├── ThreadPanel.tsx  # Threaded replies panel
+│   │   │   ├── AttachmentPicker.tsx # Document attachment modal
+│   │   │   ├── MeetingLinkCard.tsx  # Meeting link display
+│   │   │   ├── MessageBubble.tsx    # Styled message component
+│   │   │   └── index.ts         # Barrel exports
 │   │   ├── dashboard/           # Dashboard components
 │   │   │   ├── header.tsx       # Header with user menu & impersonation
 │   │   │   └── sidebar.tsx
@@ -446,10 +464,14 @@ test_app/
 | **Project** | Projects with status and date tracking |
 | **Task** | Project tasks with priority and status |
 | **ProjectMilestone** | Project milestones with due dates |
-| **CollaborationChannel** | Discussion channels with role-based access |
-| **ChannelPost** | Posts within collaboration channels |
-| **ChannelPostReply** | Replies to channel posts |
-| **ChannelMember** | Channel membership tracking |
+| **CollaborationChannel** | Discussion channels and DM conversations with role-based access |
+| **ChannelPost** | Posts within collaboration channels (with reactions, mentions, attachments) |
+| **ChannelPostReply** | Replies to channel posts (with reactions, mentions) |
+| **ChannelMember** | Channel membership tracking with unread status |
+| **PostReaction** | Emoji reactions on posts and replies |
+| **PostMention** | @mention tracking with read status |
+| **PostAttachment** | File attachments linked to posts/replies |
+| **MeetingLink** | Meeting URLs (Zoom, Google Meet, Teams) linked to channels/posts |
 | **SharedDocument** | Shared documents with role-based access |
 | **TimeClockEntry** | Clock in/out entries for attendance |
 | **TimeEntry** | Project-based time logging |
@@ -457,6 +479,15 @@ test_app/
 | **EventAttendee** | Event attendance with RSVP status |
 | **KBCategory** | Knowledge base categories with hierarchy |
 | **KBArticle** | Knowledge base articles with publishing workflow |
+
+### Coach Prospect Pipeline Entities
+
+| Entity | Description |
+|--------|-------------|
+| **Prospect** | Prospective coach tracking through onboarding pipeline |
+| **ProspectStatusHistory** | Audit trail of prospect status changes |
+| **ProspectPayment** | Payment tracking (Stripe, PayPal, Manual methods) |
+| **AdminNotification** | In-app notifications for admin users |
 
 ### Key Relationships
 
@@ -604,11 +635,13 @@ The application primarily uses Next.js Server Actions for data mutations:
 | `users.ts` | getAllUsers, createUser, updateUserRole, deleteUser, resetUserPassword, getUserFeaturePermissions, setUserFeaturePermission, setUserFeaturePermissions |
 | `crm.ts` | CRM contacts, deals, pipeline stages, and activities CRUD |
 | `projects.ts` | Projects, tasks, and milestones CRUD |
-| `collaboration.ts` | getChannels, createChannel, updateChannel, deleteChannel, createPost, createReply, getSharedDocuments, createSharedDocument |
+| `collaboration.ts` | Channels, posts, replies, DMs, reactions (addReaction, removeReaction), mentions (getMentionableUsers, getUserMentions), attachments, meeting links, shared documents |
 | `time-clock.ts` | clockIn, clockOut, getTimeClockEntries, createTimeEntry, getTimeEntries |
 | `scheduling.ts` | Calendar events and attendee management |
 | `knowledge-base.ts` | getKBCategories, getKBArticles, createKBArticle, updateKBArticle, publishKBArticle |
-| `surveys.ts` | createSurvey, addQuestion, updateQuestion, deleteQuestion, reorderQuestions, duplicateQuestion, submitSurvey, getSurveyResults, exportSurveyResultsCSV |
+| `surveys.ts` | createSurvey, addQuestion, updateQuestion, deleteQuestion, reorderQuestions, duplicateQuestion, submitSurvey, getSurveyResults, exportSurveyResultsCSV, getOrCreateCoachAssessment, getCoachAssessmentLink, submitPublicSurvey |
+| `prospects.ts` | createManualProspect, getProspect, getAllProspects, updateProspectStatus, getProspectStats |
+| `notifications.ts` | createNotification, getUnreadNotifications, markNotificationAsRead, getNotificationCount |
 
 ---
 
@@ -718,6 +751,57 @@ Progress is tracked with visual indicators and the coach status updates automati
 - Update thread status (Open, In Progress, Resolved)
 - Reply to coaches
 
+### Collaboration (Slack-like Messaging)
+
+The Collaboration feature provides Slack-like team communication:
+
+**Sidebar Navigation:**
+- Expandable sub-menu under Communication (Coach/Admin) or Tools (Ambassador)
+- Channels - Team discussion threads
+- Direct Messages - Private 1:1 conversations
+- Files - Shared document management (Coach/Admin only)
+
+**Channels:**
+- Public and private channels with role-based access
+- Create posts with @mentions (type `@` to see autocomplete)
+- Add emoji reactions to posts (13 supported emojis)
+- Reply to posts with threaded conversations
+- Pin important posts
+- Join/leave channels
+
+**Direct Messages:**
+- Start private conversations with any user
+- Full message history
+- Same @mention and reaction features as channels
+
+**@Mentions:**
+- Type `@` in any message to trigger autocomplete dropdown
+- Select a user to insert formatted mention: `@[Name](user:userId)`
+- Mentions are highlighted in blue when displayed
+- Users can view their mentions and mark as read
+
+**Emoji Reactions:**
+- Click the smiley icon to add a reaction
+- Supported emojis: +1, -1, heart, smile, laugh, thinking, clap, fire, eyes, check, x, question, celebration
+- Reactions grouped by emoji with count
+- Click existing reaction to add/remove your own
+
+**Meeting Links:**
+- Add Zoom, Google Meet, or Microsoft Teams links
+- Auto-detection of meeting provider from URL
+- Join button to open meeting in new tab
+
+**UI Components (`src/components/collaboration/`):**
+| Component | Purpose |
+|-----------|---------|
+| `EmojiPicker` | Popover with emoji grid for reactions |
+| `ReactionBar` | Display grouped reactions with counts |
+| `MentionInput` | Textarea with @mention autocomplete |
+| `ThreadPanel` | Slide-out panel for threaded replies |
+| `AttachmentPicker` | Modal to select/upload documents |
+| `MeetingLinkCard` | Card showing meeting info with Join button |
+| `MessageBubble` | Styled message with author, reactions, replies |
+
 ### Admin-Configurable Business Tools
 
 The platform includes 6 configurable business tools that can be enabled/disabled per role:
@@ -726,7 +810,7 @@ The platform includes 6 configurable business tools that can be enabled/disabled
 |---------|-------------|-------|------------|
 | **CRM** | Contact management with deals pipeline | Full access | - |
 | **Project Management** | Projects, tasks, milestones | Full access | - |
-| **Collaboration** | Discussion channels and document sharing | Full access | Read/participate |
+| **Collaboration** | Slack-like channels, DMs, @mentions, reactions, file sharing | Full access | Read/participate |
 | **Time Clock** | Attendance clock in/out and time logging | Full access | Full access |
 | **Scheduling** | Calendar events and meeting management | Full access | View/RSVP |
 | **Knowledge Base** | Articles and documentation | Full access | Read-only |
@@ -794,15 +878,69 @@ Create and manage quizzes (scored) and surveys (feedback collection):
 **Coach/Ambassador Workflow:**
 1. View available surveys in their dashboard
 2. Click "Start" to begin a survey
-3. Answer all required questions
-4. Submit and view results (if enabled)
-5. Retake if allowed
+3. Answer questions one at a time (paginated display)
+4. Progress bar shows current question and completion percentage
+5. Use Previous/Next buttons to navigate
+6. Submit on final question and view results (if enabled)
+7. Retake if allowed
 
 **Results & Analytics (Admin):**
 - Overview tab: Total responses, pass rate (quizzes), role breakdown charts
 - Question Analysis tab: Per-question statistics with charts
 - Individual Responses tab: View each submission with answers
 - Export to CSV for further analysis
+
+### Coach Prospect Pipeline
+
+A comprehensive system for tracking prospective coaches from initial assessment through payment and account creation.
+
+**Workflow Overview:**
+1. Admin clicks "Get Assessment Link" in Prospects page
+2. Admin shares the public assessment URL with prospective coach
+3. Prospect completes assessment (no login required):
+   - Provides contact info (name, email, phone, referrer)
+   - Answers 3 assessment questions (paginated with progress bar)
+   - Sees completion message: "Someone will reach out within 24 hours to schedule orientation"
+4. Prospect record auto-created with status ASSESSMENT_COMPLETED
+5. Admin receives notification and sees prospect in pipeline
+6. Admin manages prospect through pipeline stages
+
+**Assessment Questions:**
+1. "Are you passionate about youth development and in what way(s)?"
+2. "Are you committed to your personal success? Note: Your success will help mentor our youth."
+3. "Are you willing to go through continued transformation in becoming a better version of yourself?"
+
+**Prospect Status Flow:**
+```
+ASSESSMENT_PENDING → ASSESSMENT_COMPLETED → ORIENTATION_SCHEDULED →
+ORIENTATION_COMPLETED → BUSINESS_FORM_PENDING → BUSINESS_FORM_SUBMITTED →
+INTERVIEW_SCHEDULED → INTERVIEW_COMPLETED → APPROVED/REJECTED →
+ACCEPTANCE_PENDING → PAYMENT_PENDING → PAYMENT_COMPLETED → ACCOUNT_CREATED
+```
+
+**Admin Features:**
+- **Get Assessment Link** - Generates shareable URL with copy button
+- **Add Prospect** - Manual prospect creation form
+- **Pipeline View** - Filter prospects by status
+- **Prospect Detail** - View full info, assessment answers, status timeline
+- **Generated Links Section** - Shows all generated links (business form, acceptance) with copy buttons for easy resending
+- **Status Management** - Update prospect status with notes; copy link buttons shown when tokens exist
+
+**Business Development Form:**
+- Public form accessed via token link (no login required)
+- Collects: Company name, bio, vision/mission statements, services, pricing structure
+- **"Other" service option** - Prospects can select "Other" and enter a custom service not in the predefined list
+- Predefined services: Life Coaching, Mentoring, Training & Workshops, Business Consulting, Public Speaking, Writing & Content
+
+**Routes:**
+| Route | Description |
+|-------|-------------|
+| `/admin/prospects` | Prospect list/pipeline view |
+| `/admin/prospects/[id]` | Prospect detail page |
+| `/assessment/[surveyId]` | Public assessment form (no auth) |
+| `/business-form/[token]` | Public business development form (no auth) |
+| `/acceptance/[token]` | Public acceptance letter with payment (no auth) |
+| `/book/[slug]` | Public calendar booking page (no auth) |
 
 ### Sidebar Navigation
 

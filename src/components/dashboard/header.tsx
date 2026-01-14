@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
-import { Bell, LogOut, User, Users, ChevronDown, ArrowLeftRight, Shield } from 'lucide-react'
+import { LogOut, User, Users, ChevronDown, ArrowLeftRight, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { getUsersForImpersonation, getImpersonationData } from '@/lib/actions/impersonation'
 import { useRouter } from 'next/navigation'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 
 interface HeaderProps {
   user: {
@@ -111,11 +112,8 @@ export function Header({ user }: HeaderProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Notifications */}
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
-            </Button>
+            {/* Notifications - Only for Admin */}
+            {user.role === 'ADMIN' && <NotificationBell />}
 
             {/* User Menu */}
             <DropdownMenu onOpenChange={(open) => { if (open) loadUsers() }}>

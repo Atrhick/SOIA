@@ -7,6 +7,7 @@ This file provides context for AI assistants working on the StageOneInAction Bac
 This is a **Next.js 14** web application for managing coaches and ambassadors in the StageOneInAction organization. It's a comprehensive back-office platform with role-based access for Admins, Coaches, and Ambassadors.
 
 ### Key Features
+- **Coach Prospect Pipeline**: Public assessment surveys for prospective coaches with automatic prospect tracking through the onboarding pipeline
 - **Admin Impersonation**: Admins can view the app as any coach or ambassador via the profile dropdown menu (with visual banner indicator)
 - **Ambassador Profile Editing**: Ambassadors can edit their profile with photo URL, bio, and social media links
 - **Ambassador Account Creation**: Admins/Coaches can create ambassador accounts (ages 10-24) with enhanced form inputs
@@ -80,10 +81,21 @@ Session includes: `id`, `email`, `role`, `coachId` (for coaches), `ambassadorId`
 - `CRMPipelineStage` / `CRMContact` / `CRMDeal` / `CRMActivity` - CRM system
 - `Project` / `Task` / `ProjectMilestone` - Project management
 - `CollaborationChannel` / `ChannelPost` / `ChannelPostReply` / `ChannelMember` - Discussion channels
+- `PostReaction` - Emoji reactions on posts/replies (13 supported emojis)
+- `PostMention` - @mention tracking with read status
+- `PostAttachment` - File attachments linked to posts/replies
+- `MeetingLink` - Meeting URLs (Zoom, Google Meet, Teams)
 - `SharedDocument` - Document sharing with role-based access
 - `TimeClockEntry` / `TimeEntry` - Time tracking (attendance + project-based)
 - `CalendarEvent` / `EventAttendee` - Scheduling and calendar
 - `KBCategory` / `KBArticle` - Knowledge base with publishing workflow
+
+### Coach Prospect Pipeline Models
+
+- `Prospect` - Prospective coach tracking through onboarding pipeline
+- `ProspectStatusHistory` - Audit trail of status changes
+- `ProspectPayment` - Payment tracking (Stripe, PayPal, Manual)
+- `AdminNotification` - In-app notifications for admins
 
 ### Important Field Names
 
@@ -115,8 +127,9 @@ src/app/(dashboard)/
 src/lib/actions/     # Server actions
 src/components/
 ├── providers.tsx    # SessionProvider wrapper (required for useSession)
+├── collaboration/   # Slack-like messaging components (EmojiPicker, ReactionBar, MentionInput, etc.)
 ├── dashboard/       # Header with impersonation, Sidebar
-└── ui/              # Reusable UI components (dropdown-menu, dialog, etc.)
+└── ui/              # Reusable UI components (dropdown-menu, dialog, checkbox, etc.)
 ```
 
 ## Common Patterns
@@ -403,20 +416,81 @@ await setUserFeaturePermission(userId, 'CRM', false)
 await setUserFeaturePermission(userId, 'CRM', null)
 ```
 
-## Collaboration System
+## Collaboration System (Slack-like Messaging)
 
-Team discussion channels and document sharing:
+Slack-like team communication with channels, DMs, @mentions, and reactions:
 
 **Key files:**
-- `src/lib/actions/collaboration.ts` - Channel and document actions
-- `src/app/(dashboard)/admin/collaboration/` - Admin channel management
-- `src/app/(dashboard)/coach/collaboration/` - Coach collaboration view
-- `src/app/(dashboard)/ambassador/collaboration/` - Ambassador collaboration view
+- `src/lib/actions/collaboration.ts` - All collaboration server actions
+- `src/components/collaboration/` - Reusable UI components
+- `src/app/(dashboard)/*/collaboration/channels/` - Channel pages per role
+- `src/app/(dashboard)/*/collaboration/messages/` - DM pages per role
+- `src/app/(dashboard)/*/collaboration/files/` - File management (Coach/Admin only)
+
+**Route Structure:**
+```
+src/app/(dashboard)/[role]/collaboration/
+├── page.tsx                    # Redirects to /channels
+├── channels/
+│   ├── page.tsx                # Channels list (server)
+│   └── channels-client.tsx     # Channels UI (client)
+├── messages/
+│   ├── page.tsx                # DM list (server)
+│   └── messages-client.tsx     # DM UI (client)
+└── files/
+    ├── page.tsx                # Files list (server)
+    └── files-client.tsx        # Files UI (client)
+```
+
+**UI Components (`src/components/collaboration/`):**
+- `EmojiPicker` - Popover with 13 emoji reactions
+- `ReactionBar` - Display grouped reactions with counts
+- `MentionInput` - Textarea with @mention autocomplete dropdown
+- `ThreadPanel` - Slide-out panel for threaded replies
+- `AttachmentPicker` - Modal to select/upload documents
+- `MeetingLinkCard` - Card for Zoom/Google Meet/Teams links
+- `MessageBubble` - Styled message with author, reactions, replies
+
+**@Mention Format:**
+- Stored in content: `@[Display Name](user:userId)`
+- Parse with: `/@\[([^\]]+)\]\(user:([^)]+)\)/g`
+- Render with: `renderMentions(content)` helper
+
+**Supported Emojis:**
+`+1`, `-1`, `heart`, `smile`, `laugh`, `thinking`, `clap`, `fire`, `eyes`, `check`, `x`, `question`, `celebration`
+
+**Meeting Link Providers:**
+`ZOOM`, `GOOGLE_MEET`, `MICROSOFT_TEAMS`, `CUSTOM`
+
+**Key Server Actions:**
+```typescript
+// Reactions
+addReaction(postId, replyId, emoji)
+removeReaction(reactionId)
+
+// Mentions
+getMentionableUsers(channelId)
+getUserMentions()
+markMentionAsRead(mentionId)
+
+// Attachments
+attachDocumentToPost(postId, replyId, documentId)
+removeAttachment(attachmentId)
+
+// Meeting Links
+addMeetingLink(channelId, postId, provider, url, title)
+removeMeetingLink(linkId)
+```
 
 **Features:**
-- Channels with role-based access (allowedRoles array)
-- Posts and replies within channels
+- Public/private channels with role-based access
+- Direct messages (1:1 conversations)
+- @mention autocomplete with user search
+- Emoji reactions with grouped counts
+- Threaded replies on posts
 - Pin/unpin posts
+- File attachments linked to SharedDocument
+- Meeting link integration with auto-detection
 - Shared documents with role-based visibility
 
 ## Knowledge Base
@@ -431,7 +505,98 @@ Articles and documentation for coaches and ambassadors:
 - DRAFT → PUBLISHED → ARCHIVED
 - Categories with hierarchy (parentId)
 - Role-based access (allowedRoles array)
-- View count tracking
+
+## Coach Prospect Pipeline
+
+Tracks prospective coaches from initial assessment through payment and account creation.
+
+**Key files:**
+- `src/lib/actions/prospects.ts` - Prospect CRUD and status management
+- `src/lib/actions/surveys.ts` - `getOrCreateCoachAssessment()`, `getCoachAssessmentLink()`
+- `src/app/(dashboard)/admin/prospects/` - Admin prospect management
+- `src/app/(public)/assessment/[surveyId]/` - Public assessment form (no login required)
+
+**Route Structure:**
+```
+src/app/(public)/
+├── layout.tsx                    # Minimal public layout
+├── assessment/
+│   └── [surveyId]/
+│       ├── page.tsx              # Server component
+│       └── assessment-client.tsx # Paginated form with progress bar
+├── business-form/
+│   └── [token]/
+│       ├── page.tsx              # Server component
+│       └── business-form-client.tsx # Business development form
+├── acceptance/
+│   └── [token]/
+│       ├── page.tsx              # Server component
+│       └── acceptance-client.tsx # Acceptance letter with payment
+└── book/
+    └── [slug]/
+        ├── page.tsx              # Calendar booking page
+        └── booking-client.tsx    # Slot selection UI
+
+src/app/(dashboard)/admin/prospects/
+├── page.tsx                      # Prospect list (server)
+├── prospects-client.tsx          # List with pipeline view (client)
+└── [id]/
+    ├── page.tsx                  # Prospect detail (server)
+    └── prospect-detail-client.tsx # Detail view (client)
+```
+
+**Prospect Status Flow:**
+```
+ASSESSMENT_PENDING → ASSESSMENT_COMPLETED → ORIENTATION_SCHEDULED →
+ORIENTATION_COMPLETED → BUSINESS_FORM_PENDING → BUSINESS_FORM_SUBMITTED →
+INTERVIEW_SCHEDULED → INTERVIEW_COMPLETED → APPROVED/REJECTED →
+ACCEPTANCE_PENDING → PAYMENT_PENDING → PAYMENT_COMPLETED → ACCOUNT_CREATED
+```
+
+**Assessment Survey:**
+- Auto-created with 3 required TEXT_LONG questions:
+  1. "Are you passionate about youth development and in what way(s)?"
+  2. "Are you committed to your personal success?"
+  3. "Are you willing to go through continued transformation..."
+- Shows progress bar and one question per page
+- Collects prospect info: firstName, lastName, email, phone, referrerName
+- Completion message: "Someone will reach out within 24 hours to schedule orientation"
+
+**Getting the Assessment Link:**
+```typescript
+import { getCoachAssessmentLink } from '@/lib/actions/surveys'
+
+const result = await getCoachAssessmentLink()
+// result.assessmentLink = "/assessment/[surveyId]"
+```
+
+**Creating a Prospect Manually:**
+```typescript
+import { createManualProspect } from '@/lib/actions/prospects'
+
+await createManualProspect({
+  firstName: 'John',
+  lastName: 'Doe',
+  email: 'john@example.com',
+  phone: '555-1234',
+  referrerName: 'Jane Smith',
+})
+```
+
+**Admin UI Features:**
+- "Get Assessment Link" button - generates shareable URL with copy functionality
+- "Add Prospect" button - manual prospect creation form
+- Pipeline view with status filtering
+- Prospect detail page with status timeline
+- **Generated Links section** - Shows all generated links (business form, acceptance) with copy buttons for easy resending
+- Status-based action buttons show "Copy Link" when tokens already exist
+
+**Business Development Form:**
+- Public form accessed via token (no login required)
+- Route: `/business-form/[token]`
+- Fields: Company name, bio, vision/mission statements, services, pricing
+- **"Other" service option** - Prospects can select "Other" and enter a custom service not in the predefined list
+- Predefined services: Life Coaching, Mentoring Services, Training & Workshops, Business Consulting, Public Speaking, Writing & Content
 
 ## Surveys & Quizzes
 
@@ -469,6 +634,13 @@ Unified survey builder for creating quizzes and surveys:
 - Question duplication
 - Inline settings editing
 - Live preview for Likert scales
+
+**Survey taking experience (Coach/Ambassador):**
+- Paginated display (one question per page)
+- Progress bar showing "Question X of Y" and percentage
+- Previous/Next navigation buttons
+- Validation before proceeding to next question
+- Submit button on final question
 
 **Server actions:**
 ```typescript

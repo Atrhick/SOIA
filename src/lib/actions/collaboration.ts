@@ -26,8 +26,16 @@ const createReplySchema = z.object({
 // Helper to revalidate all collaboration paths
 function revalidateCollaboration() {
   revalidatePath('/admin/collaboration')
+  revalidatePath('/admin/collaboration/channels')
+  revalidatePath('/admin/collaboration/messages')
+  revalidatePath('/admin/collaboration/files')
   revalidatePath('/coach/collaboration')
+  revalidatePath('/coach/collaboration/channels')
+  revalidatePath('/coach/collaboration/messages')
+  revalidatePath('/coach/collaboration/files')
   revalidatePath('/ambassador/collaboration')
+  revalidatePath('/ambassador/collaboration/channels')
+  revalidatePath('/ambassador/collaboration/messages')
 }
 
 // ============ CHANNELS ============
@@ -57,6 +65,7 @@ export async function getChannels() {
     return {
       channels: channels.map(c => ({
         ...c,
+        name: c.name || 'Untitled Channel',
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
         postCount: c._count.posts,
@@ -82,8 +91,12 @@ export async function getChannel(channelId: string) {
         posts: {
           include: {
             replies: {
+              include: {
+                reactions: true,
+              },
               orderBy: { createdAt: 'asc' }
-            }
+            },
+            reactions: true,
           },
           orderBy: { createdAt: 'desc' },
           take: 50,
@@ -104,6 +117,21 @@ export async function getChannel(channelId: string) {
       return { error: 'Access denied' }
     }
 
+    // Get user info for post/reply authors and reactions
+    const authorIds = new Set<string>()
+    channel.posts.forEach(p => {
+      authorIds.add(p.authorId)
+      p.replies.forEach(r => authorIds.add(r.authorId))
+      p.reactions.forEach(r => authorIds.add(r.userId))
+      p.replies.forEach(reply => reply.reactions.forEach(r => authorIds.add(r.userId)))
+    })
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: Array.from(authorIds) } },
+      select: { id: true, email: true },
+    })
+    const userMap = new Map(users.map(u => [u.id, u.email.split('@')[0]]))
+
     return {
       channel: {
         ...channel,
@@ -111,11 +139,23 @@ export async function getChannel(channelId: string) {
         updatedAt: channel.updatedAt.toISOString(),
         posts: channel.posts.map(p => ({
           ...p,
+          authorName: userMap.get(p.authorId) || 'Unknown',
           createdAt: p.createdAt.toISOString(),
           updatedAt: p.updatedAt.toISOString(),
+          reactions: p.reactions.map(r => ({
+            ...r,
+            userName: userMap.get(r.userId),
+            createdAt: r.createdAt.toISOString(),
+          })),
           replies: p.replies.map(r => ({
             ...r,
+            authorName: userMap.get(r.authorId) || 'Unknown',
             createdAt: r.createdAt.toISOString(),
+            reactions: r.reactions.map(reaction => ({
+              ...reaction,
+              userName: userMap.get(reaction.userId),
+              createdAt: reaction.createdAt.toISOString(),
+            })),
           }))
         })),
         members: channel.members.map(m => ({
@@ -598,7 +638,7 @@ export async function getDirectMessages() {
         email: true,
         role: true,
         coachProfile: { select: { firstName: true, lastName: true } },
-        ambassador: { select: { firstName: true, lastName: true } },
+        ambassadorProfile: { select: { firstName: true, lastName: true } },
       }
     })
 
@@ -614,8 +654,8 @@ export async function getDirectMessages() {
             if (!user) return null
             const name = user.coachProfile
               ? `${user.coachProfile.firstName} ${user.coachProfile.lastName}`
-              : user.ambassador
-                ? `${user.ambassador.firstName} ${user.ambassador.lastName}`
+              : user.ambassadorProfile
+                ? `${user.ambassadorProfile.firstName} ${user.ambassadorProfile.lastName}`
                 : user.email
             return {
               userId: m.userId,
@@ -798,7 +838,7 @@ export async function getDirectMessageHistory(channelId: string) {
         email: true,
         role: true,
         coachProfile: { select: { firstName: true, lastName: true } },
-        ambassador: { select: { firstName: true, lastName: true } },
+        ambassadorProfile: { select: { firstName: true, lastName: true } },
       }
     })
 
@@ -809,8 +849,8 @@ export async function getDirectMessageHistory(channelId: string) {
       if (!user) return 'Unknown'
       return user.coachProfile
         ? `${user.coachProfile.firstName} ${user.coachProfile.lastName}`
-        : user.ambassador
-          ? `${user.ambassador.firstName} ${user.ambassador.lastName}`
+        : user.ambassadorProfile
+          ? `${user.ambassadorProfile.firstName} ${user.ambassadorProfile.lastName}`
           : user.email
     }
 
@@ -898,7 +938,7 @@ export async function getUsersForDM() {
         email: true,
         role: true,
         coachProfile: { select: { firstName: true, lastName: true } },
-        ambassador: { select: { firstName: true, lastName: true } },
+        ambassadorProfile: { select: { firstName: true, lastName: true } },
       },
       orderBy: { email: 'asc' }
     })
@@ -910,13 +950,683 @@ export async function getUsersForDM() {
         role: u.role,
         name: u.coachProfile
           ? `${u.coachProfile.firstName} ${u.coachProfile.lastName}`
-          : u.ambassador
-            ? `${u.ambassador.firstName} ${u.ambassador.lastName}`
+          : u.ambassadorProfile
+            ? `${u.ambassadorProfile.firstName} ${u.ambassadorProfile.lastName}`
             : u.email,
       }))
     }
   } catch (error) {
     console.error('Error fetching users for DM:', error)
     return { error: 'Failed to fetch users' }
+  }
+}
+
+// ============ DOCUMENT UPLOAD ============
+
+export async function uploadDocument(formData: FormData) {
+  const session = await auth()
+  if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'COACH')) {
+    return { error: 'Unauthorized' }
+  }
+
+  const title = formData.get('title') as string
+  const description = formData.get('description') as string
+  const fileName = formData.get('fileName') as string
+  const fileUrl = formData.get('fileUrl') as string
+  const category = formData.get('category') as string
+  const isPublic = formData.get('isPublic') === 'true'
+  const allowedRoles = JSON.parse(formData.get('allowedRoles') as string || '["ADMIN", "COACH", "AMBASSADOR"]')
+
+  if (!title || !fileName || !fileUrl) {
+    return { error: 'Title, file name, and URL are required' }
+  }
+
+  try {
+    const document = await prisma.sharedDocument.create({
+      data: {
+        uploaderId: session.user.id,
+        title,
+        description: description || null,
+        fileName,
+        fileUrl,
+        category: category || null,
+        isPublic,
+        allowedRoles,
+      },
+    })
+
+    revalidateCollaboration()
+    return {
+      success: true,
+      document: {
+        ...document,
+        createdAt: document.createdAt.toISOString(),
+        updatedAt: document.updatedAt.toISOString(),
+      }
+    }
+  } catch (error) {
+    console.error('Error uploading document:', error)
+    return { error: 'Failed to upload document' }
+  }
+}
+
+// ============ REACTIONS ============
+
+const SUPPORTED_EMOJIS = ['+1', '-1', 'heart', 'smile', 'laugh', 'thinking', 'clap', 'fire', 'eyes', 'check', 'x', 'question', 'celebration']
+
+export async function addReaction(postId: string | null, replyId: string | null, emoji: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  if (!postId && !replyId) {
+    return { error: 'Post ID or Reply ID is required' }
+  }
+
+  if (!SUPPORTED_EMOJIS.includes(emoji)) {
+    return { error: 'Invalid emoji' }
+  }
+
+  try {
+    const reaction = await prisma.postReaction.create({
+      data: {
+        postId,
+        replyId,
+        userId: session.user.id,
+        emoji,
+      },
+    })
+
+    revalidateCollaboration()
+    return { success: true, reaction }
+  } catch (error: any) {
+    // Handle unique constraint violation (user already reacted with this emoji)
+    if (error?.code === 'P2002') {
+      return { error: 'You already reacted with this emoji' }
+    }
+    console.error('Error adding reaction:', error)
+    return { error: 'Failed to add reaction' }
+  }
+}
+
+export async function removeReaction(reactionId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const reaction = await prisma.postReaction.findUnique({
+      where: { id: reactionId },
+    })
+
+    if (!reaction) {
+      return { error: 'Reaction not found' }
+    }
+
+    // Only the user who created the reaction can remove it
+    if (reaction.userId !== session.user.id && session.user.role !== 'ADMIN') {
+      return { error: 'Unauthorized' }
+    }
+
+    await prisma.postReaction.delete({
+      where: { id: reactionId },
+    })
+
+    revalidateCollaboration()
+    return { success: true }
+  } catch (error) {
+    console.error('Error removing reaction:', error)
+    return { error: 'Failed to remove reaction' }
+  }
+}
+
+export async function getPostReactions(postId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const reactions = await prisma.postReaction.findMany({
+      where: { postId },
+    })
+
+    // Group by emoji and count
+    const grouped = reactions.reduce((acc, r) => {
+      if (!acc[r.emoji]) {
+        acc[r.emoji] = { count: 0, userIds: [], hasUserReacted: false }
+      }
+      acc[r.emoji].count++
+      acc[r.emoji].userIds.push(r.userId)
+      if (r.userId === session.user.id) {
+        acc[r.emoji].hasUserReacted = true
+      }
+      return acc
+    }, {} as Record<string, { count: number; userIds: string[]; hasUserReacted: boolean }>)
+
+    return { reactions: grouped }
+  } catch (error) {
+    console.error('Error fetching reactions:', error)
+    return { error: 'Failed to fetch reactions' }
+  }
+}
+
+// ============ MENTIONS ============
+
+// Parse @mentions from content: @[Name](user:userId)
+// Note: This is a helper function, not exported as a server action
+function parseMentions(content: string): string[] {
+  const mentionRegex = /@\[([^\]]+)\]\(user:([^)]+)\)/g
+  const mentions: string[] = []
+  let match
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    mentions.push(match[2]) // userId
+  }
+
+  return mentions
+}
+
+export async function getMentionableUsers(channelId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const channel = await prisma.collaborationChannel.findUnique({
+      where: { id: channelId },
+      include: {
+        members: true,
+      }
+    })
+
+    if (!channel) {
+      return { error: 'Channel not found' }
+    }
+
+    // Get all members of the channel
+    const memberIds = channel.members.map(m => m.userId)
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: memberIds } },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        coachProfile: { select: { firstName: true, lastName: true } },
+        ambassadorProfile: { select: { firstName: true, lastName: true } },
+      }
+    })
+
+    return {
+      users: users.map(u => ({
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        name: u.coachProfile
+          ? `${u.coachProfile.firstName} ${u.coachProfile.lastName}`
+          : u.ambassadorProfile
+            ? `${u.ambassadorProfile.firstName} ${u.ambassadorProfile.lastName}`
+            : u.email,
+      }))
+    }
+  } catch (error) {
+    console.error('Error fetching mentionable users:', error)
+    return { error: 'Failed to fetch users' }
+  }
+}
+
+export async function getUserMentions() {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const mentions = await prisma.postMention.findMany({
+      where: { mentionedUserId: session.user.id },
+      include: {
+        post: {
+          include: {
+            channel: true,
+          }
+        },
+        reply: {
+          include: {
+            post: {
+              include: {
+                channel: true,
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    })
+
+    return {
+      mentions: mentions.map(m => ({
+        id: m.id,
+        isRead: m.isRead,
+        createdAt: m.createdAt.toISOString(),
+        postId: m.postId,
+        replyId: m.replyId,
+        channelId: m.post?.channelId || m.reply?.post?.channelId,
+        channelName: m.post?.channel?.name || m.reply?.post?.channel?.name,
+      }))
+    }
+  } catch (error) {
+    console.error('Error fetching user mentions:', error)
+    return { error: 'Failed to fetch mentions' }
+  }
+}
+
+export async function markMentionAsRead(mentionId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const mention = await prisma.postMention.findUnique({
+      where: { id: mentionId },
+    })
+
+    if (!mention || mention.mentionedUserId !== session.user.id) {
+      return { error: 'Mention not found' }
+    }
+
+    await prisma.postMention.update({
+      where: { id: mentionId },
+      data: { isRead: true },
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error marking mention as read:', error)
+    return { error: 'Failed to mark mention as read' }
+  }
+}
+
+// ============ ATTACHMENTS ============
+
+export async function attachDocumentToPost(postId: string | null, replyId: string | null, documentId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  if (!postId && !replyId) {
+    return { error: 'Post ID or Reply ID is required' }
+  }
+
+  try {
+    // Verify document exists and user has access
+    const document = await prisma.sharedDocument.findUnique({
+      where: { id: documentId },
+    })
+
+    if (!document) {
+      return { error: 'Document not found' }
+    }
+
+    if (!document.isPublic && !document.allowedRoles.includes(session.user.role) && session.user.role !== 'ADMIN') {
+      return { error: 'Access denied to document' }
+    }
+
+    const attachment = await prisma.postAttachment.create({
+      data: {
+        postId,
+        replyId,
+        documentId,
+      },
+    })
+
+    revalidateCollaboration()
+    return { success: true, attachment }
+  } catch (error) {
+    console.error('Error attaching document:', error)
+    return { error: 'Failed to attach document' }
+  }
+}
+
+export async function removeAttachment(attachmentId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const attachment = await prisma.postAttachment.findUnique({
+      where: { id: attachmentId },
+      include: {
+        post: true,
+        reply: true,
+      }
+    })
+
+    if (!attachment) {
+      return { error: 'Attachment not found' }
+    }
+
+    // Only author or admin can remove
+    const authorId = attachment.post?.authorId || attachment.reply?.authorId
+    if (authorId !== session.user.id && session.user.role !== 'ADMIN') {
+      return { error: 'Unauthorized' }
+    }
+
+    await prisma.postAttachment.delete({
+      where: { id: attachmentId },
+    })
+
+    revalidateCollaboration()
+    return { success: true }
+  } catch (error) {
+    console.error('Error removing attachment:', error)
+    return { error: 'Failed to remove attachment' }
+  }
+}
+
+// ============ MEETING LINKS ============
+
+const meetingProviders = ['ZOOM', 'GOOGLE_MEET', 'MICROSOFT_TEAMS', 'CUSTOM'] as const
+
+export async function addMeetingLink(
+  channelId: string | null,
+  postId: string | null,
+  provider: string,
+  url: string,
+  title?: string,
+  scheduledAt?: string,
+  duration?: number
+) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  if (!channelId && !postId) {
+    return { error: 'Channel ID or Post ID is required' }
+  }
+
+  if (!url) {
+    return { error: 'Meeting URL is required' }
+  }
+
+  if (!meetingProviders.includes(provider as any)) {
+    return { error: 'Invalid meeting provider' }
+  }
+
+  try {
+    const meetingLink = await prisma.meetingLink.create({
+      data: {
+        channelId,
+        postId,
+        provider: provider as any,
+        url,
+        title,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        duration,
+        createdById: session.user.id,
+      },
+    })
+
+    revalidateCollaboration()
+    return {
+      success: true,
+      meetingLink: {
+        ...meetingLink,
+        createdAt: meetingLink.createdAt.toISOString(),
+        scheduledAt: meetingLink.scheduledAt?.toISOString() || null,
+      }
+    }
+  } catch (error) {
+    console.error('Error adding meeting link:', error)
+    return { error: 'Failed to add meeting link' }
+  }
+}
+
+export async function removeMeetingLink(linkId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const link = await prisma.meetingLink.findUnique({
+      where: { id: linkId },
+    })
+
+    if (!link) {
+      return { error: 'Meeting link not found' }
+    }
+
+    // Only creator or admin can remove
+    if (link.createdById !== session.user.id && session.user.role !== 'ADMIN') {
+      return { error: 'Unauthorized' }
+    }
+
+    await prisma.meetingLink.delete({
+      where: { id: linkId },
+    })
+
+    revalidateCollaboration()
+    return { success: true }
+  } catch (error) {
+    console.error('Error removing meeting link:', error)
+    return { error: 'Failed to remove meeting link' }
+  }
+}
+
+export async function getChannelMeetingLinks(channelId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const links = await prisma.meetingLink.findMany({
+      where: { channelId },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return {
+      meetingLinks: links.map(l => ({
+        ...l,
+        createdAt: l.createdAt.toISOString(),
+        scheduledAt: l.scheduledAt?.toISOString() || null,
+      }))
+    }
+  } catch (error) {
+    console.error('Error fetching meeting links:', error)
+    return { error: 'Failed to fetch meeting links' }
+  }
+}
+
+// ============ POST EDITING ============
+
+export async function updatePost(postId: string, content: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  if (!content.trim()) {
+    return { error: 'Content cannot be empty' }
+  }
+
+  try {
+    const post = await prisma.channelPost.findUnique({
+      where: { id: postId },
+    })
+
+    if (!post) {
+      return { error: 'Post not found' }
+    }
+
+    // Only author or admin can edit
+    if (post.authorId !== session.user.id && session.user.role !== 'ADMIN') {
+      return { error: 'Unauthorized' }
+    }
+
+    const updated = await prisma.channelPost.update({
+      where: { id: postId },
+      data: {
+        content: content.trim(),
+        isEdited: true,
+        editedAt: new Date(),
+      },
+    })
+
+    revalidateCollaboration()
+    return {
+      success: true,
+      post: {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+        editedAt: updated.editedAt?.toISOString() || null,
+      }
+    }
+  } catch (error) {
+    console.error('Error updating post:', error)
+    return { error: 'Failed to update post' }
+  }
+}
+
+export async function updateReply(replyId: string, content: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  if (!content.trim()) {
+    return { error: 'Content cannot be empty' }
+  }
+
+  try {
+    const reply = await prisma.channelPostReply.findUnique({
+      where: { id: replyId },
+    })
+
+    if (!reply) {
+      return { error: 'Reply not found' }
+    }
+
+    // Only author or admin can edit
+    if (reply.authorId !== session.user.id && session.user.role !== 'ADMIN') {
+      return { error: 'Unauthorized' }
+    }
+
+    const updated = await prisma.channelPostReply.update({
+      where: { id: replyId },
+      data: {
+        content: content.trim(),
+        isEdited: true,
+        editedAt: new Date(),
+      },
+    })
+
+    revalidateCollaboration()
+    return {
+      success: true,
+      reply: {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+        editedAt: updated.editedAt?.toISOString() || null,
+      }
+    }
+  } catch (error) {
+    console.error('Error updating reply:', error)
+    return { error: 'Failed to update reply' }
+  }
+}
+
+// ============ UNREAD TRACKING ============
+
+export async function markChannelAsRead(channelId: string) {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    await prisma.channelMember.update({
+      where: {
+        channelId_userId: {
+          channelId,
+          userId: session.user.id,
+        }
+      },
+      data: { lastReadAt: new Date() },
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error marking channel as read:', error)
+    return { error: 'Failed to mark channel as read' }
+  }
+}
+
+export async function getUnreadCounts() {
+  const session = await auth()
+  if (!session) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Get all channels user is a member of
+    const memberships = await prisma.channelMember.findMany({
+      where: { userId: session.user.id },
+      include: {
+        channel: {
+          include: {
+            _count: {
+              select: { posts: true }
+            },
+            posts: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            }
+          }
+        }
+      }
+    })
+
+    const unreadCounts: Record<string, number> = {}
+
+    for (const membership of memberships) {
+      // Count posts created after lastReadAt
+      const unreadPosts = await prisma.channelPost.count({
+        where: {
+          channelId: membership.channelId,
+          createdAt: { gt: membership.lastReadAt },
+        }
+      })
+      if (unreadPosts > 0) {
+        unreadCounts[membership.channelId] = unreadPosts
+      }
+    }
+
+    // Get unread mentions count
+    const unreadMentions = await prisma.postMention.count({
+      where: {
+        mentionedUserId: session.user.id,
+        isRead: false,
+      }
+    })
+
+    return {
+      channels: unreadCounts,
+      mentions: unreadMentions,
+    }
+  } catch (error) {
+    console.error('Error fetching unread counts:', error)
+    return { error: 'Failed to fetch unread counts' }
   }
 }

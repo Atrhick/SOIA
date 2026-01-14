@@ -323,7 +323,7 @@ export function SurveyResultsClient({
                       outerRadius={100}
                       paddingAngle={2}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                     >
                       {roleData.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -430,10 +430,13 @@ export function SurveyResultsClient({
                       <XAxis type="number" />
                       <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12 }} />
                       <Tooltip
-                        formatter={(value: number, name: string) => [
-                          name === 'count' ? `${value} responses` : `${value.toFixed(1)}%`,
-                          name === 'count' ? 'Count' : 'Percentage'
-                        ]}
+                        formatter={(value, name) => {
+                          const v = value ?? 0
+                          return [
+                            name === 'count' ? `${v} responses` : `${Number(v).toFixed(1)}%`,
+                            name === 'count' ? 'Count' : 'Percentage'
+                          ]
+                        }}
                       />
                       <Bar dataKey="count" name="count" />
                     </BarChart>

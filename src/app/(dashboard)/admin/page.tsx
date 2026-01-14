@@ -69,7 +69,11 @@ async function getUpcomingEvents() {
     },
     orderBy: { startDate: 'asc' },
     take: 5,
-    include: {
+    select: {
+      id: true,
+      name: true,
+      location: true,
+      startDate: true,
       _count: {
         select: {
           qualifications: { where: { status: 'QUALIFIED' } },
@@ -81,20 +85,23 @@ async function getUpcomingEvents() {
 }
 
 async function getRecentActivity() {
-  const [recentCoaches, recentSponsorships] = await Promise.all([
-    prisma.coachProfile.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      include: { user: true },
-    }),
-    prisma.sponsorshipRequest.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      include: { coach: true },
-    }),
-  ])
+  const recentCoaches = await prisma.coachProfile.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      coachStatus: true,
+      user: {
+        select: {
+          email: true,
+        },
+      },
+    },
+  })
 
-  return { recentCoaches, recentSponsorships }
+  return { recentCoaches }
 }
 
 export default async function AdminDashboard() {

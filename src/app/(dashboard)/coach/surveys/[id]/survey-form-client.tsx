@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -9,6 +9,9 @@ import {
   XCircle,
   Send,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from 'lucide-react'
 import { submitSurvey } from '@/lib/actions/surveys'
 
@@ -41,6 +44,7 @@ interface Survey {
   passingScore: number | null
   showResults: boolean
   allowRetake: boolean
+  showProgressBar?: boolean
   questions: SurveyQuestion[]
 }
 
@@ -60,6 +64,7 @@ export function SurveyFormClient({ survey, userRole }: SurveyFormClientProps) {
   const router = useRouter()
   const basePath = userRole === 'COACH' ? '/coach' : '/ambassador'
 
+  const [currentStep, setCurrentStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, {
     selectedOptionIds?: string[]
     likertValue?: number
@@ -69,12 +74,16 @@ export function SurveyFormClient({ survey, userRole }: SurveyFormClientProps) {
   const [error, setError] = useState('')
   const [result, setResult] = useState<SubmissionResult | null>(null)
 
-  const handleOptionChange = (questionId: string, optionId: string, isMultiple: boolean) => {
+  const totalSteps = survey.questions.length
+  const currentQuestion = survey.questions[currentStep]
+  const progress = ((currentStep + 1) / totalSteps) * 100
+  const showProgressBar = survey.showProgressBar !== false // Default to true
+
+  const handleOptionChange = useCallback((questionId: string, optionId: string, isMultiple: boolean) => {
     setAnswers(prev => {
       const current = prev[questionId]?.selectedOptionIds || []
 
       if (isMultiple) {
-        // Toggle for multiple select
         const newSelected = current.includes(optionId)
           ? current.filter(id => id !== optionId)
           : [...current, optionId]
@@ -83,99 +92,100 @@ export function SurveyFormClient({ survey, userRole }: SurveyFormClientProps) {
           [questionId]: { ...prev[questionId], selectedOptionIds: newSelected }
         }
       } else {
-        // Single select
         return {
           ...prev,
           [questionId]: { selectedOptionIds: [optionId] }
         }
       }
     })
-  }
+  }, [])
 
-  const handleLikertChange = (questionId: string, value: number) => {
+  const handleLikertChange = useCallback((questionId: string, value: number) => {
     setAnswers(prev => ({
       ...prev,
       [questionId]: { likertValue: value }
     }))
-  }
+  }, [])
 
-  const handleTextChange = (questionId: string, value: string) => {
+  const handleTextChange = useCallback((questionId: string, value: string) => {
     setAnswers(prev => ({
       ...prev,
       [questionId]: { textResponse: value }
     }))
-  }
+  }, [])
 
-  const validateAnswers = (): string | null => {
-    for (const question of survey.questions) {
-      if (!question.isRequired) continue
+  const isCurrentStepValid = useCallback(() => {
+    if (!currentQuestion) return false
+    if (!currentQuestion.isRequired) return true
 
-      const answer = answers[question.id]
+    const answer = answers[currentQuestion.id]
+    if (!answer) return false
 
-      switch (question.questionType) {
-        case 'MULTIPLE_CHOICE':
-        case 'MULTIPLE_SELECT':
-          if (!answer?.selectedOptionIds?.length) {
-            return `Please answer question: "${question.questionText.substring(0, 50)}..."`
-          }
-          break
-        case 'LIKERT_SCALE':
-          if (answer?.likertValue === undefined) {
-            return `Please answer question: "${question.questionText.substring(0, 50)}..."`
-          }
-          break
-        case 'TEXT_SHORT':
-        case 'TEXT_LONG':
-          if (!answer?.textResponse?.trim()) {
-            return `Please answer question: "${question.questionText.substring(0, 50)}..."`
-          }
-          if (question.minLength && answer.textResponse.length < question.minLength) {
-            return `Answer must be at least ${question.minLength} characters for: "${question.questionText.substring(0, 50)}..."`
-          }
-          break
-      }
+    switch (currentQuestion.questionType) {
+      case 'MULTIPLE_CHOICE':
+        return answer.selectedOptionIds && answer.selectedOptionIds.length === 1
+      case 'MULTIPLE_SELECT':
+        return answer.selectedOptionIds && answer.selectedOptionIds.length > 0
+      case 'LIKERT_SCALE':
+        return answer.likertValue !== undefined
+      case 'TEXT_SHORT':
+      case 'TEXT_LONG':
+        if (!answer.textResponse?.trim()) return false
+        if (currentQuestion.minLength && answer.textResponse.length < currentQuestion.minLength) return false
+        return true
+      default:
+        return false
     }
-    return null
-  }
+  }, [currentQuestion, answers])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const validationError = validateAnswers()
-    if (validationError) {
-      setError(validationError)
+  const handleNext = useCallback(async () => {
+    if (!isCurrentStepValid()) {
+      setError('Please complete this question before continuing')
       return
     }
 
-    setIsSubmitting(true)
     setError('')
 
-    const formattedAnswers = survey.questions.map(q => ({
-      questionId: q.id,
-      selectedOptionIds: answers[q.id]?.selectedOptionIds,
-      likertValue: answers[q.id]?.likertValue,
-      textResponse: answers[q.id]?.textResponse,
-    }))
+    if (currentStep < totalSteps - 1) {
+      setCurrentStep(prev => prev + 1)
+    } else {
+      // Submit the survey
+      setIsSubmitting(true)
 
-    try {
-      const response = await submitSurvey(survey.id, formattedAnswers)
+      const formattedAnswers = survey.questions.map(q => ({
+        questionId: q.id,
+        selectedOptionIds: answers[q.id]?.selectedOptionIds,
+        likertValue: answers[q.id]?.likertValue,
+        textResponse: answers[q.id]?.textResponse,
+      }))
 
-      if (response.error) {
-        setError(response.error)
-      } else {
-        setResult({
-          success: true,
-          score: response.score,
-          passed: response.passed,
-          showResults: response.showResults,
-        })
+      try {
+        const response = await submitSurvey(survey.id, formattedAnswers)
+
+        if (response.error) {
+          setError(response.error)
+        } else {
+          setResult({
+            success: true,
+            score: response.score,
+            passed: response.passed,
+            showResults: response.showResults,
+          })
+        }
+      } catch {
+        setError('Failed to submit. Please try again.')
+      } finally {
+        setIsSubmitting(false)
       }
-    } catch {
-      setError('Failed to submit. Please try again.')
-    } finally {
-      setIsSubmitting(false)
     }
-  }
+  }, [currentStep, totalSteps, isCurrentStepValid, survey, answers])
+
+  const handlePrevious = useCallback(() => {
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1)
+      setError('')
+    }
+  }, [currentStep])
 
   // Show results screen
   if (result) {
@@ -281,6 +291,22 @@ export function SurveyFormClient({ survey, userRole }: SurveyFormClientProps) {
         </div>
       </div>
 
+      {/* Progress Bar */}
+      {showProgressBar && (
+        <div className="bg-white rounded-lg border p-4">
+          <div className="flex justify-between text-sm text-gray-600 mb-2">
+            <span>Question {currentStep + 1} of {totalSteps}</span>
+            <span>{Math.round(progress)}% complete</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-600 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Info Bar */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
         <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
@@ -300,170 +326,200 @@ export function SurveyFormClient({ survey, userRole }: SurveyFormClientProps) {
         <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
       )}
 
-      {/* Questions Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {survey.questions.map((question, index) => (
-          <div key={question.id} className="bg-white rounded-lg border p-6">
-            <div className="mb-4">
-              <div className="flex items-start gap-2">
-                <span className="text-sm font-medium text-gray-500">{index + 1}.</span>
-                <div className="flex-1">
-                  <p className="font-medium">
-                    {question.questionText}
-                    {question.isRequired && <span className="text-red-500 ml-1">*</span>}
-                  </p>
-                </div>
+      {/* Single Question Display */}
+      {currentQuestion && (
+        <div className="bg-white rounded-lg border p-6">
+          <div className="mb-6">
+            <p className="text-lg font-medium text-gray-900">
+              {currentQuestion.questionText}
+              {currentQuestion.isRequired && <span className="text-red-500 ml-1">*</span>}
+            </p>
+          </div>
+
+          {/* Multiple Choice */}
+          {currentQuestion.questionType === 'MULTIPLE_CHOICE' && (
+            <div className="space-y-3">
+              {currentQuestion.options.map((option) => {
+                const isSelected = answers[currentQuestion.id]?.selectedOptionIds?.includes(option.id)
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => handleOptionChange(currentQuestion.id, option.id, false)}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        isSelected ? 'border-primary-500 bg-primary-500' : 'border-gray-300'
+                      }`}>
+                        {isSelected && (
+                          <div className="w-2 h-2 rounded-full bg-white" />
+                        )}
+                      </div>
+                      <span className="text-gray-900">{option.optionText}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Multiple Select */}
+          {currentQuestion.questionType === 'MULTIPLE_SELECT' && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500 mb-2">Select all that apply</p>
+              {currentQuestion.options.map((option) => {
+                const isSelected = answers[currentQuestion.id]?.selectedOptionIds?.includes(option.id)
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => handleOptionChange(currentQuestion.id, option.id, true)}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                        isSelected ? 'border-primary-500 bg-primary-500' : 'border-gray-300'
+                      }`}>
+                        {isSelected && (
+                          <CheckCircle className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                      <span className="text-gray-900">{option.optionText}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Likert Scale */}
+          {currentQuestion.questionType === 'LIKERT_SCALE' && currentQuestion.likertConfig && (
+            <div className="space-y-4">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>{currentQuestion.likertConfig.minLabel}</span>
+                <span>{currentQuestion.likertConfig.maxLabel}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                {Array.from(
+                  { length: currentQuestion.likertConfig.maxValue - currentQuestion.likertConfig.minValue + 1 },
+                  (_, i) => currentQuestion.likertConfig!.minValue + i
+                ).map(value => {
+                  const isSelected = answers[currentQuestion.id]?.likertValue === value
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => handleLikertChange(currentQuestion.id, value)}
+                      className={`flex-1 py-3 rounded-lg border-2 font-medium transition-all ${
+                        isSelected
+                          ? 'border-primary-500 bg-primary-500 text-white'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      {value}
+                    </button>
+                  )
+                })}
               </div>
             </div>
+          )}
 
-            {/* Multiple Choice */}
-            {question.questionType === 'MULTIPLE_CHOICE' && (
-              <div className="space-y-2 ml-6">
-                {question.options.map((option) => (
-                  <label
-                    key={option.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      answers[question.id]?.selectedOptionIds?.includes(option.id)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`question-${question.id}`}
-                      checked={answers[question.id]?.selectedOptionIds?.includes(option.id) || false}
-                      onChange={() => handleOptionChange(question.id, option.id, false)}
-                      className="text-blue-600"
-                    />
-                    <span>{option.optionText}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+          {/* Short Text */}
+          {currentQuestion.questionType === 'TEXT_SHORT' && (
+            <div>
+              <input
+                type="text"
+                value={answers[currentQuestion.id]?.textResponse || ''}
+                onChange={(e) => handleTextChange(currentQuestion.id, e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Type your answer here..."
+                maxLength={currentQuestion.maxLength || undefined}
+              />
+              {(currentQuestion.minLength || currentQuestion.maxLength) && (
+                <p className="text-xs text-gray-500 mt-2">
+                  {currentQuestion.minLength && `Min: ${currentQuestion.minLength} characters`}
+                  {currentQuestion.minLength && currentQuestion.maxLength && ' • '}
+                  {currentQuestion.maxLength && `Max: ${currentQuestion.maxLength} characters`}
+                  {' • '}
+                  Current: {(answers[currentQuestion.id]?.textResponse || '').length} characters
+                </p>
+              )}
+            </div>
+          )}
 
-            {/* Multiple Select */}
-            {question.questionType === 'MULTIPLE_SELECT' && (
-              <div className="space-y-2 ml-6">
-                <p className="text-sm text-gray-500 mb-2">Select all that apply</p>
-                {question.options.map((option) => (
-                  <label
-                    key={option.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      answers[question.id]?.selectedOptionIds?.includes(option.id)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={answers[question.id]?.selectedOptionIds?.includes(option.id) || false}
-                      onChange={() => handleOptionChange(question.id, option.id, true)}
-                      className="rounded text-blue-600"
-                    />
-                    <span>{option.optionText}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+          {/* Long Text */}
+          {currentQuestion.questionType === 'TEXT_LONG' && (
+            <div>
+              <textarea
+                value={answers[currentQuestion.id]?.textResponse || ''}
+                onChange={(e) => handleTextChange(currentQuestion.id, e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[150px]"
+                placeholder="Type your answer here..."
+                maxLength={currentQuestion.maxLength || undefined}
+              />
+              {(currentQuestion.minLength || currentQuestion.maxLength) && (
+                <p className="text-xs text-gray-500 mt-2">
+                  {currentQuestion.minLength && `Min: ${currentQuestion.minLength} characters`}
+                  {currentQuestion.minLength && currentQuestion.maxLength && ' • '}
+                  {currentQuestion.maxLength && `Max: ${currentQuestion.maxLength} characters`}
+                  {' • '}
+                  Current: {(answers[currentQuestion.id]?.textResponse || '').length} characters
+                </p>
+              )}
+            </div>
+          )}
 
-            {/* Likert Scale */}
-            {question.questionType === 'LIKERT_SCALE' && question.likertConfig && (
-              <div className="ml-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-500">{question.likertConfig.minLabel}</span>
-                  <span className="text-sm text-gray-500">{question.likertConfig.maxLabel}</span>
-                </div>
-                <div className="flex justify-center gap-2">
-                  {Array.from({
-                    length: question.likertConfig.maxValue - question.likertConfig.minValue + 1
-                  }).map((_, i) => {
-                    const value = question.likertConfig!.minValue + i
-                    const isSelected = answers[question.id]?.likertValue === value
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => handleLikertChange(question.id, value)}
-                        className={`w-12 h-12 rounded-full border-2 text-lg font-medium transition-colors ${
-                          isSelected
-                            ? 'border-blue-500 bg-blue-500 text-white'
-                            : 'border-gray-300 text-gray-600 hover:border-blue-300'
-                        }`}
-                      >
-                        {value}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+          {/* Navigation */}
+          <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={handlePrevious}
+              disabled={currentStep === 0}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                currentStep === 0
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <ChevronLeft className="w-5 h-5" />
+              Previous
+            </button>
 
-            {/* Short Text */}
-            {question.questionType === 'TEXT_SHORT' && (
-              <div className="ml-6">
-                <input
-                  type="text"
-                  value={answers[question.id]?.textResponse || ''}
-                  onChange={(e) => handleTextChange(question.id, e.target.value)}
-                  className="w-full rounded-lg border p-3"
-                  placeholder="Enter your answer..."
-                  maxLength={question.maxLength || undefined}
-                />
-                {(question.minLength || question.maxLength) && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {question.minLength && `Min: ${question.minLength} characters`}
-                    {question.minLength && question.maxLength && ' • '}
-                    {question.maxLength && `Max: ${question.maxLength} characters`}
-                    {' • '}
-                    Current: {(answers[question.id]?.textResponse || '').length} characters
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Long Text */}
-            {question.questionType === 'TEXT_LONG' && (
-              <div className="ml-6">
-                <textarea
-                  value={answers[question.id]?.textResponse || ''}
-                  onChange={(e) => handleTextChange(question.id, e.target.value)}
-                  className="w-full rounded-lg border p-3"
-                  rows={4}
-                  placeholder="Enter your answer..."
-                  maxLength={question.maxLength || undefined}
-                />
-                {(question.minLength || question.maxLength) && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {question.minLength && `Min: ${question.minLength} characters`}
-                    {question.minLength && question.maxLength && ' • '}
-                    {question.maxLength && `Max: ${question.maxLength} characters`}
-                    {' • '}
-                    Current: {(answers[question.id]?.textResponse || '').length} characters
-                  </p>
-                )}
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={isSubmitting}
+              className="flex items-center gap-2 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Submitting...
+                </>
+              ) : currentStep === totalSteps - 1 ? (
+                <>
+                  <Send className="w-5 h-5" />
+                  Submit
+                </>
+              ) : (
+                <>
+                  Next
+                  <ChevronRight className="w-5 h-5" />
+                </>
+              )}
+            </button>
           </div>
-        ))}
-
-        {/* Submit Button */}
-        <div className="flex justify-end gap-4">
-          <Link
-            href={`${basePath}/surveys`}
-            className="px-6 py-3 border rounded-lg hover:bg-gray-50"
-          >
-            Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Send className="h-4 w-4" />
-            {isSubmitting ? 'Submitting...' : 'Submit'}
-          </button>
         </div>
-      </form>
+      )}
     </div>
   )
 }
