@@ -42,6 +42,8 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Copy public folder if it exists (may have static assets)
 COPY --from=builder /app/public ./public
 
@@ -54,5 +56,5 @@ USER nextjs
 ENV PORT=8080
 EXPOSE 8080
 
-# Run migrations and start the application
-CMD npx prisma migrate deploy && node server.js
+# Start the application (skip migrations - run them separately)
+CMD ["node", "server.js"]
