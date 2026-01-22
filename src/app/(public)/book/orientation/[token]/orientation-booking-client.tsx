@@ -33,6 +33,14 @@ interface CalendarData {
   }[]
 }
 
+interface ProspectData {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string | null
+}
+
 interface AvailableSlot {
   id: string
   startTime: string
@@ -42,8 +50,10 @@ interface AvailableSlot {
   remainingCapacity: number
 }
 
-interface BookingClientProps {
+interface OrientationBookingClientProps {
   calendar: CalendarData
+  prospect: ProspectData
+  token: string
 }
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -52,7 +62,7 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ]
 
-export function BookingClient({ calendar }: BookingClientProps) {
+export function OrientationBookingClient({ calendar, prospect, token }: OrientationBookingClientProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([])
@@ -64,19 +74,16 @@ export function BookingClient({ calendar }: BookingClientProps) {
   const [error, setError] = useState('')
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
 
-  // Form fields
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  // Pre-filled from prospect data (read-only display)
+  const name = `${prospect.firstName} ${prospect.lastName}`
+  const email = prospect.email
+  const phone = prospect.phone || ''
+
+  // Optional notes from prospect
   const [notes, setNotes] = useState('')
 
   // Fetch available dates for the current month
   const fetchAvailableDates = useCallback(async () => {
-    console.log('[BookingClient] Fetching available dates for:', {
-      calendarId: calendar.id,
-      year: currentMonth.getFullYear(),
-      month: currentMonth.getMonth()
-    })
     setIsLoadingDates(true)
     try {
       const result = await getAvailableDatesForMonth(
@@ -84,21 +91,16 @@ export function BookingClient({ calendar }: BookingClientProps) {
         currentMonth.getFullYear(),
         currentMonth.getMonth()
       )
-      console.log('[BookingClient] Result:', result)
       if (result.availableDates) {
-        console.log('[BookingClient] Available dates:', result.availableDates)
         setAvailableDates(new Set(result.availableDates))
-      } else if (result.error) {
-        console.error('[BookingClient] Error:', result.error)
       }
     } catch (err) {
-      console.error('[BookingClient] Failed to load available dates:', err)
+      console.error('Failed to load available dates:', err)
     } finally {
       setIsLoadingDates(false)
     }
   }, [calendar.id, currentMonth])
 
-  // Fetch available dates when month changes
   useEffect(() => {
     fetchAvailableDates()
   }, [fetchAvailableDates])
@@ -114,12 +116,10 @@ export function BookingClient({ calendar }: BookingClientProps) {
 
     const days: (Date | null)[] = []
 
-    // Add empty cells for days before the first of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null)
     }
 
-    // Add the days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(new Date(year, month, i))
     }
@@ -132,8 +132,6 @@ export function BookingClient({ calendar }: BookingClientProps) {
   today.setHours(0, 0, 0, 0)
 
   const isDateSelectable = (date: Date) => {
-    // Check if this date has available slots
-    // Use local date formatting to be consistent with the server
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     return availableDates.has(dateStr)
   }
@@ -144,7 +142,6 @@ export function BookingClient({ calendar }: BookingClientProps) {
     setSelectedSlot(null)
 
     try {
-      // Use local date formatting to be consistent with the server
       const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
       const result = await getAvailableSlots(calendar.id, dateStr)
 
@@ -188,7 +185,6 @@ export function BookingClient({ calendar }: BookingClientProps) {
     setError('')
 
     try {
-      // Use local date formatting to be consistent with the server
       const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
       const result = await createPublicBooking({
         calendarId: calendar.id,
@@ -197,6 +193,7 @@ export function BookingClient({ calendar }: BookingClientProps) {
         bookerName: name,
         bookerEmail: email,
         bookerPhone: phone || undefined,
+        prospectId: prospect.id,
         notes: notes || undefined,
       })
 
@@ -231,7 +228,7 @@ export function BookingClient({ calendar }: BookingClientProps) {
             Booking Confirmed!
           </h1>
           <p className="text-gray-600 mb-6">
-            Your {calendar.name.toLowerCase()} has been scheduled.
+            Your orientation has been scheduled.
           </p>
 
           <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
@@ -272,6 +269,10 @@ export function BookingClient({ calendar }: BookingClientProps) {
         {calendar.description && (
           <p className="text-gray-600 max-w-2xl mx-auto">{calendar.description}</p>
         )}
+        <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-full text-sm">
+          <User className="w-4 h-4" />
+          <span>Booking for: <strong>{name}</strong></span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -406,7 +407,7 @@ export function BookingClient({ calendar }: BookingClientProps) {
                   {/* Time slot selection */}
                   <div>
                     <p className="text-sm text-gray-600 mb-3">
-                      Select a time <span className="text-gray-500">({availableSlots[0]?.timezone === 'America/Los_Angeles' ? 'Pacific Time' : availableSlots[0]?.timezone || 'Pacific Time'})</span>:
+                      Select a time <span className="text-gray-500">({availableSlots[0]?.timezone || 'America/Los_Angeles'})</span>:
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {availableSlots.map(slot => (
@@ -424,7 +425,7 @@ export function BookingClient({ calendar }: BookingClientProps) {
                             }
                           `}
                         >
-                          {formatTime(slot.startTime)} {slot.timezone === 'America/Los_Angeles' ? 'PT' : ''}
+                          {formatTime(slot.startTime)} {slot.timezone === 'America/Los_Angeles' ? 'PT' : slot.timezone}
                         </button>
                       ))}
                     </div>
@@ -435,55 +436,53 @@ export function BookingClient({ calendar }: BookingClientProps) {
                     <form onSubmit={handleSubmit} className="space-y-4 pt-4 border-t">
                       <h4 className="font-medium text-gray-900">Your Information</h4>
 
+                      {/* Read-only prospect info */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Full Name *
+                          Full Name
                         </label>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type="text"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="John Doe"
+                            readOnly
+                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
                           />
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Email Address *
+                          Email Address
                         </label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type="email"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="name@example.com"
+                            readOnly
+                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
                           />
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Phone Number
-                        </label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="(555) 123-4567"
-                          />
+                      {phone && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Phone Number
+                          </label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <input
+                              type="tel"
+                              value={phone}
+                              readOnly
+                              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -506,7 +505,7 @@ export function BookingClient({ calendar }: BookingClientProps) {
 
                       <button
                         type="submit"
-                        disabled={isSubmitting || !name || !email}
+                        disabled={isSubmitting}
                         className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                       >
                         {isSubmitting ? (

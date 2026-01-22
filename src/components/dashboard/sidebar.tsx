@@ -59,11 +59,17 @@ interface NavSection {
 // Ambassador navigation - organized into sections
 const ambassadorNavSections: NavSection[] = [
   {
+    title: 'Assessments',
+    icon: FileQuestion,
+    items: [
+      { href: '/ambassador/surveys', label: 'Surveys & Quizzes', icon: FileQuestion },
+    ],
+  },
+  {
     title: 'Learning',
     icon: GraduationCap,
     items: [
-      { href: '/ambassador/classes', label: 'Classes', icon: GraduationCap },
-      { href: '/ambassador/surveys', label: 'Surveys & Quizzes', icon: FileQuestion },
+      { href: '/ambassador/learning', label: 'Courses', icon: GraduationCap },
       { href: '/ambassador/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
     ],
   },
@@ -103,6 +109,13 @@ const coachNavSections: NavSection[] = [
     ],
   },
   {
+    title: 'Assessments',
+    icon: FileQuestion,
+    items: [
+      { href: '/coach/surveys', label: 'Surveys & Quizzes', icon: FileQuestion },
+    ],
+  },
+  {
     title: 'Business',
     icon: TrendingUp,
     items: [
@@ -116,9 +129,7 @@ const coachNavSections: NavSection[] = [
     title: 'Content',
     icon: BookOpen,
     items: [
-      { href: '/coach/classes', label: 'My Classes', icon: BookOpen },
-      { href: '/coach/courses', label: 'Courses', icon: GraduationCap },
-      { href: '/coach/surveys', label: 'Surveys & Quizzes', icon: FileQuestion },
+      { href: '/coach/learning', label: 'Learning', icon: GraduationCap },
       { href: '/coach/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
     ],
   },
@@ -157,13 +168,19 @@ const adminNavSections: NavSection[] = [
     ],
   },
   {
+    title: 'Assessments',
+    icon: FileQuestion,
+    items: [
+      { href: '/admin/surveys', label: 'Surveys & Quizzes', icon: FileQuestion },
+    ],
+  },
+  {
     title: 'Onboarding & Training',
     icon: GraduationCap,
     items: [
       { href: '/admin/onboarding', label: 'Onboarding Config', icon: CheckSquare },
       { href: '/admin/ambassador-onboarding', label: 'Amb. Onboarding', icon: ClipboardList },
-      { href: '/admin/courses', label: 'Courses & Quizzes', icon: GraduationCap },
-      { href: '/admin/surveys', label: 'Surveys', icon: FileQuestion },
+      { href: '/admin/lms', label: 'Courses', icon: GraduationCap },
       { href: '/admin/business-ideas', label: 'Business Ideas', icon: Lightbulb },
     ],
   },
@@ -171,7 +188,6 @@ const adminNavSections: NavSection[] = [
     title: 'Content',
     icon: BookOpen,
     items: [
-      { href: '/admin/classes', label: 'All Classes', icon: BookOpen },
       { href: '/admin/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
       { href: '/admin/resource-centers', label: 'Resource Centers', icon: Building2 },
     ],

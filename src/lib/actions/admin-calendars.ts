@@ -595,17 +595,51 @@ export async function getAvailableDatesForMonth(calendarId: string, year: number
       },
       select: {
         slotId: true,
+        eventId: true,
         bookingDate: true,
       },
     })
 
-    // Group bookings by date and slot - use local date string for consistency
+    // Get CalendarEvents for this month (these also create availability)
+    const calendarEvents = await prisma.calendarEvent.findMany({
+      where: {
+        adminCalendarId: calendarId,
+        startTime: {
+          gte: firstDay,
+          lte: new Date(year, month + 1, 0, 23, 59, 59),
+        },
+      },
+    })
+
+    // Group bookings by date and slot/event - use local date string for consistency
     const bookingsByDateSlot = new Map<string, number>()
+    const bookingsByDateEvent = new Map<string, number>()
     existingBookings.forEach((b) => {
       // Use local date formatting to be consistent with the loop below
       const dateStr = `${b.bookingDate.getFullYear()}-${String(b.bookingDate.getMonth() + 1).padStart(2, '0')}-${String(b.bookingDate.getDate()).padStart(2, '0')}`
-      const key = `${dateStr}-${b.slotId}`
-      bookingsByDateSlot.set(key, (bookingsByDateSlot.get(key) || 0) + 1)
+      if (b.slotId) {
+        const key = `${dateStr}-${b.slotId}`
+        bookingsByDateSlot.set(key, (bookingsByDateSlot.get(key) || 0) + 1)
+      }
+      if (b.eventId) {
+        const key = `${dateStr}-${b.eventId}`
+        bookingsByDateEvent.set(key, (bookingsByDateEvent.get(key) || 0) + 1)
+      }
+    })
+
+    // Create a set of dates that have events (each event = 1 booking capacity)
+    const eventDates = new Set<string>()
+    calendarEvents.forEach((event) => {
+      const eventDate = new Date(event.startTime)
+      if (eventDate >= today) {
+        const dateStr = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, '0')}-${String(eventDate.getDate()).padStart(2, '0')}`
+        // Check if event is not already booked
+        const key = `${dateStr}-${event.id}`
+        const currentBookings = bookingsByDateEvent.get(key) || 0
+        if (currentBookings < 1) {
+          eventDates.add(dateStr)
+        }
+      }
     })
 
     // Calculate available dates
@@ -618,6 +652,12 @@ export async function getAvailableDatesForMonth(calendarId: string, year: number
       const dayOfWeek = d.getDay()
       // Use local date formatting to be consistent with how we store dates
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+      // Check if this date has an available event
+      if (eventDates.has(dateStr)) {
+        availableDates.push(dateStr)
+        continue
+      }
 
       // Check if any slot for this day of week has availability
       const slotsForDay = calendar.slots.filter((s) => s.dayOfWeek === dayOfWeek)
@@ -642,8 +682,11 @@ export async function getAvailableDatesForMonth(calendarId: string, year: number
 
 export async function getAvailableSlots(calendarId: string, date: string) {
   try {
-    const targetDate = new Date(date)
+    // Parse date in local timezone by appending T00:00:00
+    const targetDate = new Date(date + 'T00:00:00')
     const dayOfWeek = targetDate.getDay()
+
+    console.log('[getAvailableSlots] Date:', date, 'Parsed:', targetDate.toISOString(), 'DayOfWeek:', dayOfWeek)
 
     const calendar = await prisma.adminCalendar.findUnique({
       where: { id: calendarId },
@@ -664,6 +707,8 @@ export async function getAvailableSlots(calendarId: string, date: string) {
       return { error: 'Calendar not found' }
     }
 
+    console.log('[getAvailableSlots] Found slots:', calendar.slots.length, calendar.slots.map(s => ({ id: s.id, dayOfWeek: s.dayOfWeek, time: s.startTime })))
+
     // Get existing bookings for this date
     const startOfDay = new Date(targetDate)
     startOfDay.setHours(0, 0, 0, 0)
@@ -681,7 +726,20 @@ export async function getAvailableSlots(calendarId: string, date: string) {
       },
     })
 
-    // Calculate available slots
+    // Get CalendarEvents for this date (these are also bookable slots)
+    const calendarEvents = await prisma.calendarEvent.findMany({
+      where: {
+        adminCalendarId: calendarId,
+        startTime: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    })
+
+    console.log('[getAvailableSlots] Found events:', calendarEvents.length, calendarEvents.map(e => ({ id: e.id, title: e.title, time: e.startTime })))
+
+    // Calculate available slots from recurring/specific slots
     const availableSlots = calendar.slots.map((slot) => {
       const slotBookings = existingBookings.filter((b) => b.slotId === slot.id)
       const remainingCapacity = slot.maxBookings - slotBookings.length
@@ -693,10 +751,33 @@ export async function getAvailableSlots(calendarId: string, date: string) {
         timezone: slot.timezone,
         available: remainingCapacity > 0,
         remainingCapacity,
+        isEvent: false,
       }
     })
 
-    return { slots: availableSlots, date }
+    // Add CalendarEvents as bookable slots (each event has capacity of 1)
+    const eventSlots = calendarEvents.map((event) => {
+      const eventBookings = existingBookings.filter((b) => b.eventId === event.id)
+      const remainingCapacity = 1 - eventBookings.length
+
+      // Extract time from the event's startTime and endTime
+      const startTime = new Date(event.startTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+      const endTime = new Date(event.endTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+
+      return {
+        id: `event_${event.id}`,
+        startTime,
+        endTime,
+        timezone: 'America/Los_Angeles',
+        available: remainingCapacity > 0,
+        remainingCapacity,
+        isEvent: true,
+        eventId: event.id,
+        eventTitle: event.title,
+      }
+    })
+
+    return { slots: [...availableSlots, ...eventSlots], date }
   } catch (error) {
     console.error('Error fetching available slots:', error)
     return { error: 'Failed to fetch available slots' }
@@ -714,56 +795,101 @@ export async function createPublicBooking(data: {
   notes?: string
 }) {
   try {
-    // Get the slot details
-    const slot = await prisma.calendarSlot.findUnique({
-      where: { id: data.slotId },
-      include: { calendar: true },
-    })
+    const bookingDate = new Date(data.date + 'T00:00:00')
+    let startTime: Date
+    let endTime: Date
+    let timezone = 'America/Los_Angeles'
+    let requiresApproval = false
+    let calendarCreatedBy: string | null = null
+    let actualSlotId: string | null = null
+    let actualEventId: string | null = null
 
-    if (!slot || slot.calendarId !== data.calendarId) {
-      return { error: 'Invalid slot' }
-    }
+    // Check if this is an event booking (slotId starts with 'event_')
+    if (data.slotId.startsWith('event_')) {
+      const eventId = data.slotId.replace('event_', '')
+      const event = await prisma.calendarEvent.findUnique({
+        where: { id: eventId },
+        include: { adminCalendar: true },
+      })
 
-    // Parse the time and create booking datetime
-    const bookingDate = new Date(data.date)
-    const [startHour, startMinute] = slot.startTime.split(':').map(Number)
-    const [endHour, endMinute] = slot.endTime.split(':').map(Number)
+      if (!event || event.adminCalendarId !== data.calendarId) {
+        return { error: 'Invalid event' }
+      }
 
-    const startTime = new Date(bookingDate)
-    startTime.setHours(startHour, startMinute, 0, 0)
+      // Check if event is already booked
+      const existingBookings = await prisma.calendarBooking.count({
+        where: {
+          eventId: eventId,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+        },
+      })
 
-    const endTime = new Date(bookingDate)
-    endTime.setHours(endHour, endMinute, 0, 0)
+      if (existingBookings >= 1) {
+        return { error: 'This time slot is no longer available' }
+      }
 
-    // Check availability
-    const existingBookings = await prisma.calendarBooking.count({
-      where: {
-        slotId: data.slotId,
-        bookingDate,
-        status: { in: ['PENDING', 'CONFIRMED'] },
-      },
-    })
+      startTime = new Date(event.startTime)
+      endTime = new Date(event.endTime)
+      requiresApproval = event.adminCalendar?.requiresApproval || false
+      calendarCreatedBy = event.adminCalendar?.createdBy || null
+      actualEventId = eventId
+    } else {
+      // Regular slot booking
+      const slot = await prisma.calendarSlot.findUnique({
+        where: { id: data.slotId },
+        include: { calendar: true },
+      })
 
-    if (existingBookings >= slot.maxBookings) {
-      return { error: 'This slot is no longer available' }
+      if (!slot || slot.calendarId !== data.calendarId) {
+        return { error: 'Invalid slot' }
+      }
+
+      // Parse the time and create booking datetime
+      const [startHour, startMinute] = slot.startTime.split(':').map(Number)
+      const [endHour, endMinute] = slot.endTime.split(':').map(Number)
+
+      startTime = new Date(bookingDate)
+      startTime.setHours(startHour, startMinute, 0, 0)
+
+      endTime = new Date(bookingDate)
+      endTime.setHours(endHour, endMinute, 0, 0)
+
+      timezone = slot.timezone
+      requiresApproval = slot.calendar.requiresApproval
+      calendarCreatedBy = slot.calendar.createdBy
+      actualSlotId = data.slotId
+
+      // Check availability
+      const existingBookings = await prisma.calendarBooking.count({
+        where: {
+          slotId: data.slotId,
+          bookingDate,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+        },
+      })
+
+      if (existingBookings >= slot.maxBookings) {
+        return { error: 'This slot is no longer available' }
+      }
     }
 
     // Create booking
     const booking = await prisma.calendarBooking.create({
       data: {
         calendarId: data.calendarId,
-        slotId: data.slotId,
+        slotId: actualSlotId,
+        eventId: actualEventId,
         bookingDate,
         startTime,
         endTime,
-        timezone: slot.timezone,
+        timezone,
         bookerName: data.bookerName,
         bookerEmail: data.bookerEmail,
         bookerPhone: data.bookerPhone,
         prospectId: data.prospectId,
         notes: data.notes,
-        status: slot.calendar.requiresApproval ? 'PENDING' : 'CONFIRMED',
-        confirmedAt: slot.calendar.requiresApproval ? null : new Date(),
+        status: requiresApproval ? 'PENDING' : 'CONFIRMED',
+        confirmedAt: requiresApproval ? null : new Date(),
       },
     })
 
@@ -788,17 +914,19 @@ export async function createPublicBooking(data: {
       })
 
       // Create admin notification
-      await prisma.adminNotification.create({
-        data: {
-          userId: slot.calendar.createdBy,
-          type: 'PROSPECT_STATUS_CHANGED',
-          title: 'New Orientation Booking',
-          message: `${data.bookerName} has scheduled an orientation for ${startTime.toLocaleDateString()}`,
-          entityType: 'Prospect',
-          entityId: data.prospectId,
-          actionUrl: `/admin/prospects/${data.prospectId}`,
-        },
-      })
+      if (calendarCreatedBy) {
+        await prisma.adminNotification.create({
+          data: {
+            userId: calendarCreatedBy,
+            type: 'PROSPECT_STATUS_CHANGED',
+            title: 'New Orientation Booking',
+            message: `${data.bookerName} has scheduled an orientation for ${startTime.toLocaleDateString()}`,
+            entityType: 'Prospect',
+            entityId: data.prospectId,
+            actionUrl: `/admin/prospects/${data.prospectId}`,
+          },
+        })
+      }
     }
 
     return {

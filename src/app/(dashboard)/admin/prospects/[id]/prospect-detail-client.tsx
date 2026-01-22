@@ -22,16 +22,25 @@ import {
   AlertCircle,
   Loader2,
   Video,
+  ClipboardList,
+  Briefcase,
+  MessageSquare,
+  CreditCard,
+  Trash2,
 } from 'lucide-react'
+import { ProspectJourney, ProspectStep } from '@/components/ui/onboarding-journey'
 import { ProspectStatus } from '@prisma/client'
 import {
   updateProspectStatus,
   completeOrientation,
   generateBusinessFormToken,
+  generateOrientationToken,
   scheduleInterview,
   completeInterview,
   generateAcceptanceToken,
   createCoachFromProspect,
+  deleteProspect,
+  getProspectAssessmentResults,
 } from '@/lib/actions/prospects'
 import {
   getAvailableOrientationSlots,
@@ -64,9 +73,11 @@ interface Prospect {
   referrerName: string | null
   status: ProspectStatus
   assessmentToken: string
+  orientationToken: string | null
   businessFormToken: string | null
   acceptanceToken: string | null
   assessmentSurveyId: string | null
+  assessmentSubmissionId: string | null
   assessmentCompletedAt: string | null
   orientationScheduledAt: string | null
   orientationCompletedAt: string | null
@@ -90,6 +101,25 @@ interface Prospect {
   createdAt: string
   updatedAt: string
   statusHistory: StatusHistory[]
+}
+
+interface AssessmentAnswer {
+  questionId: string
+  questionText: string
+  questionType: string
+  textResponse: string | null
+  likertValue: number | null
+  selectedOptions: string[]
+  isCorrect: boolean | null
+}
+
+interface AssessmentResults {
+  surveyTitle: string
+  surveyType: string
+  submittedAt: string
+  score: number | null
+  passed: boolean | null
+  answers: AssessmentAnswer[]
 }
 
 interface ProspectDetailClientProps {
@@ -142,6 +172,14 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
   const [orientationMeetingLink, setOrientationMeetingLink] = useState<string | null>(null)
   const [scheduledMeetingLink, setScheduledMeetingLink] = useState<string | null>(null)
 
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Assessment results state (auto-loaded)
+  const [assessmentResults, setAssessmentResults] = useState<AssessmentResults | null>(null)
+  const [isLoadingAssessment, setIsLoadingAssessment] = useState(false)
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-'
     return new Date(dateString).toLocaleString('en-US', {
@@ -170,6 +208,47 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
     })
   }
 
+  // Build prospect journey steps based on current status
+  const getStepStatus = (stepStatuses: ProspectStatus[]): ProspectStep['status'] => {
+    if (prospect.status === 'REJECTED') {
+      // If rejected, mark all steps up to interview as completed, rest as skipped
+      const rejectedAfter: ProspectStatus[] = ['APPROVED', 'ACCEPTANCE_PENDING', 'PAYMENT_PENDING', 'PAYMENT_COMPLETED', 'ACCOUNT_CREATED']
+      if (stepStatuses.some(s => rejectedAfter.includes(s))) return 'skipped'
+    }
+
+    const statusOrder: ProspectStatus[] = [
+      'ASSESSMENT_PENDING', 'ASSESSMENT_COMPLETED',
+      'ORIENTATION_SCHEDULED', 'ORIENTATION_COMPLETED',
+      'BUSINESS_FORM_PENDING', 'BUSINESS_FORM_SUBMITTED',
+      'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED',
+      'APPROVED', 'REJECTED',
+      'ACCEPTANCE_PENDING', 'PAYMENT_PENDING', 'PAYMENT_COMPLETED', 'ACCOUNT_CREATED'
+    ]
+
+    const currentIndex = statusOrder.indexOf(prospect.status)
+    const stepIndices = stepStatuses.map(s => statusOrder.indexOf(s))
+    const maxStepIndex = Math.max(...stepIndices)
+    const minStepIndex = Math.min(...stepIndices)
+
+    if (currentIndex > maxStepIndex) return 'completed'
+    if (currentIndex >= minStepIndex && currentIndex <= maxStepIndex) return 'current'
+    return 'pending'
+  }
+
+  const preOnboardingSteps: ProspectStep[] = [
+    { id: 'assessment', title: 'Assessment', shortTitle: 'Assessment', icon: ClipboardList, status: getStepStatus(['ASSESSMENT_PENDING', 'ASSESSMENT_COMPLETED']) },
+    { id: 'orientation', title: 'Orientation', shortTitle: 'Orientation', icon: Video, status: getStepStatus(['ORIENTATION_SCHEDULED', 'ORIENTATION_COMPLETED']) },
+    { id: 'business-form', title: 'Business Form', shortTitle: 'Biz Form', icon: Briefcase, status: getStepStatus(['BUSINESS_FORM_PENDING', 'BUSINESS_FORM_SUBMITTED']) },
+    { id: 'interview', title: 'Interview', shortTitle: 'Interview', icon: MessageSquare, status: getStepStatus(['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED']) },
+    { id: 'decision', title: 'Decision', shortTitle: 'Decision', icon: prospect.status === 'REJECTED' ? XCircle : CheckCircle, status: getStepStatus(['APPROVED', 'REJECTED']) },
+  ]
+
+  const onboardingSteps: ProspectStep[] = [
+    { id: 'acceptance', title: 'Acceptance', shortTitle: 'Accept', icon: FileText, status: getStepStatus(['ACCEPTANCE_PENDING']) },
+    { id: 'payment', title: 'Payment', shortTitle: 'Payment', icon: CreditCard, status: getStepStatus(['PAYMENT_PENDING', 'PAYMENT_COMPLETED']) },
+    { id: 'account', title: 'Account Created', shortTitle: 'Account', icon: UserPlus, status: getStepStatus(['ACCOUNT_CREATED']) },
+  ]
+
   // Fetch available orientation slots when modal opens
   const fetchOrientationSlots = useCallback(async () => {
     setIsLoadingSlots(true)
@@ -188,6 +267,23 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
       setIsLoadingSlots(false)
     }
   }, [])
+
+  // Auto-load assessment results on mount if prospect has completed assessment
+  // (either has assessmentSubmissionId or assessmentCompletedAt indicating they took the assessment)
+  useEffect(() => {
+    const shouldLoadAssessment = (prospect.assessmentSubmissionId || prospect.assessmentCompletedAt) && !assessmentResults
+    if (shouldLoadAssessment) {
+      const loadAssessment = async () => {
+        setIsLoadingAssessment(true)
+        const result = await getProspectAssessmentResults(prospect.id)
+        if (result.results) {
+          setAssessmentResults(result.results)
+        }
+        setIsLoadingAssessment(false)
+      }
+      loadAssessment()
+    }
+  }, [prospect.assessmentSubmissionId, prospect.assessmentCompletedAt, prospect.id, assessmentResults])
 
   useEffect(() => {
     if (showScheduleModal === 'orientation') {
@@ -318,6 +414,22 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
     setSuccess('Copied to clipboard')
     setTimeout(() => setSuccess(null), 2000)
   }
+
+  const handleDeleteProspect = async () => {
+    setIsDeleting(true)
+    setError(null)
+
+    const result = await deleteProspect(prospect.id)
+    if (result.error) {
+      setError(result.error)
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
+    } else {
+      // Redirect to prospects list after successful deletion
+      router.push('/admin/prospects')
+    }
+  }
+
 
   const getNextActions = () => {
     switch (prospect.status) {
@@ -508,6 +620,17 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
         </div>
         <div className="flex items-center gap-4">
           {getNextActions()}
+
+          {/* Delete Button - only show if account not created */}
+          {!prospect.coachProfileId && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center px-3 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -567,6 +690,13 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
         </div>
       )}
 
+      {/* Prospect Journey Progress */}
+      <ProspectJourney
+        preOnboardingSteps={preOnboardingSteps}
+        onboardingSteps={onboardingSteps}
+        coachProfileId={prospect.coachProfileId}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
@@ -596,24 +726,175 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                 </div>
               </div>
               <div>
-                <label className="text-sm text-gray-500">Assessment Date</label>
+                <label className="text-sm text-gray-500">Created</label>
                 <div className="flex items-center text-gray-900">
                   <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                  {formatDate(prospect.assessmentCompletedAt)}
+                  {formatDate(prospect.createdAt)}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Business Information */}
-          {(prospect.companyName || prospect.bio || prospect.visionStatement) && (
+          {/* Assessment Responses - Always show this section */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-primary-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Assessment Responses</h2>
+              </div>
+              {prospect.assessmentCompletedAt && (
+                <span className="text-sm text-gray-500">
+                  Completed {formatDate(prospect.assessmentCompletedAt)}
+                </span>
+              )}
+            </div>
+
+            {isLoadingAssessment ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+                <span className="ml-2 text-gray-500">Loading assessment responses...</span>
+              </div>
+            ) : assessmentResults && assessmentResults.answers.length > 0 ? (
+              <div className="space-y-4">
+                {assessmentResults.answers.map((answer, index) => (
+                  <div key={answer.questionId} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-medium">
+                        {index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 mb-2">
+                          {answer.questionText}
+                        </p>
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          {answer.textResponse ? (
+                            <p className="text-gray-700 whitespace-pre-wrap">{answer.textResponse}</p>
+                          ) : answer.likertValue !== null ? (
+                            <p className="text-gray-700">Rating: {answer.likertValue}</p>
+                          ) : answer.selectedOptions.length > 0 ? (
+                            <ul className="list-disc list-inside text-gray-700">
+                              {answer.selectedOptions.map((opt, i) => (
+                                <li key={i}>{opt}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-gray-400 italic">No response provided</p>
+                          )}
+                        </div>
+                        {answer.isCorrect !== null && (
+                          <div className={`mt-2 text-sm ${answer.isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                            {answer.isCorrect ? (
+                              <span className="flex items-center gap-1">
+                                <CheckCircle className="h-4 w-4" /> Correct
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <XCircle className="h-4 w-4" /> Incorrect
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : !prospect.assessmentCompletedAt && !prospect.assessmentSubmissionId ? (
+              <div className="text-center py-6 bg-gray-50 rounded-lg">
+                <ClipboardList className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500 font-medium">No Assessment Submission</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  This prospect was added manually without completing the assessment form.
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-6 bg-gray-50 rounded-lg">
+                <AlertCircle className="h-10 w-10 text-amber-400 mx-auto mb-2" />
+                <p className="text-gray-500 font-medium">Assessment Data Not Found</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  The assessment responses could not be located. The prospect may have completed the assessment before data linking was implemented.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Interview Information - Show if any interview data exists */}
+          {(prospect.interviewScheduledAt || prospect.interviewCompletedAt || prospect.interviewNotes || prospect.interviewResult) && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Business Information</h2>
+              <div className="flex items-center gap-2 mb-4">
+                <MessageSquare className="h-5 w-5 text-primary-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Interview Information</h2>
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {prospect.interviewScheduledAt && (
+                    <div>
+                      <label className="text-sm text-gray-500">Scheduled</label>
+                      <div className="flex items-center text-gray-900">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                        {formatDate(prospect.interviewScheduledAt)}
+                      </div>
+                    </div>
+                  )}
+                  {prospect.interviewCompletedAt && (
+                    <div>
+                      <label className="text-sm text-gray-500">Completed</label>
+                      <div className="flex items-center text-gray-900">
+                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                        {formatDate(prospect.interviewCompletedAt)}
+                      </div>
+                    </div>
+                  )}
+                  {prospect.interviewResult && (
+                    <div>
+                      <label className="text-sm text-gray-500">Result</label>
+                      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
+                        prospect.interviewResult === 'APPROVED'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {prospect.interviewResult === 'APPROVED' ? (
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                        ) : (
+                          <XCircle className="h-4 w-4 mr-1" />
+                        )}
+                        {prospect.interviewResult}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {prospect.interviewNotes && (
+                  <div>
+                    <label className="text-sm text-gray-500">Interview Notes</label>
+                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.interviewNotes}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Business Information - Always show with status */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Business Development Form</h2>
+              </div>
+              {prospect.businessFormSubmittedAt && (
+                <span className="text-sm text-gray-500">
+                  Submitted {formatDate(prospect.businessFormSubmittedAt)}
+                </span>
+              )}
+            </div>
+
+            {prospect.companyName || prospect.bio || prospect.visionStatement ? (
               <div className="space-y-4">
                 {prospect.companyName && (
                   <div>
                     <label className="text-sm text-gray-500">Company Name</label>
-                    <div className="flex items-center text-gray-900">
+                    <div className="flex items-center text-gray-900 mt-1">
                       <Building className="h-4 w-4 mr-2 text-gray-400" />
                       {prospect.companyName}
                     </div>
@@ -622,29 +903,35 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                 {prospect.bio && (
                   <div>
                     <label className="text-sm text-gray-500">Bio</label>
-                    <p className="text-gray-900 mt-1">{prospect.bio}</p>
+                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.bio}</p>
+                    </div>
                   </div>
                 )}
                 {prospect.visionStatement && (
                   <div>
                     <label className="text-sm text-gray-500">Vision Statement</label>
-                    <p className="text-gray-900 mt-1">{prospect.visionStatement}</p>
+                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.visionStatement}</p>
+                    </div>
                   </div>
                 )}
                 {prospect.missionStatement && (
                   <div>
                     <label className="text-sm text-gray-500">Mission Statement</label>
-                    <p className="text-gray-900 mt-1">{prospect.missionStatement}</p>
+                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.missionStatement}</p>
+                    </div>
                   </div>
                 )}
                 {prospect.servicesInterested.length > 0 && (
                   <div>
                     <label className="text-sm text-gray-500">Services Interested</label>
-                    <div className="flex flex-wrap gap-2 mt-1">
+                    <div className="flex flex-wrap gap-2 mt-2">
                       {prospect.servicesInterested.map((service, i) => (
                         <span
                           key={i}
-                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                          className="px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
                         >
                           {service}
                         </span>
@@ -655,92 +942,246 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                 {prospect.proposedCostOfServices && (
                   <div>
                     <label className="text-sm text-gray-500">Proposed Pricing</label>
-                    <p className="text-gray-900 mt-1">{prospect.proposedCostOfServices}</p>
+                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.proposedCostOfServices}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6 bg-gray-50 rounded-lg">
+                <Briefcase className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500 font-medium">Not Yet Submitted</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {prospect.businessFormToken
+                    ? 'Business development form link has been sent. Waiting for prospect to complete it.'
+                    : 'Business development form has not been requested yet.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Orientation Information - Show if any orientation data exists */}
+          {(prospect.orientationScheduledAt || prospect.orientationCompletedAt || prospect.orientationNotes) && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Video className="h-5 w-5 text-primary-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Orientation Information</h2>
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {prospect.orientationScheduledAt && (
+                    <div>
+                      <label className="text-sm text-gray-500">Scheduled</label>
+                      <div className="flex items-center text-gray-900">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                        {formatDate(prospect.orientationScheduledAt)}
+                      </div>
+                    </div>
+                  )}
+                  {prospect.orientationCompletedAt && (
+                    <div>
+                      <label className="text-sm text-gray-500">Completed</label>
+                      <div className="flex items-center text-gray-900">
+                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                        {formatDate(prospect.orientationCompletedAt)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {prospect.orientationNotes && (
+                  <div>
+                    <label className="text-sm text-gray-500">Orientation Notes</label>
+                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.orientationNotes}</p>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Payment Information */}
-          {prospect.payment && (
+          {/* Terms & Payment Information */}
+          {(prospect.termsAcceptedAt || prospect.payment) && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Information</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-gray-500">Amount</label>
-                  <div className="flex items-center text-gray-900">
-                    <DollarSign className="h-4 w-4 mr-2 text-gray-400" />
-                    ${prospect.payment.amount.toFixed(2)}
+              <div className="flex items-center gap-2 mb-4">
+                <CreditCard className="h-5 w-5 text-primary-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Acceptance & Payment</h2>
+              </div>
+              <div className="space-y-4">
+                {/* Terms Acceptance */}
+                {prospect.termsAcceptedAt && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-sm text-gray-500">Terms Accepted</label>
+                      <div className="flex items-center text-green-600 mt-1">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {formatDate(prospect.termsAcceptedAt)}
+                      </div>
+                    </div>
+                    {prospect.privacyAcceptedAt && (
+                      <div>
+                        <label className="text-sm text-gray-500">Privacy Accepted</label>
+                        <div className="flex items-center text-green-600 mt-1">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          {formatDate(prospect.privacyAcceptedAt)}
+                        </div>
+                      </div>
+                    )}
+                    {prospect.nonRefundAcknowledgedAt && (
+                      <div>
+                        <label className="text-sm text-gray-500">Refund Policy Acknowledged</label>
+                        <div className="flex items-center text-green-600 mt-1">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          {formatDate(prospect.nonRefundAcknowledgedAt)}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Method</label>
-                  <div className="text-gray-900">{prospect.payment.method}</div>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Status</label>
-                  <div className="text-gray-900">{prospect.payment.status}</div>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Paid At</label>
-                  <div className="text-gray-900">{formatDate(prospect.payment.paidAt)}</div>
-                </div>
+                )}
+
+                {/* Payment Info */}
+                {prospect.payment && (
+                  <div className="pt-4 border-t border-gray-100">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Details</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div>
+                        <label className="text-sm text-gray-500">Amount</label>
+                        <div className="flex items-center text-gray-900 mt-1">
+                          <DollarSign className="h-4 w-4 mr-1 text-gray-400" />
+                          {prospect.payment.amount.toFixed(2)}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-500">Method</label>
+                        <div className="text-gray-900 mt-1">{prospect.payment.method}</div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-500">Status</label>
+                        <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                          prospect.payment.status === 'COMPLETED'
+                            ? 'bg-green-100 text-green-800'
+                            : prospect.payment.status === 'FAILED'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {prospect.payment.status}
+                        </div>
+                      </div>
+                      {prospect.payment.paidAt && (
+                        <div>
+                          <label className="text-sm text-gray-500">Paid</label>
+                          <div className="text-gray-900 mt-1">{formatDate(prospect.payment.paidAt)}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* Generated Links Section */}
-          {(prospect.businessFormToken || prospect.acceptanceToken) && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Generated Links</h2>
-              <p className="text-sm text-gray-500 mb-4">
-                Use these links to resend to the prospect if they lose access.
-              </p>
-              <div className="space-y-3">
-                {prospect.businessFormToken && (
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Business Development Form</p>
-                      <p className="text-xs text-gray-500 truncate max-w-md">
-                        /business-form/{prospect.businessFormToken}
-                      </p>
-                    </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Prospect Links</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Share these links with the prospect to complete their onboarding steps.
+            </p>
+            <div className="space-y-3">
+              {/* Orientation Booking Link - show after assessment completion */}
+              {prospect.assessmentCompletedAt && !prospect.orientationCompletedAt && (
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Orientation Booking</p>
+                    <p className="text-xs text-green-600">
+                      {prospect.orientationToken
+                        ? 'Prospect can self-schedule their orientation call'
+                        : 'Generate a secure link for the prospect to book orientation'
+                      }
+                    </p>
+                  </div>
+                  {prospect.orientationToken ? (
                     <button
                       onClick={() => {
-                        const link = `${window.location.origin}/business-form/${prospect.businessFormToken}`
+                        const link = `${window.location.origin}/book/orientation/${prospect.orientationToken}`
                         copyToClipboard(link)
                       }}
-                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
+                      className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
                     >
                       <Copy className="h-4 w-4 mr-1" />
-                      Copy
+                      Copy Link
                     </button>
-                  </div>
-                )}
-                {prospect.acceptanceToken && (
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Acceptance & Payment</p>
-                      <p className="text-xs text-gray-500 truncate max-w-md">
-                        /acceptance/{prospect.acceptanceToken}
-                      </p>
-                    </div>
+                  ) : (
                     <button
-                      onClick={() => {
-                        const link = `${window.location.origin}/acceptance/${prospect.acceptanceToken}`
-                        copyToClipboard(link)
+                      onClick={async () => {
+                        setIsLoading(true)
+                        const result = await generateOrientationToken(prospect.id)
+                        if (result.error) {
+                          setError(result.error)
+                        } else if (result.token) {
+                          const link = `${window.location.origin}/book/orientation/${result.token}`
+                          copyToClipboard(link)
+                          router.refresh()
+                        }
+                        setIsLoading(false)
                       }}
-                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
+                      disabled={isLoading}
+                      className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
                     >
-                      <Copy className="h-4 w-4 mr-1" />
-                      Copy
+                      <Send className="h-4 w-4 mr-1" />
+                      Generate Link
                     </button>
+                  )}
+                </div>
+              )}
+              {prospect.businessFormToken && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Business Development Form</p>
+                    <p className="text-xs text-gray-500 truncate max-w-md">
+                      /business-form/{prospect.businessFormToken}
+                    </p>
                   </div>
-                )}
-              </div>
+                  <button
+                    onClick={() => {
+                      const link = `${window.location.origin}/business-form/${prospect.businessFormToken}`
+                      copyToClipboard(link)
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copy
+                  </button>
+                </div>
+              )}
+              {prospect.acceptanceToken && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Acceptance & Payment</p>
+                    <p className="text-xs text-gray-500 truncate max-w-md">
+                      /acceptance/{prospect.acceptanceToken}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const link = `${window.location.origin}/acceptance/${prospect.acceptanceToken}`
+                      copyToClipboard(link)
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copy
+                  </button>
+                </div>
+              )}
+              {/* Show message if no links available yet */}
+              {!prospect.assessmentCompletedAt && !prospect.businessFormToken && !prospect.acceptanceToken && (
+                <p className="text-sm text-gray-500 italic">
+                  Links will appear here as the prospect progresses through onboarding.
+                </p>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Sidebar */}
@@ -972,6 +1413,58 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Delete Prospect
+              </h3>
+            </div>
+            <p className="text-gray-600 mb-2">
+              Are you sure you want to delete this prospect?
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              <strong>{prospect.firstName} {prospect.lastName}</strong> ({prospect.email})
+            </p>
+            <p className="text-sm text-red-600 mb-6">
+              This action cannot be undone. All data associated with this prospect will be permanently deleted.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteProspect}
+                disabled={isDeleting}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin inline" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2 inline" />
+                    Delete Prospect
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

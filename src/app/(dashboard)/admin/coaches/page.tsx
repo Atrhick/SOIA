@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, UserPlus, ChevronRight } from 'lucide-react'
+import { Users, UserPlus, ChevronRight, Clock } from 'lucide-react'
 
 const userStatusVariants = {
   ACTIVE: 'success',
@@ -19,33 +19,77 @@ const coachStatusVariants = {
 } as const
 
 async function getCoaches() {
-  return prisma.coachProfile.findMany({
-    include: {
-      user: true,
-      ambassadors: true,
-      recruiter: true,
-      recruitedCoaches: true,
-    },
-    orderBy: { createdAt: 'desc' },
+  const [coaches, requiredTasksCount] = await Promise.all([
+    prisma.coachProfile.findMany({
+      include: {
+        user: true,
+        ambassadors: true,
+        recruiter: true,
+        recruitedCoaches: true,
+        onboardingProgress: {
+          where: { status: 'APPROVED' },
+          include: { task: { select: { isRequired: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.onboardingTask.count({
+      where: { isActive: true, isRequired: true },
+    }),
+  ])
+
+  // Calculate onboarding progress for each coach
+  return coaches.map((coach) => {
+    const completedRequired = coach.onboardingProgress.filter(
+      (p) => p.task.isRequired
+    ).length
+    const onboardingPercentage = requiredTasksCount > 0
+      ? Math.round((completedRequired / requiredTasksCount) * 100)
+      : 0
+
+    return {
+      ...coach,
+      onboardingPercentage,
+      completedTasks: completedRequired,
+      totalRequiredTasks: requiredTasksCount,
+    }
   })
 }
 
-export default async function CoachesPage() {
+interface PageProps {
+  searchParams: Promise<{ filter?: string }>
+}
+
+export default async function CoachesPage({ searchParams }: PageProps) {
   const session = await auth()
 
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/login')
   }
 
-  const coaches = await getCoaches()
+  const params = await searchParams
+  const filter = params.filter || 'all'
 
-  // Stats
+  const allCoaches = await getCoaches()
+
+  // Stats (always calculated from all coaches)
   const stats = {
-    total: coaches.length,
-    active: coaches.filter((c) => c.coachStatus === 'ACTIVE_COACH').length,
-    onboarding: coaches.filter((c) => c.coachStatus === 'ONBOARDING_INCOMPLETE').length,
-    suspended: coaches.filter((c) => c.user.status === 'SUSPENDED').length,
+    total: allCoaches.length,
+    active: allCoaches.filter((c) => c.coachStatus === 'ACTIVE_COACH').length,
+    onboarding: allCoaches.filter((c) => c.coachStatus === 'ONBOARDING_INCOMPLETE').length,
+    suspended: allCoaches.filter((c) => c.user.status === 'SUSPENDED').length,
   }
+
+  // Filter coaches based on URL param
+  const coaches = filter === 'all'
+    ? allCoaches
+    : filter === 'active'
+      ? allCoaches.filter((c) => c.coachStatus === 'ACTIVE_COACH')
+      : filter === 'onboarding'
+        ? allCoaches.filter((c) => c.coachStatus === 'ONBOARDING_INCOMPLETE')
+        : filter === 'suspended'
+          ? allCoaches.filter((c) => c.user.status === 'SUSPENDED')
+          : allCoaches
 
   return (
     <div className="space-y-6">
@@ -63,66 +107,89 @@ export default async function CoachesPage() {
         </Link>
       </div>
 
-      {/* Stats */}
+      {/* Stats - Clickable Filters */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary-100 rounded-lg">
-                <Users className="h-6 w-6 text-primary-600" />
+        <Link href="/admin/coaches">
+          <Card className={`cursor-pointer transition-all hover:shadow-md ${filter === 'all' ? 'ring-2 ring-primary-500' : ''}`}>
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary-100 rounded-lg">
+                  <Users className="h-6 w-6 text-primary-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-sm text-gray-500">Total Coaches</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.total}</p>
-                <p className="text-sm text-gray-500">Total Coaches</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/admin/coaches?filter=active">
+          <Card className={`cursor-pointer transition-all hover:shadow-md ${filter === 'active' ? 'ring-2 ring-green-500' : ''}`}>
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <Users className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.active}</p>
+                  <p className="text-sm text-gray-500">Active Coaches</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Users className="h-6 w-6 text-green-600" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/admin/coaches?filter=onboarding">
+          <Card className={`cursor-pointer transition-all hover:shadow-md ${filter === 'onboarding' ? 'ring-2 ring-amber-500' : ''}`}>
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-yellow-100 rounded-lg">
+                  <Clock className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.onboarding}</p>
+                  <p className="text-sm text-gray-500">Onboarding</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.active}</p>
-                <p className="text-sm text-gray-500">Active Coaches</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/admin/coaches?filter=suspended">
+          <Card className={`cursor-pointer transition-all hover:shadow-md ${filter === 'suspended' ? 'ring-2 ring-red-500' : ''}`}>
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-red-100 rounded-lg">
+                  <Users className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.suspended}</p>
+                  <p className="text-sm text-gray-500">Suspended</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <Users className="h-6 w-6 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.onboarding}</p>
-                <p className="text-sm text-gray-500">Onboarding</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-red-100 rounded-lg">
-                <Users className="h-6 w-6 text-red-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.suspended}</p>
-                <p className="text-sm text-gray-500">Suspended</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Coach List */}
       <Card>
         <CardHeader>
-          <CardTitle>All Coaches</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              {filter === 'all' ? 'All Coaches' :
+               filter === 'active' ? 'Active Coaches' :
+               filter === 'onboarding' ? 'Coaches in Onboarding' :
+               filter === 'suspended' ? 'Suspended Coaches' : 'All Coaches'}
+            </CardTitle>
+            {filter !== 'all' && (
+              <Link
+                href="/admin/coaches"
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                Clear filter
+              </Link>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {coaches.length > 0 ? (
@@ -158,10 +225,30 @@ export default async function CoachesPage() {
                       <p className="text-xs text-gray-500">Recruited</p>
                     </div>
 
-                    <div className="hidden sm:flex flex-col items-end gap-1">
-                      <Badge variant={coachStatusVariants[coach.coachStatus]}>
-                        {coach.coachStatus === 'ACTIVE_COACH' ? 'Active' : 'Onboarding'}
-                      </Badge>
+                    <div className="hidden sm:flex flex-col items-end gap-1.5">
+                      {coach.coachStatus === 'ACTIVE_COACH' ? (
+                        <Badge variant="success">Active</Badge>
+                      ) : (
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3.5 w-3.5 text-amber-500" />
+                            <span className="text-xs font-semibold text-amber-700">
+                              Onboarding
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-500">
+                              {coach.completedTasks}/{coach.totalRequiredTasks} tasks
+                            </span>
+                            <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-amber-500 rounded-full transition-all"
+                                style={{ width: `${coach.onboardingPercentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <Badge variant={userStatusVariants[coach.user.status]} className="text-xs">
                         {coach.user.status}
                       </Badge>

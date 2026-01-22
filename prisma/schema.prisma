@@ -336,6 +336,220 @@ model QuizResult {
 }
 
 // ============================================
+// LMS - Learning Management System
+// ============================================
+
+enum LMSCourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LMSContentType {
+  VIDEO
+  TEXT
+  QUIZ
+  DOCUMENT
+}
+
+enum LMSProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model LMSCourse {
+  id              String          @id @default(cuid())
+
+  title           String
+  description     String?         @db.Text
+  thumbnail       String?         // URL to course thumbnail image
+
+  status          LMSCourseStatus @default(DRAFT)
+
+  // Access control
+  allowedRoles    String[]        // ["COACH", "AMBASSADOR"]
+
+  // Prerequisites (IDs of courses that must be completed first)
+  prerequisiteIds String[]
+
+  // Estimated duration in minutes
+  estimatedDuration Int?
+
+  // Sorting
+  sortOrder       Int             @default(0)
+
+  createdBy       String          // Admin user ID
+  publishedAt     DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  modules         LMSModule[]
+  enrollments     LMSEnrollment[]
+
+  @@map("lms_courses")
+}
+
+model LMSModule {
+  id              String      @id @default(cuid())
+  courseId        String
+  course          LMSCourse   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  title           String
+  description     String?     @db.Text
+
+  // Optional unlock requirement (e.g., previous module must be completed)
+  unlockAfterModuleId String?
+
+  sortOrder       Int         @default(0)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  lessons         LMSLesson[]
+
+  @@map("lms_modules")
+}
+
+model LMSLesson {
+  id              String      @id @default(cuid())
+  moduleId        String
+  module          LMSModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  title           String
+  description     String?     @db.Text
+
+  // Estimated duration in minutes
+  estimatedDuration Int?
+
+  sortOrder       Int         @default(0)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  contentBlocks   LMSContentBlock[]
+  progress        LMSLessonProgress[]
+
+  @@map("lms_lessons")
+}
+
+model LMSContentBlock {
+  id              String          @id @default(cuid())
+  lessonId        String
+  lesson          LMSLesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  title           String?         // Optional title for the block
+  type            LMSContentType
+
+  // Content stored as JSON based on type:
+  // VIDEO: { url: string, provider: "youtube" | "vimeo" | "custom", duration: number }
+  // TEXT: { content: string, format: "markdown" | "html" }
+  // QUIZ: { surveyId: string } - Links to existing Survey system
+  // DOCUMENT: { url: string, fileName: string, fileSize: number, mimeType: string }
+  content         Json
+
+  // Completion requirements
+  // VIDEO: percentage watched (e.g., 80)
+  // TEXT: null (view = complete)
+  // QUIZ: passing score required
+  // DOCUMENT: null (download/view = complete)
+  completionThreshold Int?
+
+  sortOrder       Int             @default(0)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  progress        LMSContentProgress[]
+
+  @@map("lms_content_blocks")
+}
+
+model LMSEnrollment {
+  id              String          @id @default(cuid())
+  courseId        String
+  course          LMSCourse       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId          String
+
+  // Progress tracking
+  status          LMSProgressStatus @default(NOT_STARTED)
+  progressPercentage Int           @default(0)
+
+  // Completion
+  completedAt     DateTime?
+
+  // Certificate (if applicable)
+  certificateIssuedAt DateTime?
+  certificateUrl  String?
+
+  // Time tracking
+  totalTimeSpent  Int             @default(0) // Total minutes spent
+  lastAccessedAt  DateTime?
+
+  enrolledAt      DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  lessonProgress  LMSLessonProgress[]
+
+  @@unique([courseId, userId])
+  @@map("lms_enrollments")
+}
+
+model LMSLessonProgress {
+  id              String          @id @default(cuid())
+  enrollmentId    String
+  enrollment      LMSEnrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lessonId        String
+  lesson          LMSLesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  status          LMSProgressStatus @default(NOT_STARTED)
+
+  // Time tracking
+  timeSpent       Int             @default(0) // Minutes spent on this lesson
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  contentProgress LMSContentProgress[]
+
+  @@unique([enrollmentId, lessonId])
+  @@map("lms_lesson_progress")
+}
+
+model LMSContentProgress {
+  id              String          @id @default(cuid())
+  lessonProgressId String
+  lessonProgress  LMSLessonProgress @relation(fields: [lessonProgressId], references: [id], onDelete: Cascade)
+  contentBlockId  String
+  contentBlock    LMSContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+
+  status          LMSProgressStatus @default(NOT_STARTED)
+
+  // For VIDEO: percentage watched (0-100)
+  // For QUIZ: score achieved
+  progressValue   Int?
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([lessonProgressId, contentBlockId])
+  @@map("lms_content_progress")
+}
+
+// ============================================
 // WEEKLY GOALS
 // ============================================
 
@@ -1432,6 +1646,7 @@ model CalendarEvent {
   adminCalendar   AdminCalendar?   @relation("AdminCalendarEvents", fields: [adminCalendarId], references: [id], onDelete: SetNull)
 
   attendees      EventAttendee[]
+  bookings       CalendarBooking[]
 
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -1559,6 +1774,10 @@ model Survey {
   requiresProspectInfo Boolean        @default(false)  // Captures name, email, phone, referrer
   showProgressBar     Boolean         @default(true)
 
+  // Contact Info Field Configuration (JSON)
+  // Structure: { fields: [{ name: string, label: string, type: string, required: boolean, enabled: boolean }] }
+  contactInfoConfig   Json?
+
   // Quiz-specific options
   scoreMode       QuizScoreMode       @default(SCORE_ONLY)  // How to handle quiz scoring
   passingScore    Int?                // Percentage required to pass (only for PASS_FAIL mode)
@@ -1574,16 +1793,39 @@ model Survey {
   updatedAt       DateTime            @updatedAt
 
   // Relations
+  pages           SurveyPage[]
   questions       SurveyQuestion[]
   submissions     SurveySubmission[]
 
   @@map("surveys")
 }
 
+model SurveyPage {
+  id              String              @id @default(cuid())
+  surveyId        String
+  survey          Survey              @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  title           String?             // Optional section title (e.g., "Personal Information")
+  description     String?             @db.Text // Optional section description
+  sortOrder       Int                 @default(0)
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  questions       SurveyQuestion[]
+
+  @@map("survey_pages")
+}
+
 model SurveyQuestion {
   id              String              @id @default(cuid())
   surveyId        String
   survey          Survey              @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  // Page grouping (optional - null means standalone/legacy question)
+  pageId          String?
+  page            SurveyPage?         @relation(fields: [pageId], references: [id], onDelete: SetNull)
 
   questionText    String              @db.Text
   questionType    SurveyQuestionType
@@ -1634,6 +1876,7 @@ model SurveySubmission {
   // Responder info (null for anonymous surveys)
   userId          String?
   userRole        String?           // Role at time of submission
+  contactEmail    String?           // Email for public surveys (e.g., coach assessment)
 
   // Quiz scoring (null for surveys)
   score           Float?
@@ -1647,6 +1890,7 @@ model SurveySubmission {
   // Relations
   answers         SurveyAnswer[]
 
+  @@index([contactEmail])
   @@map("survey_submissions")
 }
 
@@ -1731,6 +1975,7 @@ model Prospect {
 
   // Unique Access Tokens
   assessmentToken       String              @unique @default(cuid())
+  orientationToken      String?             @unique
   businessFormToken     String?             @unique
   acceptanceToken       String?             @unique
 
@@ -1987,6 +2232,8 @@ model CalendarBooking {
   calendar        AdminCalendar   @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   slotId          String?
   slot            CalendarSlot?   @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  eventId         String?
+  event           CalendarEvent?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   // Booking details
   bookingDate     DateTime        // The actual date of the booking

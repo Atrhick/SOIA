@@ -23,6 +23,7 @@ interface HeaderProps {
   user: {
     email: string
     role: string
+    name?: string | null
     isImpersonating?: boolean
     originalAdminId?: string
   }
@@ -123,7 +124,7 @@ export function Header({ user }: HeaderProps) {
                     <User className="h-4 w-4 text-primary-600" />
                   </div>
                   <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium text-gray-900">{user.email}</p>
+                    <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
                     <p className="text-xs text-gray-500 capitalize">{user.role.toLowerCase()}</p>
                   </div>
                   <ChevronDown className="h-4 w-4 text-gray-500" />

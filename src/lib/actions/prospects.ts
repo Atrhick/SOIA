@@ -214,13 +214,15 @@ export async function getProspect(id: string) {
   }
 }
 
-export async function getProspectByToken(token: string, tokenType: 'assessment' | 'business' | 'acceptance') {
+export async function getProspectByToken(token: string, tokenType: 'assessment' | 'orientation' | 'business' | 'acceptance') {
   try {
     const whereClause = tokenType === 'assessment'
       ? { assessmentToken: token }
-      : tokenType === 'business'
-        ? { businessFormToken: token }
-        : { acceptanceToken: token }
+      : tokenType === 'orientation'
+        ? { orientationToken: token }
+        : tokenType === 'business'
+          ? { businessFormToken: token }
+          : { acceptanceToken: token }
 
     const prospect = await prisma.prospect.findFirst({
       where: whereClause,
@@ -432,6 +434,75 @@ export async function completeOrientation(id: string, notes?: string) {
   } catch (error) {
     console.error('Error completing orientation:', error)
     return { error: 'Failed to complete orientation' }
+  }
+}
+
+// ============================================
+// ORIENTATION TOKEN
+// ============================================
+
+export async function generateOrientationToken(prospectId: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Check if prospect already has a token
+    const existingProspect = await prisma.prospect.findUnique({
+      where: { id: prospectId },
+      select: { orientationToken: true, status: true },
+    })
+
+    if (existingProspect?.orientationToken) {
+      return { success: true, token: existingProspect.orientationToken }
+    }
+
+    const token = `or_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+
+    await prisma.prospect.update({
+      where: { id: prospectId },
+      data: {
+        orientationToken: token,
+      },
+    })
+
+    revalidatePath('/admin/prospects')
+    return { success: true, token }
+  } catch (error) {
+    console.error('Error generating orientation token:', error)
+    return { error: 'Failed to generate orientation link' }
+  }
+}
+
+export async function getProspectByOrientationToken(token: string) {
+  try {
+    const prospect = await prisma.prospect.findFirst({
+      where: { orientationToken: token },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        status: true,
+        orientationScheduledAt: true,
+      },
+    })
+
+    if (!prospect) {
+      return { error: 'Invalid or expired link' }
+    }
+
+    // Check if orientation is already scheduled or completed
+    if (prospect.orientationScheduledAt) {
+      return { error: 'Orientation has already been scheduled' }
+    }
+
+    return { prospect }
+  } catch (error) {
+    console.error('Error getting prospect by orientation token:', error)
+    return { error: 'Failed to validate link' }
   }
 }
 
@@ -798,6 +869,215 @@ export async function createCoachFromProspect(
   } catch (error) {
     console.error('Error creating coach from prospect:', error)
     return { error: 'Failed to create coach account' }
+  }
+}
+
+// ============================================
+// STATISTICS
+// ============================================
+
+// ============================================
+// DELETE PROSPECT
+// ============================================
+
+export async function deleteProspect(id: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const prospect = await prisma.prospect.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        coachProfileId: true,
+        status: true,
+      },
+    })
+
+    if (!prospect) {
+      return { error: 'Prospect not found' }
+    }
+
+    // Don't allow deletion if account has been created
+    if (prospect.coachProfileId) {
+      return { error: 'Cannot delete prospect after coach account has been created. Delete the coach account instead.' }
+    }
+
+    // Delete the prospect (cascade will handle related records)
+    await prisma.prospect.delete({
+      where: { id },
+    })
+
+    // Log the deletion
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: 'DELETE_PROSPECT',
+        entityType: 'Prospect',
+        entityId: id,
+        details: `Deleted prospect: ${prospect.firstName} ${prospect.lastName} (${prospect.email})`,
+      },
+    })
+
+    revalidatePath('/admin/prospects')
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting prospect:', error)
+    return { error: 'Failed to delete prospect' }
+  }
+}
+
+// ============================================
+// ASSESSMENT RESULTS
+// ============================================
+
+export async function getProspectAssessmentResults(prospectId: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const prospect = await prisma.prospect.findUnique({
+      where: { id: prospectId },
+      select: {
+        id: true,
+        email: true,
+        assessmentSubmissionId: true,
+        assessmentSurveyId: true,
+        assessmentCompletedAt: true,
+      },
+    })
+
+    if (!prospect) {
+      return { error: 'Prospect not found' }
+    }
+
+    let submissionId = prospect.assessmentSubmissionId
+
+    // If no direct submission ID, try to find submission by email from coach assessment survey
+    if (!submissionId && prospect.assessmentSurveyId) {
+      const matchingSubmission = await prisma.surveySubmission.findFirst({
+        where: {
+          surveyId: prospect.assessmentSurveyId,
+          contactEmail: prospect.email,
+        },
+        orderBy: { submittedAt: 'desc' },
+        select: { id: true },
+      })
+
+      if (matchingSubmission) {
+        submissionId = matchingSubmission.id
+        // Update the prospect with the found submission ID for future use
+        await prisma.prospect.update({
+          where: { id: prospectId },
+          data: { assessmentSubmissionId: submissionId },
+        })
+      }
+    }
+
+    // If still no submission, try to find by email in the coach assessment survey
+    if (!submissionId) {
+      // Find the coach assessment survey by title
+      const coachAssessment = await prisma.survey.findFirst({
+        where: { title: 'Coach Assessment' },
+        select: { id: true },
+      })
+
+      if (coachAssessment) {
+        const matchingSubmission = await prisma.surveySubmission.findFirst({
+          where: {
+            surveyId: coachAssessment.id,
+            contactEmail: prospect.email,
+          },
+          orderBy: { submittedAt: 'desc' },
+          select: { id: true },
+        })
+
+        if (matchingSubmission) {
+          submissionId = matchingSubmission.id
+          // Update the prospect with the found submission ID for future use
+          await prisma.prospect.update({
+            where: { id: prospectId },
+            data: {
+              assessmentSubmissionId: submissionId,
+              assessmentSurveyId: coachAssessment.id,
+            },
+          })
+        }
+      }
+    }
+
+    if (!submissionId) {
+      return { error: 'No assessment submission found for this prospect' }
+    }
+
+    // Get the submission with answers
+    const submission = await prisma.surveySubmission.findUnique({
+      where: { id: submissionId },
+      include: {
+        answers: {
+          include: {
+            question: {
+              select: {
+                id: true,
+                questionText: true,
+                questionType: true,
+                sortOrder: true,
+              },
+            },
+            selectedOptions: {
+              select: {
+                id: true,
+                optionText: true,
+              },
+            },
+          },
+        },
+        survey: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+          },
+        },
+      },
+    })
+
+    if (!submission) {
+      return { error: 'Assessment submission not found' }
+    }
+
+    // Format the results
+    const results = {
+      surveyTitle: submission.survey.title,
+      surveyType: submission.survey.type,
+      submittedAt: submission.submittedAt.toISOString(),
+      score: submission.score,
+      passed: submission.passed,
+      answers: submission.answers
+        .sort((a, b) => a.question.sortOrder - b.question.sortOrder)
+        .map(answer => ({
+          questionId: answer.question.id,
+          questionText: answer.question.questionText,
+          questionType: answer.question.questionType,
+          textResponse: answer.textResponse,
+          likertValue: answer.likertValue,
+          selectedOptions: answer.selectedOptions.map(opt => opt.optionText),
+          isCorrect: answer.isCorrect,
+        })),
+    }
+
+    return { results }
+  } catch (error) {
+    console.error('Error getting prospect assessment results:', error)
+    return { error: 'Failed to get assessment results' }
   }
 }
 

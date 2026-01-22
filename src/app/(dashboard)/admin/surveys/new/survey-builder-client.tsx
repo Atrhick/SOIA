@@ -25,8 +25,18 @@ import {
   FileQuestion,
   ClipboardList,
   Settings,
+  Layers,
+  GripVertical,
+  FolderPlus,
+  MoveRight,
+  Eye,
+  User,
+  Mail,
+  Phone,
+  Users,
+  Lock,
 } from 'lucide-react'
-import { createSurvey, addQuestion, updateQuestion, deleteQuestion, reorderQuestions, duplicateQuestion } from '@/lib/actions/surveys'
+import { createSurvey, addQuestion, updateQuestion, deleteQuestion, reorderQuestions, duplicateQuestion, createSurveyPage, updateSurveyPage, deleteSurveyPage, moveQuestionToPage, addQuestionToPage } from '@/lib/actions/surveys'
 
 interface SurveyOption {
   id: string
@@ -45,6 +55,14 @@ interface SurveyQuestion {
   minLength: number | null
   maxLength: number | null
   options: SurveyOption[]
+  pageId: string | null
+}
+
+interface SurveyPage {
+  id: string
+  title: string | null
+  description: string | null
+  sortOrder: number
 }
 
 const QUESTION_TYPES = [
@@ -63,12 +81,28 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
   const router = useRouter()
   const [surveyId, setSurveyId] = useState<string | null>(null)
   const [questions, setQuestions] = useState<SurveyQuestion[]>([])
+  const [pages, setPages] = useState<SurveyPage[]>([])
   const [showQuestionForm, setShowQuestionForm] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState<SurveyQuestion | null>(null)
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [showSettings, setShowSettings] = useState(true)
+
+  // Page management state
+  const [showPageForm, setShowPageForm] = useState(false)
+  const [editingPage, setEditingPage] = useState<SurveyPage | null>(null)
+  const [pageForm, setPageForm] = useState({ title: '', description: '' })
+  const [addingToPageId, setAddingToPageId] = useState<string | null>(null)
+
+  // Default contact info fields configuration
+  const defaultContactFields = [
+    { name: 'firstName', label: 'First Name', type: 'text', required: true, enabled: true },
+    { name: 'lastName', label: 'Last Name', type: 'text', required: true, enabled: true },
+    { name: 'email', label: 'Email', type: 'email', required: true, enabled: true },
+    { name: 'phone', label: 'Phone', type: 'tel', required: false, enabled: true },
+    { name: 'referrerName', label: 'Referrer Name', type: 'text', required: false, enabled: false },
+  ]
 
   // Survey settings form
   const [surveyForm, setSurveyForm] = useState({
@@ -82,6 +116,9 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
     showResults: true,
     allowRetake: true,
     closesAt: '',
+    isPublic: false,
+    collectContactInfo: false,
+    contactInfoFields: defaultContactFields,
   })
 
   // Question form
@@ -157,6 +194,23 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
     }
   }
 
+  const toggleContactField = (fieldName: string, property: 'enabled' | 'required') => {
+    setSurveyForm({
+      ...surveyForm,
+      contactInfoFields: surveyForm.contactInfoFields.map(field => {
+        if (field.name === fieldName) {
+          if (property === 'enabled') {
+            // When disabling a field, also set required to false
+            return { ...field, enabled: !field.enabled, required: !field.enabled ? field.required : false }
+          } else {
+            return { ...field, required: !field.required }
+          }
+        }
+        return field
+      })
+    })
+  }
+
   const handleCreateSurvey = async () => {
     if (!surveyForm.title.trim()) {
       setError('Title is required')
@@ -174,6 +228,11 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
     formData.set('isAnonymous', String(surveyForm.isAnonymous))
     formData.set('showResults', String(surveyForm.showResults))
     formData.set('allowRetake', String(surveyForm.allowRetake))
+    formData.set('isPublic', String(surveyForm.isPublic))
+    formData.set('requiresProspectInfo', String(surveyForm.collectContactInfo))
+    if (surveyForm.collectContactInfo) {
+      formData.set('contactInfoConfig', JSON.stringify({ fields: surveyForm.contactInfoFields }))
+    }
     if (surveyForm.closesAt) {
       formData.set('closesAt', surveyForm.closesAt)
     }
@@ -263,7 +322,10 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
           resetQuestionForm()
         }
       } else {
-        const result = await addQuestion(surveyId, data)
+        // If adding to a specific page, use addQuestionToPage
+        const result = addingToPageId
+          ? await addQuestionToPage(surveyId, addingToPageId, data)
+          : await addQuestion(surveyId, data)
         if (result.error) {
           setError(result.error)
         } else if (result.question) {
@@ -284,9 +346,11 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
               isCorrect: o.isCorrect,
               sortOrder: o.sortOrder,
             })) || [],
+            pageId: addingToPageId,
           }
           setQuestions([...questions, newQuestion])
           resetQuestionForm()
+          setAddingToPageId(null)
         }
       }
     } catch {
@@ -323,21 +387,23 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
       if (result.error) {
         setError(result.error)
       } else if (result.question) {
+        const q = result.question as any
         const newQuestion: SurveyQuestion = {
-          id: result.question.id,
-          questionText: result.question.questionText,
-          questionType: result.question.questionType as SurveyQuestion['questionType'],
-          isRequired: result.question.isRequired,
-          sortOrder: result.question.sortOrder,
-          likertConfig: result.question.likertConfig as any,
-          minLength: result.question.minLength,
-          maxLength: result.question.maxLength,
-          options: result.question.options?.map((o: any) => ({
+          id: q.id,
+          questionText: q.questionText,
+          questionType: q.questionType as SurveyQuestion['questionType'],
+          isRequired: q.isRequired,
+          sortOrder: q.sortOrder,
+          likertConfig: q.likertConfig as any,
+          minLength: q.minLength,
+          maxLength: q.maxLength,
+          options: q.options?.map((o: any) => ({
             id: o.id,
             optionText: o.optionText,
             isCorrect: o.isCorrect,
             sortOrder: o.sortOrder,
           })) || [],
+          pageId: q.pageId || null,
         }
         setQuestions([...questions, newQuestion])
       }
@@ -370,6 +436,117 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
       setQuestions(questions)
       setError(result.error)
     }
+  }
+
+  // ============================================
+  // PAGE MANAGEMENT HANDLERS
+  // ============================================
+
+  const resetPageForm = () => {
+    setPageForm({ title: '', description: '' })
+    setEditingPage(null)
+    setShowPageForm(false)
+  }
+
+  const handleCreatePage = async () => {
+    if (!surveyId) return
+
+    setIsSubmitting(true)
+    try {
+      const result = await createSurveyPage(surveyId, {
+        title: pageForm.title || undefined,
+        description: pageForm.description || undefined,
+      })
+      if (result.error) {
+        setError(result.error)
+      } else if (result.page) {
+        setPages([...pages, result.page as SurveyPage])
+        resetPageForm()
+      }
+    } catch {
+      setError('Failed to create page')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleUpdatePage = async () => {
+    if (!editingPage) return
+
+    setIsSubmitting(true)
+    try {
+      const result = await updateSurveyPage(editingPage.id, {
+        title: pageForm.title || undefined,
+        description: pageForm.description || undefined,
+      })
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setPages(pages.map(p =>
+          p.id === editingPage.id
+            ? { ...p, title: pageForm.title || null, description: pageForm.description || null }
+            : p
+        ))
+        resetPageForm()
+      }
+    } catch {
+      setError('Failed to update page')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeletePage = async (pageId: string) => {
+    if (!confirm('Are you sure you want to delete this page/section? Questions will be moved to standalone.')) {
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const result = await deleteSurveyPage(pageId)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setPages(pages.filter(p => p.id !== pageId))
+        // Update questions to have no pageId
+        setQuestions(questions.map(q =>
+          q.pageId === pageId ? { ...q, pageId: null } : q
+        ))
+      }
+    } catch {
+      setError('Failed to delete page')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleMoveQuestionToPage = async (questionId: string, pageId: string | null) => {
+    setIsSubmitting(true)
+    try {
+      const result = await moveQuestionToPage(questionId, pageId)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setQuestions(questions.map(q =>
+          q.id === questionId ? { ...q, pageId } : q
+        ))
+      }
+    } catch {
+      setError('Failed to move question')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleEditPage = (page: SurveyPage) => {
+    setPageForm({ title: page.title || '', description: page.description || '' })
+    setEditingPage(page)
+    setShowPageForm(true)
+  }
+
+  // Get questions for a specific page or standalone (no page)
+  const getQuestionsForPage = (pageId: string | null) => {
+    return questions.filter(q => q.pageId === pageId).sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
   const addOption = () => {
@@ -426,12 +603,22 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
           </div>
         </div>
         {surveyId && (
-          <button
-            onClick={() => router.push('/admin/surveys')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Done
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.open(`/assessment/${surveyId}?preview=true`, '_blank')}
+              className="flex items-center gap-2 px-4 py-2 border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50"
+              title="Preview how respondents will see this survey"
+            >
+              <Eye className="h-4 w-4" />
+              Preview
+            </button>
+            <button
+              onClick={() => router.push('/admin/surveys')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Done
+            </button>
+          </div>
         )}
       </div>
 
@@ -550,6 +737,116 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
                 </div>
               </div>
 
+              {/* Public Access */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Access Type</label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={surveyForm.isPublic}
+                    onChange={(e) => setSurveyForm({ ...surveyForm, isPublic: e.target.checked })}
+                    className="rounded text-blue-600"
+                    disabled={!!surveyId}
+                  />
+                  <span className="text-sm">Public (no login required)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Contact Info Collection */}
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Collect Contact Information</label>
+                  <p className="text-xs text-gray-500">Collect respondent info before the survey questions</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={surveyForm.collectContactInfo}
+                    onChange={(e) => setSurveyForm({ ...surveyForm, collectContactInfo: e.target.checked })}
+                    className="sr-only peer"
+                    disabled={!!surveyId}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {surveyForm.collectContactInfo && (
+                <div className="space-y-4">
+                  {/* Required Fields Section */}
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lock className="h-4 w-4 text-blue-600" />
+                      <h4 className="text-sm font-medium text-blue-900">Required Fields</h4>
+                      <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Always collected</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 py-2 px-3 bg-white rounded-lg border border-blue-200">
+                        <User className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm font-medium text-gray-700 flex-1">First Name</span>
+                        <span className="text-xs text-blue-600 font-medium">Required</span>
+                      </div>
+                      <div className="flex items-center gap-3 py-2 px-3 bg-white rounded-lg border border-blue-200">
+                        <User className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm font-medium text-gray-700 flex-1">Last Name</span>
+                        <span className="text-xs text-blue-600 font-medium">Required</span>
+                      </div>
+                      <div className="flex items-center gap-3 py-2 px-3 bg-white rounded-lg border border-blue-200">
+                        <Mail className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm font-medium text-gray-700 flex-1">Email</span>
+                        <span className="text-xs text-blue-600 font-medium">Required</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Optional Fields Section */}
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Optional Fields</h4>
+                    <div className="space-y-2">
+                      {surveyForm.contactInfoFields
+                        .filter(field => !['firstName', 'lastName', 'email'].includes(field.name))
+                        .map((field) => {
+                          const IconComponent = field.name === 'phone' ? Phone : Users
+                          return (
+                            <div key={field.name} className={`flex items-center gap-3 py-2 px-3 rounded-lg border transition-colors ${
+                              field.enabled ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'
+                            }`}>
+                              <label className="flex items-center gap-3 flex-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={field.enabled}
+                                  onChange={() => toggleContactField(field.name, 'enabled')}
+                                  className="rounded text-blue-600 h-4 w-4"
+                                  disabled={!!surveyId}
+                                />
+                                <IconComponent className={`h-4 w-4 ${field.enabled ? 'text-gray-500' : 'text-gray-400'}`} />
+                                <span className={`text-sm font-medium ${field.enabled ? 'text-gray-700' : 'text-gray-400'}`}>
+                                  {field.label}
+                                </span>
+                              </label>
+                              {field.enabled && (
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={field.required}
+                                    onChange={() => toggleContactField(field.name, 'required')}
+                                    className="rounded text-orange-500 h-4 w-4"
+                                    disabled={!!surveyId}
+                                  />
+                                  <span className="text-xs text-gray-500">Required</span>
+                                </label>
+                              )}
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               {/* Score Mode (Quiz only) */}
               {surveyForm.type === 'QUIZ' && (
                 <div className="col-span-2">
@@ -676,26 +973,106 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
           {/* Questions Header */}
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Step 2: Add Questions</h2>
-            <button
-              onClick={() => {
-                resetQuestionForm()
-                setShowQuestionForm(true)
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4" />
-              Add Question
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setPageForm({ title: '', description: '' })
+                  setEditingPage(null)
+                  setShowPageForm(true)
+                }}
+                className="flex items-center gap-2 px-4 py-2 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50"
+              >
+                <Layers className="h-4 w-4" />
+                Add Page/Section
+              </button>
+              <button
+                onClick={() => {
+                  resetQuestionForm()
+                  setAddingToPageId(null)
+                  setShowQuestionForm(true)
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4" />
+                Add Question
+              </button>
+            </div>
           </div>
+
+          {/* Page Form */}
+          {showPageForm && (
+            <div className="bg-purple-50 rounded-lg border border-purple-200 p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-purple-900">
+                  {editingPage ? 'Edit Page/Section' : 'Add New Page/Section'}
+                </h3>
+                <button onClick={resetPageForm} className="p-1 hover:bg-purple-100 rounded">
+                  <X className="h-5 w-5 text-purple-700" />
+                </button>
+              </div>
+              <p className="text-sm text-purple-700">
+                Pages group multiple questions together on one screen. Respondents see all questions on a page before moving to the next.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-purple-900 mb-1">
+                    Section Title (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={pageForm.title}
+                    onChange={(e) => setPageForm({ ...pageForm, title: e.target.value })}
+                    className="w-full rounded-lg border border-purple-300 p-2"
+                    placeholder="e.g., Personal Information, Experience, etc."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-purple-900 mb-1">
+                    Description (optional)
+                  </label>
+                  <textarea
+                    value={pageForm.description}
+                    onChange={(e) => setPageForm({ ...pageForm, description: e.target.value })}
+                    className="w-full rounded-lg border border-purple-300 p-2"
+                    rows={2}
+                    placeholder="Instructions or context for this section..."
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={editingPage ? handleUpdatePage : handleCreatePage}
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+                >
+                  <Save className="h-4 w-4" />
+                  {isSubmitting ? 'Saving...' : editingPage ? 'Update Page' : 'Add Page'}
+                </button>
+                <button
+                  onClick={resetPageForm}
+                  className="px-4 py-2 border border-purple-300 rounded-lg hover:bg-purple-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Question Form */}
           {showQuestionForm && (
             <div className="bg-white rounded-lg border p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">
-                  {editingQuestion ? 'Edit Question' : 'Add New Question'}
-                </h3>
-                <button onClick={resetQuestionForm} className="p-1 hover:bg-gray-100 rounded">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {editingQuestion ? 'Edit Question' : 'Add New Question'}
+                  </h3>
+                  {addingToPageId && (
+                    <p className="text-sm text-purple-600 mt-1">
+                      Adding to: {pages.find(p => p.id === addingToPageId)?.title || 'Untitled Page'}
+                    </p>
+                  )}
+                </div>
+                <button onClick={() => { resetQuestionForm(); setAddingToPageId(null); }} className="p-1 hover:bg-gray-100 rounded">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -941,187 +1318,406 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
             </div>
           )}
 
-          {/* Questions List */}
-          <div className="space-y-3">
-            {questions.length > 0 ? (
-              questions.map((question, index) => {
-                const Icon = getQuestionTypeIcon(question.questionType)
-                const isExpanded = expandedQuestion === question.id
-
-                return (
-                  <div key={question.id} className="bg-white rounded-lg border">
-                    <div
-                      className="p-4 cursor-pointer"
-                      onClick={() => setExpandedQuestion(isExpanded ? null : question.id)}
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Reorder buttons */}
-                        <div className="flex flex-col gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleMoveQuestion(index, 'up')
-                            }}
-                            disabled={index === 0}
-                            className="p-1 hover:bg-gray-100 rounded disabled:opacity-30"
-                          >
-                            <ArrowUp className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleMoveQuestion(index, 'down')
-                            }}
-                            disabled={index === questions.length - 1}
-                            className="p-1 hover:bg-gray-100 rounded disabled:opacity-30"
-                          >
-                            <ArrowDown className="h-3 w-3" />
-                          </button>
+          {/* Questions List - Grouped by Pages */}
+          <div className="space-y-4">
+            {/* Pages with their questions */}
+            {pages.sort((a, b) => a.sortOrder - b.sortOrder).map((page, pageIndex) => {
+              const pageQuestions = getQuestionsForPage(page.id)
+              return (
+                <div key={page.id} className="bg-purple-50 rounded-lg border border-purple-200">
+                  {/* Page Header */}
+                  <div className="p-4 border-b border-purple-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-100 text-purple-700">
+                          <Layers className="h-4 w-4" />
                         </div>
-
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-medium text-sm">
-                          {index + 1}
-                        </div>
-
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Icon className="h-4 w-4 text-gray-400" />
-                            <span className="text-xs text-gray-500">{getQuestionTypeLabel(question.questionType)}</span>
-                            {question.isRequired && (
-                              <span className="text-xs text-red-500">*</span>
-                            )}
-                          </div>
-                          <p className="font-medium">{question.questionText}</p>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDuplicateQuestion(question.id)
-                            }}
-                            className="p-1 text-gray-400 hover:text-blue-600"
-                            title="Duplicate"
-                            disabled={isSubmitting}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditQuestion(question)
-                            }}
-                            className="p-1 text-gray-400 hover:text-blue-600"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteQuestion(question.id)
-                            }}
-                            className="p-1 text-gray-400 hover:text-red-600"
-                            disabled={isSubmitting}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <h3 className="font-semibold text-purple-900">
+                            {page.title || `Page ${pageIndex + 1}`}
+                          </h3>
+                          {page.description && (
+                            <p className="text-sm text-purple-700 mt-0.5">{page.description}</p>
                           )}
+                          <p className="text-xs text-purple-500 mt-1">
+                            {pageQuestions.length} question{pageQuestions.length !== 1 ? 's' : ''} on this page
+                          </p>
                         </div>
                       </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setAddingToPageId(page.id)
+                            resetQuestionForm()
+                            setShowQuestionForm(true)
+                          }}
+                          className="p-1.5 text-purple-600 hover:bg-purple-100 rounded"
+                          title="Add question to this page"
+                        >
+                          <FolderPlus className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEditPage(page)}
+                          className="p-1.5 text-purple-600 hover:bg-purple-100 rounded"
+                          title="Edit page"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePage(page.id)}
+                          className="p-1.5 text-purple-600 hover:text-red-600 hover:bg-purple-100 rounded"
+                          title="Delete page"
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
+                  </div>
 
-                    {isExpanded && (
-                      <div className="border-t px-4 py-3 bg-gray-50">
-                        {['MULTIPLE_CHOICE', 'MULTIPLE_SELECT'].includes(question.questionType) && (
-                          <div className="space-y-1">
-                            {question.options.map((option) => (
-                              <div
-                                key={option.id}
-                                className={`flex items-center gap-2 text-sm ${
-                                  option.isCorrect ? 'text-green-700' : 'text-gray-600'
-                                }`}
-                              >
-                                {option.isCorrect ? (
-                                  <CheckCircle className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <Circle className="h-4 w-4 text-gray-300" />
-                                )}
-                                {option.optionText}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                  {/* Questions in this page */}
+                  <div className="p-3 space-y-2">
+                    {pageQuestions.length > 0 ? (
+                      pageQuestions.map((question, questionIndex) => {
+                        const Icon = getQuestionTypeIcon(question.questionType)
+                        const isExpanded = expandedQuestion === question.id
+                        const globalIndex = questions.findIndex(q => q.id === question.id)
 
-                        {question.questionType === 'LIKERT_SCALE' && question.likertConfig && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-500">{question.likertConfig.minLabel}</span>
-                            <div className="flex gap-2">
-                              {Array.from({
-                                length: question.likertConfig.maxValue - question.likertConfig.minValue + 1
-                              }).map((_, i) => (
-                                <div
-                                  key={i}
-                                  className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm text-gray-600"
-                                >
-                                  {question.likertConfig!.minValue + i}
+                        return (
+                          <div key={question.id} className="bg-white rounded-lg border">
+                            <div
+                              className="p-3 cursor-pointer"
+                              onClick={() => setExpandedQuestion(isExpanded ? null : question.id)}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-600 font-medium text-xs">
+                                  {questionIndex + 1}
                                 </div>
-                              ))}
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Icon className="h-4 w-4 text-gray-400" />
+                                    <span className="text-xs text-gray-500">{getQuestionTypeLabel(question.questionType)}</span>
+                                    {question.isRequired && (
+                                      <span className="text-xs text-red-500">*</span>
+                                    )}
+                                  </div>
+                                  <p className="font-medium text-sm">{question.questionText}</p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {/* Move to page dropdown */}
+                                  <select
+                                    value={question.pageId || ''}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      handleMoveQuestionToPage(question.id, e.target.value || null)
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-xs border rounded px-1 py-0.5 text-gray-600"
+                                    title="Move to page"
+                                  >
+                                    <option value="">Standalone</option>
+                                    {pages.map(p => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.title || `Page ${pages.findIndex(pg => pg.id === p.id) + 1}`}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleDuplicateQuestion(question.id)
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-blue-600"
+                                    title="Duplicate"
+                                    disabled={isSubmitting}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleEditQuestion(question)
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-blue-600"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleDeleteQuestion(question.id)
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-red-600"
+                                    disabled={isSubmitting}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                  {isExpanded ? (
+                                    <ChevronUp className="h-4 w-4 text-gray-400" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <span className="text-xs text-gray-500">{question.likertConfig.maxLabel}</span>
-                          </div>
-                        )}
-
-                        {question.questionType === 'TEXT_SHORT' && (
-                          <div className="text-sm text-gray-500">
-                            Short text response
-                            {(question.minLength || question.maxLength) && (
-                              <span className="ml-2">
-                                ({question.minLength && `min: ${question.minLength}`}
-                                {question.minLength && question.maxLength && ', '}
-                                {question.maxLength && `max: ${question.maxLength}`} characters)
-                              </span>
+                            {isExpanded && (
+                              <div className="border-t px-3 py-2 bg-gray-50 text-sm">
+                                {['MULTIPLE_CHOICE', 'MULTIPLE_SELECT'].includes(question.questionType) && (
+                                  <div className="space-y-1">
+                                    {question.options.map((option) => (
+                                      <div
+                                        key={option.id}
+                                        className={`flex items-center gap-2 ${
+                                          option.isCorrect ? 'text-green-700' : 'text-gray-600'
+                                        }`}
+                                      >
+                                        {option.isCorrect ? (
+                                          <CheckCircle className="h-3 w-3 text-green-600" />
+                                        ) : (
+                                          <Circle className="h-3 w-3 text-gray-300" />
+                                        )}
+                                        {option.optionText}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {question.questionType === 'LIKERT_SCALE' && question.likertConfig && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-500">{question.likertConfig.minLabel}</span>
+                                    <span className="text-xs text-gray-400">({question.likertConfig.minValue}-{question.likertConfig.maxValue})</span>
+                                    <span className="text-xs text-gray-500">{question.likertConfig.maxLabel}</span>
+                                  </div>
+                                )}
+                                {['TEXT_SHORT', 'TEXT_LONG'].includes(question.questionType) && (
+                                  <div className="text-gray-500">
+                                    {question.questionType === 'TEXT_SHORT' ? 'Short' : 'Long'} text response
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-
-                        {question.questionType === 'TEXT_LONG' && (
-                          <div className="text-sm text-gray-500">
-                            Long text response (paragraph)
-                            {(question.minLength || question.maxLength) && (
-                              <span className="ml-2">
-                                ({question.minLength && `min: ${question.minLength}`}
-                                {question.minLength && question.maxLength && ', '}
-                                {question.maxLength && `max: ${question.maxLength}`} characters)
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        )
+                      })
+                    ) : (
+                      <div className="text-center py-4 text-purple-600 text-sm">
+                        <p>No questions in this page yet.</p>
+                        <button
+                          onClick={() => {
+                            setAddingToPageId(page.id)
+                            resetQuestionForm()
+                            setShowQuestionForm(true)
+                          }}
+                          className="mt-2 text-purple-700 hover:text-purple-900 underline"
+                        >
+                          Add a question
+                        </button>
                       </div>
                     )}
                   </div>
-                )
-              })
-            ) : (
+                </div>
+              )
+            })}
+
+            {/* Standalone Questions (not in any page) */}
+            {getQuestionsForPage(null).length > 0 && (
+              <div className="space-y-3">
+                {pages.length > 0 && (
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                    Standalone Questions
+                  </h3>
+                )}
+                {getQuestionsForPage(null).map((question, index) => {
+                  const Icon = getQuestionTypeIcon(question.questionType)
+                  const isExpanded = expandedQuestion === question.id
+                  const globalIndex = questions.findIndex(q => q.id === question.id)
+
+                  return (
+                    <div key={question.id} className="bg-white rounded-lg border">
+                      <div
+                        className="p-4 cursor-pointer"
+                        onClick={() => setExpandedQuestion(isExpanded ? null : question.id)}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-medium text-sm">
+                            {index + 1}
+                          </div>
+
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Icon className="h-4 w-4 text-gray-400" />
+                              <span className="text-xs text-gray-500">{getQuestionTypeLabel(question.questionType)}</span>
+                              {question.isRequired && (
+                                <span className="text-xs text-red-500">*</span>
+                              )}
+                            </div>
+                            <p className="font-medium">{question.questionText}</p>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {/* Move to page dropdown */}
+                            {pages.length > 0 && (
+                              <select
+                                value={question.pageId || ''}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  handleMoveQuestionToPage(question.id, e.target.value || null)
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-xs border rounded px-1 py-0.5 text-gray-600"
+                                title="Move to page"
+                              >
+                                <option value="">Standalone</option>
+                                {pages.map(p => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.title || `Page ${pages.findIndex(pg => pg.id === p.id) + 1}`}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDuplicateQuestion(question.id)
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600"
+                              title="Duplicate"
+                              disabled={isSubmitting}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditQuestion(question)
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteQuestion(question.id)
+                              }}
+                              className="p-1 text-gray-400 hover:text-red-600"
+                              disabled={isSubmitting}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="border-t px-4 py-3 bg-gray-50">
+                          {['MULTIPLE_CHOICE', 'MULTIPLE_SELECT'].includes(question.questionType) && (
+                            <div className="space-y-1">
+                              {question.options.map((option) => (
+                                <div
+                                  key={option.id}
+                                  className={`flex items-center gap-2 text-sm ${
+                                    option.isCorrect ? 'text-green-700' : 'text-gray-600'
+                                  }`}
+                                >
+                                  {option.isCorrect ? (
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <Circle className="h-4 w-4 text-gray-300" />
+                                  )}
+                                  {option.optionText}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {question.questionType === 'LIKERT_SCALE' && question.likertConfig && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-500">{question.likertConfig.minLabel}</span>
+                              <div className="flex gap-2">
+                                {Array.from({
+                                  length: question.likertConfig.maxValue - question.likertConfig.minValue + 1
+                                }).map((_, i) => (
+                                  <div
+                                    key={i}
+                                    className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm text-gray-600"
+                                  >
+                                    {question.likertConfig!.minValue + i}
+                                  </div>
+                                ))}
+                              </div>
+                              <span className="text-xs text-gray-500">{question.likertConfig.maxLabel}</span>
+                            </div>
+                          )}
+
+                          {question.questionType === 'TEXT_SHORT' && (
+                            <div className="text-sm text-gray-500">
+                              Short text response
+                              {(question.minLength || question.maxLength) && (
+                                <span className="ml-2">
+                                  ({question.minLength && `min: ${question.minLength}`}
+                                  {question.minLength && question.maxLength && ', '}
+                                  {question.maxLength && `max: ${question.maxLength}`} characters)
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {question.questionType === 'TEXT_LONG' && (
+                            <div className="text-sm text-gray-500">
+                              Long text response (paragraph)
+                              {(question.minLength || question.maxLength) && (
+                                <span className="ml-2">
+                                  ({question.minLength && `min: ${question.minLength}`}
+                                  {question.minLength && question.maxLength && ', '}
+                                  {question.maxLength && `max: ${question.maxLength}`} characters)
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Empty state */}
+            {questions.length === 0 && pages.length === 0 && (
               <div className="bg-white rounded-lg border p-8 text-center">
                 <AlignLeft className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                 <h3 className="font-medium text-gray-900">No Questions Yet</h3>
                 <p className="text-sm text-gray-500 mt-1">
                   Add questions to build your {surveyForm.type === 'QUIZ' ? 'quiz' : 'survey'}.
                 </p>
-                <button
-                  onClick={() => {
-                    resetQuestionForm()
-                    setShowQuestionForm(true)
-                  }}
-                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add First Question
-                </button>
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      setPageForm({ title: '', description: '' })
+                      setEditingPage(null)
+                      setShowPageForm(true)
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50"
+                  >
+                    <Layers className="h-4 w-4" />
+                    Add Page/Section
+                  </button>
+                  <button
+                    onClick={() => {
+                      resetQuestionForm()
+                      setShowQuestionForm(true)
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Question
+                  </button>
+                </div>
               </div>
             )}
           </div>

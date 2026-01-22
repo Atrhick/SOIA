@@ -3,8 +3,12 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { CoachOnboardingClient } from './onboarding-client'
 
+// LMS Course and Survey IDs (migrated from old courses)
+const LMS_ANTI_TRAFFICKING_COURSE_ID = 'cmkk6bhdw0000yub4q0jj1tn2'
+const LMS_ANTI_TRAFFICKING_QUIZ_ID = 'cmkk6bhe50007yub4yvjxa220'
+
 async function getOnboardingData(userId: string) {
-  const [coachProfile, tasks] = await Promise.all([
+  const [coachProfile, tasks, lmsEnrollment, quizSubmission] = await Promise.all([
     prisma.coachProfile.findUnique({
       where: { userId },
       include: {
@@ -14,18 +18,31 @@ async function getOnboardingData(userId: string) {
         ambassadors: {
           where: { status: 'APPROVED' },
         },
-        quizResults: {
-          where: { courseId: 'anti-human-trafficking', passed: true },
-        },
       },
     }),
     prisma.onboardingTask.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     }),
+    // Check LMS course completion
+    prisma.lMSEnrollment.findFirst({
+      where: {
+        userId,
+        courseId: LMS_ANTI_TRAFFICKING_COURSE_ID,
+        status: 'COMPLETED',
+      },
+    }),
+    // Check Survey quiz submission (passed)
+    prisma.surveySubmission.findFirst({
+      where: {
+        userId,
+        surveyId: LMS_ANTI_TRAFFICKING_QUIZ_ID,
+        passed: true,
+      },
+    }),
   ])
 
-  return { coachProfile, tasks }
+  return { coachProfile, tasks, lmsEnrollment, quizSubmission }
 }
 
 export default async function OnboardingPage() {
@@ -35,7 +52,7 @@ export default async function OnboardingPage() {
     redirect('/login')
   }
 
-  const { coachProfile, tasks } = await getOnboardingData(session.user.id)
+  const { coachProfile, tasks, lmsEnrollment, quizSubmission } = await getOnboardingData(session.user.id)
 
   if (!coachProfile) {
     redirect('/login')
@@ -66,8 +83,11 @@ export default async function OnboardingPage() {
     ? (completedRequired / requiredTasks.length) * 100
     : 0
 
-  // Check if quiz passed
-  const quizPassed = coachProfile.quizResults.length > 0
+  // Check if quiz passed (now using Survey submission)
+  const quizPassed = quizSubmission !== null
+
+  // Check if course completed (LMS enrollment)
+  const courseCompleted = lmsEnrollment !== null
 
   return (
     <CoachOnboardingClient
@@ -79,6 +99,7 @@ export default async function OnboardingPage() {
       coachStatus={coachProfile.coachStatus}
       ambassadorsCount={coachProfile.ambassadors.length}
       quizPassed={quizPassed}
+      courseCompleted={courseCompleted}
     />
   )
 }

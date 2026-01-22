@@ -1,6 +1,6 @@
 'use client'
 
-import { LucideIcon, Check } from 'lucide-react'
+import { LucideIcon, Check, PartyPopper, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 
 export interface OnboardingStep {
@@ -10,6 +10,13 @@ export interface OnboardingStep {
   icon: LucideIcon
   status: 'completed' | 'current' | 'pending'
   link?: string
+  phase?: string // Optional phase grouping
+}
+
+export interface OnboardingPhase {
+  id: string
+  title: string
+  color: 'blue' | 'green' | 'purple' | 'amber'
 }
 
 interface OnboardingJourneyProps {
@@ -17,6 +24,7 @@ interface OnboardingJourneyProps {
   completedCount: number
   totalCount: number
   className?: string
+  phases?: OnboardingPhase[] // Optional phase definitions
 }
 
 export function OnboardingJourney({ steps, completedCount, totalCount, className = '' }: OnboardingJourneyProps) {
@@ -346,6 +354,189 @@ export function OnboardingJourneyCompact({ steps, completedCount, totalCount }: 
       <p className="mt-2 text-xs text-gray-500 text-center">
         {completedCount} of {totalCount} completed
       </p>
+    </div>
+  )
+}
+
+// Prospect Journey with Phase Delineation
+export interface ProspectStep {
+  id: string
+  title: string
+  shortTitle?: string
+  icon: LucideIcon
+  status: 'completed' | 'current' | 'pending' | 'skipped'
+}
+
+interface ProspectJourneyProps {
+  preOnboardingSteps: ProspectStep[]
+  onboardingSteps: ProspectStep[]
+  coachProfileId?: string | null
+  className?: string
+}
+
+export function ProspectJourney({ preOnboardingSteps, onboardingSteps, coachProfileId, className = '' }: ProspectJourneyProps) {
+  const allSteps = [...preOnboardingSteps, ...onboardingSteps]
+  const completedCount = allSteps.filter(s => s.status === 'completed').length
+  const totalCount = allSteps.filter(s => s.status !== 'skipped').length
+  const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+  const isComplete = progressPercentage === 100
+
+  const preOnboardingCompleted = preOnboardingSteps.filter(s => s.status === 'completed').length
+  const preOnboardingTotal = preOnboardingSteps.filter(s => s.status !== 'skipped').length
+  const onboardingCompleted = onboardingSteps.filter(s => s.status === 'completed').length
+  const onboardingTotal = onboardingSteps.filter(s => s.status !== 'skipped').length
+
+  const renderStep = (step: ProspectStep, index: number, isLastInPhase: boolean) => {
+    const StepIcon = step.icon
+    const isCompleted = step.status === 'completed'
+    const isCurrent = step.status === 'current'
+    const isPending = step.status === 'pending'
+    const isSkipped = step.status === 'skipped'
+
+    if (isSkipped) return null
+
+    return (
+      <div key={step.id} className="flex items-center">
+        <div className="flex flex-col items-center">
+          {/* Step Circle */}
+          <div
+            className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+              isCompleted
+                ? 'bg-green-500 text-white'
+                : isCurrent
+                  ? 'bg-amber-500 text-white ring-4 ring-amber-200'
+                  : 'bg-gray-200 text-gray-400'
+            }`}
+          >
+            {isCompleted ? (
+              <Check className="w-5 h-5 stroke-[3]" />
+            ) : (
+              <StepIcon className="w-5 h-5" />
+            )}
+          </div>
+          {/* Step Label */}
+          <span className={`mt-2 text-[10px] sm:text-xs font-medium text-center max-w-[60px] sm:max-w-[80px] leading-tight ${
+            isCompleted ? 'text-green-700' : isCurrent ? 'text-amber-700' : 'text-gray-400'
+          }`}>
+            {step.shortTitle || step.title}
+          </span>
+        </div>
+        {/* Connector Line (except for last in phase) */}
+        {!isLastInPhase && (
+          <div className={`w-6 sm:w-10 h-1 mx-1 rounded-full ${
+            isCompleted ? 'bg-green-400' : 'bg-gray-200'
+          }`} />
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`bg-white rounded-xl border ${isComplete ? 'border-green-300' : 'border-gray-200'} shadow-sm overflow-hidden ${className}`}>
+      {/* Completion Banner */}
+      {isComplete && (
+        <div className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <PartyPopper className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Journey Complete!</h3>
+                <p className="text-sm text-green-100">This prospect is now a coach</p>
+              </div>
+            </div>
+            {coachProfileId && (
+              <Link
+                href="/admin/coaches"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-green-700 rounded-lg font-medium text-sm hover:bg-green-50 transition-colors"
+              >
+                View Coach Profile
+                <ExternalLink className="w-4 h-4" />
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className={`px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 ${isComplete ? 'hidden' : ''}`}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Prospect Journey</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">{completedCount} of {totalCount} steps</span>
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+              {progressPercentage}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Steps with Phase Labels */}
+      <div className="px-4 py-5 overflow-x-auto">
+        <div className="flex items-start gap-4 min-w-[600px]">
+          {/* Pre-Onboarding Phase */}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-1 w-4 bg-blue-500 rounded-full" />
+              <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Pre-Onboarding</span>
+              <span className="text-[10px] text-gray-400">
+                ({preOnboardingCompleted}/{preOnboardingTotal})
+              </span>
+            </div>
+            <div className="flex items-start bg-blue-50/50 rounded-lg p-3 border border-blue-100">
+              {preOnboardingSteps.filter(s => s.status !== 'skipped').map((step, index, arr) =>
+                renderStep(step, index, index === arr.length - 1)
+              )}
+            </div>
+          </div>
+
+          {/* Phase Divider */}
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="w-px h-8 bg-gray-300" />
+            <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
+              <span className="text-gray-400 text-lg">→</span>
+            </div>
+            <div className="w-px h-8 bg-gray-300" />
+          </div>
+
+          {/* Onboarding Phase */}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-1 w-4 bg-green-500 rounded-full" />
+              <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Onboarding</span>
+              <span className="text-[10px] text-gray-400">
+                ({onboardingCompleted}/{onboardingTotal})
+              </span>
+            </div>
+            <div className="flex items-start bg-green-50/50 rounded-lg p-3 border border-green-100">
+              {onboardingSteps.filter(s => s.status !== 'skipped').map((step, index, arr) =>
+                renderStep(step, index, index === arr.length - 1)
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="px-4 pb-4">
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden flex">
+          {/* Pre-onboarding progress (blue) */}
+          <div
+            className="h-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-500"
+            style={{ width: `${(preOnboardingCompleted / totalCount) * 100}%` }}
+          />
+          {/* Onboarding progress (green) */}
+          <div
+            className="h-full bg-gradient-to-r from-green-400 to-green-500 transition-all duration-500"
+            style={{ width: `${(onboardingCompleted / totalCount) * 100}%` }}
+          />
+        </div>
+        <div className="flex justify-between mt-2 text-[10px] text-gray-400">
+          <span>Pre-Onboarding: {preOnboardingCompleted}/{preOnboardingTotal}</span>
+          <span>Onboarding: {onboardingCompleted}/{onboardingTotal}</span>
+        </div>
+      </div>
     </div>
   )
 }

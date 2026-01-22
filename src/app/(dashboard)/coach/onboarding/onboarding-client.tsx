@@ -1,9 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { OnboardingJourney, OnboardingStep } from '@/components/ui/onboarding-journey'
 import {
@@ -35,12 +34,17 @@ const taskTypeIcons: Record<string, LucideIcon> = {
   BOOLEAN: CheckSquare,
 }
 
+// LMS Course and Survey IDs (migrated from old courses)
+const LMS_ANTI_TRAFFICKING_COURSE_ID = 'cmkk6bhdw0000yub4q0jj1tn2'
+const LMS_ANTI_TRAFFICKING_QUIZ_ID = 'cmkk6bhe50007yub4yvjxa220'
+
 // Map task IDs to their action routes
 const taskRoutes: Record<string, string> = {
   'upload-profile-photo': '/coach/onboarding/profile',
-  'complete-coach-profile': '/coach/onboarding/profile',
-  'watch-anti–human-trafficking-course': '/coach/onboarding/course/anti-human-trafficking',
-  'pass-anti–human-trafficking-assessment': '/coach/onboarding/quiz/anti-human-trafficking',
+  'complete-coach-bio': '/coach/onboarding/profile',
+  'watch-anti-human-trafficking-course': `/coach/learning/${LMS_ANTI_TRAFFICKING_COURSE_ID}`,
+  'pass-anti-human-trafficking-quiz': `/coach/surveys/${LMS_ANTI_TRAFFICKING_QUIZ_ID}`,
+  'recruit-two-ambassadors': '/coach/ambassadors',
 }
 
 interface Task {
@@ -66,6 +70,7 @@ interface CoachOnboardingClientProps {
   coachStatus: string
   ambassadorsCount: number
   quizPassed: boolean
+  courseCompleted: boolean
 }
 
 export function CoachOnboardingClient({
@@ -77,13 +82,22 @@ export function CoachOnboardingClient({
   coachStatus,
   ambassadorsCount,
   quizPassed,
+  courseCompleted,
 }: CoachOnboardingClientProps) {
 
   // Helper to get the effective status for a task
   const getEffectiveStatus = (task: Task): string => {
     let status = progressMap[task.id]?.status || 'NOT_STARTED'
+    // Override status for course if completed in LMS
+    if (task.id === 'watch-anti-human-trafficking-course' && courseCompleted) {
+      status = 'APPROVED'
+    }
     // Override status for quiz if passed
-    if (task.id === 'pass-anti–human-trafficking-assessment' && quizPassed) {
+    if (task.id === 'pass-anti-human-trafficking-quiz' && quizPassed) {
+      status = 'APPROVED'
+    }
+    // Override status for ambassadors if requirement met
+    if (task.id === 'recruit-two-ambassadors' && ambassadorsCount >= 2) {
       status = 'APPROVED'
     }
     return status
@@ -125,12 +139,21 @@ export function CoachOnboardingClient({
           <h1 className="text-2xl font-bold text-gray-900">Onboarding Checklist</h1>
           <p className="text-gray-600">Complete all required tasks to become an Active Coach</p>
         </div>
-        <Badge
-          variant={coachStatus === 'ACTIVE_COACH' ? 'success' : 'warning'}
-          className="text-sm px-3 py-1"
-        >
-          {coachStatus === 'ACTIVE_COACH' ? 'Active Coach' : 'Onboarding Incomplete'}
-        </Badge>
+        <div className="flex items-center gap-3">
+          {coachStatus !== 'ACTIVE_COACH' && (
+            <Link href="/coach?skip=true">
+              <Button variant="outline" size="sm">
+                View Dashboard
+              </Button>
+            </Link>
+          )}
+          <Badge
+            variant={coachStatus === 'ACTIVE_COACH' ? 'success' : 'warning'}
+            className="text-sm px-3 py-1"
+          >
+            {coachStatus === 'ACTIVE_COACH' ? 'Active Coach' : 'Onboarding Incomplete'}
+          </Badge>
+        </div>
       </div>
 
       {/* Journey Stepper Component */}
@@ -205,46 +228,6 @@ export function CoachOnboardingClient({
         })}
       </div>
 
-      {/* Ambassador Requirement */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Ambassador Requirement
-              </CardTitle>
-              <CardDescription>
-                You need at least 2 approved ambassadors to complete onboarding
-              </CardDescription>
-            </div>
-            <Link href="/coach/ambassadors">
-              <Button variant="outline" size="sm">
-                Manage Ambassadors
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {ambassadorsCount} / 2
-              </p>
-              <p className="text-sm text-gray-500">Approved ambassadors</p>
-            </div>
-            <Badge variant={ambassadorsCount >= 2 ? 'success' : 'warning'}>
-              {ambassadorsCount >= 2 ? 'Requirement Met' : 'In Progress'}
-            </Badge>
-          </div>
-          <Progress
-            value={(ambassadorsCount / 2) * 100}
-            max={100}
-            className="mt-4"
-          />
-        </CardContent>
-      </Card>
     </div>
   )
 }

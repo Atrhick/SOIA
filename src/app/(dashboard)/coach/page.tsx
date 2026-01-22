@@ -125,12 +125,19 @@ async function getUpcomingEvents() {
   })
 }
 
-export default async function CoachDashboard() {
+interface PageProps {
+  searchParams: Promise<{ skip?: string }>
+}
+
+export default async function CoachDashboard({ searchParams }: PageProps) {
   const session = await auth()
 
   if (!session || session.user.role !== 'COACH') {
     redirect('/login')
   }
+
+  const params = await searchParams
+  const skipRedirect = params.skip === 'true'
 
   const [coachData, onboardingTasks, upcomingEvents] = await Promise.all([
     getCoachData(session.user.id),
@@ -140,6 +147,11 @@ export default async function CoachDashboard() {
 
   if (!coachData) {
     redirect('/login')
+  }
+
+  // Auto-redirect new coaches to onboarding page (unless they explicitly skipped)
+  if (coachData.coachStatus === 'ONBOARDING_INCOMPLETE' && !skipRedirect) {
+    redirect('/coach/onboarding')
   }
 
   // Fetch ambassador counts in parallel (only after we have coachData.id)

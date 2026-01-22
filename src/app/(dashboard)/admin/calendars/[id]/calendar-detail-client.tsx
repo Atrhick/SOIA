@@ -142,7 +142,15 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
     maxBookings: 1,
   })
 
-  // Event form
+  // Event form - default to today's date (using local timezone)
+  const getTodayString = () => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
@@ -281,6 +289,24 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
       return
     }
 
+    // Immediately add the event to local state for instant UI update
+    if ('event' in result && result.event) {
+      const evt = result.event
+      const newEventData: EventData = {
+        id: evt.id,
+        title: evt.title,
+        description: evt.description,
+        startTime: typeof evt.startTime === 'string' ? evt.startTime : new Date(evt.startTime).toISOString(),
+        endTime: typeof evt.endTime === 'string' ? evt.endTime : new Date(evt.endTime).toISOString(),
+        isAllDay: evt.isAllDay,
+        location: evt.location,
+        isOnline: evt.isOnline,
+        meetingLink: evt.meetingLink,
+        createdAt: typeof evt.createdAt === 'string' ? evt.createdAt : new Date(evt.createdAt).toISOString(),
+      }
+      setEvents([...events, newEventData])
+    }
+
     setShowAddEventModal(false)
     setNewEvent({
       title: '',
@@ -293,7 +319,6 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
       meetingLink: '',
     })
     setIsSubmitting(false)
-    router.refresh()
   }
 
   const handleUpdateBookingStatus = async (bookingId: string, status: BookingStatus) => {
@@ -497,7 +522,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                           className="w-full text-left text-xs px-2 py-1 rounded truncate"
                           style={{ backgroundColor: `${calendar.color}20`, color: calendar.color }}
                         >
-                          {formatTime(event.startTime.split('T')[1].slice(0, 5))} - {event.title}
+                          {new Date(event.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - {event.title}
                         </button>
                       ))}
                       {/* Bookings */}
@@ -507,7 +532,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                           onClick={() => setSelectedBooking(booking)}
                           className={`w-full text-left text-xs px-2 py-1 rounded truncate ${statusColors[booking.status]}`}
                         >
-                          {formatTime(booking.startTime.split('T')[1].slice(0, 5))} - {booking.bookerName}
+                          {new Date(booking.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - {booking.bookerName}
                         </button>
                       ))}
                       {totalItems > 3 && (
@@ -576,7 +601,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                         className="w-full text-left mb-2 p-2 rounded text-xs"
                         style={{ backgroundColor: `${calendar.color}20`, color: calendar.color }}
                       >
-                        <div className="font-medium">{formatTime(event.startTime.split('T')[1].slice(0, 5))}</div>
+                        <div className="font-medium">{new Date(event.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
                         <div className="truncate">{event.title}</div>
                       </button>
                     ))}
@@ -588,7 +613,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                         onClick={() => setSelectedBooking(booking)}
                         className={`w-full text-left mb-2 p-2 rounded text-xs ${statusColors[booking.status]}`}
                       >
-                        <div className="font-medium">{formatTime(booking.startTime.split('T')[1].slice(0, 5))}</div>
+                        <div className="font-medium">{new Date(booking.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
                         <div className="truncate">{booking.bookerName}</div>
                       </button>
                     ))}
@@ -651,8 +676,8 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                         <div>
                           <div className="font-medium" style={{ color: calendar.color }}>{event.title}</div>
                           <div className="text-sm text-gray-600">
-                            {formatTime(event.startTime.split('T')[1].slice(0, 5))} -{' '}
-                            {formatTime(event.endTime.split('T')[1].slice(0, 5))}
+                            {new Date(event.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} -{' '}
+                            {new Date(event.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                           </div>
                           {event.location && (
                             <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
@@ -685,8 +710,8 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                           <div>
                             <div className="font-medium">{booking.bookerName}</div>
                             <div className="text-sm">
-                              {formatTime(booking.startTime.split('T')[1].slice(0, 5))} -{' '}
-                              {formatTime(booking.endTime.split('T')[1].slice(0, 5))}
+                              {new Date(booking.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} -{' '}
+                              {new Date(booking.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                             </div>
                           </div>
                           <span className="text-sm font-medium">{booking.status}</span>
@@ -728,7 +753,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                             month: 'long',
                             day: 'numeric',
                           })}{' '}
-                          at {formatTime(event.startTime.split('T')[1].slice(0, 5))}
+                          at {new Date(event.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                         </div>
                       </div>
                       <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
@@ -753,7 +778,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                             month: 'long',
                             day: 'numeric',
                           })}{' '}
-                          at {formatTime(booking.startTime.split('T')[1].slice(0, 5))}
+                          at {new Date(booking.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                         </div>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[booking.status]}`}>
@@ -1069,8 +1094,8 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                   })}
                 </div>
                 <div className="text-sm text-gray-600">
-                  {formatTime(selectedBooking.startTime.split('T')[1].slice(0, 5))} -{' '}
-                  {formatTime(selectedBooking.endTime.split('T')[1].slice(0, 5))}
+                  {new Date(selectedBooking.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} -{' '}
+                  {new Date(selectedBooking.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short' })}
                 </div>
               </div>
 
@@ -1180,8 +1205,17 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                   </span>
                 </div>
                 <div className="text-sm text-gray-600 ml-6">
-                  {formatTime(selectedEvent.startTime.split('T')[1].slice(0, 5))} -{' '}
-                  {formatTime(selectedEvent.endTime.split('T')[1].slice(0, 5))}
+                  {new Date(selectedEvent.startTime).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })} -{' '}
+                  {new Date(selectedEvent.endTime).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZoneName: 'short',
+                  })}
                 </div>
               </div>
 

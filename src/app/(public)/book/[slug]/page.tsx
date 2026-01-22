@@ -4,10 +4,9 @@ import { BookingClient } from './booking-client'
 
 interface PageProps {
   params: { slug: string }
-  searchParams: { prospectId?: string }
 }
 
-export default async function PublicBookingPage({ params, searchParams }: PageProps) {
+export default async function PublicBookingPage({ params }: PageProps) {
   const result = await getPublicCalendarBySlug(params.slug)
 
   if (result.error || !result.calendar) {
@@ -15,9 +14,6 @@ export default async function PublicBookingPage({ params, searchParams }: PagePr
   }
 
   return (
-    <BookingClient
-      calendar={result.calendar}
-      prospectId={searchParams.prospectId}
-    />
+    <BookingClient calendar={result.calendar} />
   )
 }

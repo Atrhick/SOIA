@@ -66,7 +66,9 @@ Session includes: `id`, `email`, `role`, `coachId` (for coaches), `ambassadorId`
 - `User` - Authentication (has role: ADMIN, COACH, AMBASSADOR, or PARENT)
 - `CoachProfile` - Extended coach data (linked 1:1 with User)
 - `Ambassador` - Youth managed by coaches (ages 10-24, has profile fields, address, parent/guardian info)
-- `Course` / `QuizQuestion` / `QuizOption` - Training system
+- `Course` / `QuizQuestion` / `QuizOption` - Legacy training system (being replaced by LMS)
+- `LMSCourse` / `LMSModule` / `LMSLesson` / `LMSContentBlock` - New LMS system
+- `LMSEnrollment` / `LMSLessonProgress` / `LMSContentProgress` - LMS progress tracking
 - `WeeklyGoal` / `IncomeEntry` - Goal and income tracking
 - `SponsorshipRequest` - Funding requests
 - `Event` / `EventRSVP` - Event management
@@ -281,9 +283,12 @@ Admins can view the app as any coach or ambassador:
 4. An amber banner appears in the header showing "Viewing as: [email] ([role])"
 5. To switch back, click "Switch Back" button in banner or profile dropdown → "Switch Back to Admin"
 
+**Header Profile Name Display:**
+The header displays the user's profile name (firstName + lastName) for coaches and ambassadors, fetched from `CoachProfile` or `Ambassador` model respectively. Falls back to email if name is not available. The dashboard layout (`src/app/(dashboard)/layout.tsx`) fetches the profile name and passes it to the Header component.
+
 **Key files:**
 - `src/lib/actions/impersonation.ts` - Server actions for impersonation
-- `src/components/dashboard/header.tsx` - Dropdown menu with impersonation UI
+- `src/components/dashboard/header.tsx` - Dropdown menu with impersonation UI, displays profile name
 - `src/lib/auth.ts` - JWT callback handles session updates for impersonation
 
 **Session fields when impersonating:**
@@ -587,9 +592,25 @@ await createManualProspect({
 - "Get Assessment Link" button - generates shareable URL with copy functionality
 - "Add Prospect" button - manual prospect creation form
 - Pipeline view with status filtering
-- Prospect detail page with status timeline
+- Prospect detail page with status timeline and inline data display
 - **Generated Links section** - Shows all generated links (business form, acceptance) with copy buttons for easy resending
 - Status-based action buttons show "Copy Link" when tokens already exist
+- **Delete Prospect** button with confirmation (blocked if coach account already created)
+
+**Prospect Detail Page - Inline Data Display:**
+The prospect detail page shows ALL submitted data inline (not in modals) for easy review:
+- **Assessment Responses** - Auto-loaded on page mount, shows question/answer pairs
+- **Business Development Form** - Company name, bio, services, pricing (if submitted)
+- **Orientation Information** - Date and notes
+- **Interview Information** - Date and notes
+- **Terms & Payment** - Terms acceptance timestamp and payment details
+
+**Assessment Fallback Lookup:**
+For older prospects that may not have `assessmentSubmissionId` populated:
+1. Primary: Use `assessmentSubmissionId` if available
+2. Fallback 1: Find by `assessmentSurveyId` + `contactEmail`
+3. Fallback 2: Find by coach assessment survey + `contactEmail`
+4. Auto-links found submission to prospect for future lookups
 
 **Business Development Form:**
 - Public form accessed via token (no login required)
@@ -600,21 +621,23 @@ await createManualProspect({
 
 ## Surveys & Quizzes
 
-Unified survey builder for creating quizzes and surveys:
+Unified survey builder for creating quizzes and surveys with multi-question page support:
 
 **Key files:**
 - `src/lib/actions/surveys.ts` - All survey server actions
 - `src/app/(dashboard)/admin/surveys/new/` - New survey builder page
-- `src/app/(dashboard)/admin/surveys/[id]/` - Survey editor page
+- `src/app/(dashboard)/admin/surveys/[id]/` - Survey editor page (with page management)
 - `src/app/(dashboard)/admin/surveys/[id]/results/` - Results analytics
 - `src/app/(dashboard)/coach/surveys/` - Coach survey list and taking
 - `src/app/(dashboard)/ambassador/surveys/` - Ambassador survey list and taking
+- `src/app/(public)/assessment/[surveyId]/` - Public assessment form
 
 **Database models:**
 - `Survey` - Quiz or Survey with settings (passingScore, allowRetake, showResults, isAnonymous)
-- `SurveyQuestion` - Question with type (MULTIPLE_CHOICE, MULTIPLE_SELECT, LIKERT_SCALE, TEXT_SHORT, TEXT_LONG)
+- `SurveyPage` - Page/section with title, description, and sortOrder (groups multiple questions)
+- `SurveyQuestion` - Question with type, pageId (nullable for standalone questions)
 - `SurveyOption` - Options for choice questions (with isCorrect for quizzes)
-- `SurveySubmission` - User submission with score/pass status
+- `SurveySubmission` - User submission with score/pass status (includes `contactEmail` for public surveys)
 - `SurveyAnswer` - Individual question answers
 
 **Creating a survey (Admin workflow):**
@@ -628,19 +651,81 @@ Unified survey builder for creating quizzes and surveys:
 8. Duplicate questions with copy button
 9. Publish when ready
 
+**Page Management (multi-question pages):**
+Pages allow grouping multiple questions on a single screen with section titles and descriptions.
+
+- Click "Add Page/Section" button (purple) to create a new page
+- Set optional title (e.g., "Personal Information") and description
+- Add questions directly to a page using the folder+ icon on the page header
+- Move existing questions between pages using the dropdown on each question
+- Questions without a page are shown as "Standalone Questions"
+- Pages are displayed with purple background in the editor
+- When respondents take the survey, all questions on a page appear together
+
+**Page Server Actions:**
+```typescript
+import {
+  createSurveyPage,
+  updateSurveyPage,
+  deleteSurveyPage,
+  moveQuestionToPage,
+  addQuestionToPage,
+} from '@/lib/actions/surveys'
+
+// Create a page
+await createSurveyPage(surveyId, { title: 'Section 1', description: 'Instructions...' })
+
+// Move question to a page (or null for standalone)
+await moveQuestionToPage(questionId, pageId)
+
+// Add question directly to a page
+await addQuestionToPage(surveyId, pageId, questionData)
+```
+
 **Survey editor features:**
 - Optimistic UI updates (no page refresh)
 - Question reordering with arrow buttons
 - Question duplication
 - Inline settings editing
 - Live preview for Likert scales
+- Page management with edit/delete buttons
+- Move-to-page dropdown on each question
+- **Preview button** - Opens survey in new tab with preview mode (admin only)
+
+**Preview Mode:**
+- Access via "Preview" button in survey editor or `?preview=true` URL parameter
+- Shows amber banner: "Preview Mode - Responses will not be saved"
+- Allows skipping required fields for quick navigation
+- "Submit" shows completion screen without saving to database
+- Only accessible to admin users (redirects to login otherwise)
+- Works with draft surveys (doesn't require publishing first)
+
+**Contact Info Configuration:**
+Surveys can collect respondent contact information before the questions. Configure this in the Survey Settings panel.
+
+- **Toggle**: "Collect Contact Information" switch enables/disables the feature
+- **Required Fields** (always collected when enabled):
+  - First Name
+  - Last Name
+  - Email
+- **Optional Fields** (can be enabled/disabled):
+  - Phone - Toggle on/off, optionally mark as required
+  - Referrer Name - Toggle on/off, optionally mark as required
+
+The configuration is stored in `contactInfoConfig` (JSON field) and `requiresProspectInfo` (boolean).
+
+**Additional Survey Settings:**
+- `isPublic` - When true, survey doesn't require login (for public assessments)
+- `showProgressBar` - Toggle progress bar visibility during survey taking
+- `requiresProspectInfo` - Enable contact info collection form
 
 **Survey taking experience (Coach/Ambassador):**
-- Paginated display (one question per page)
-- Progress bar showing "Question X of Y" and percentage
+- Paginated display (pages show all questions together, standalone questions show one per screen)
+- Page titles and descriptions displayed as section headers
+- Progress bar showing "Step X of Y" and percentage
 - Previous/Next navigation buttons
-- Validation before proceeding to next question
-- Submit button on final question
+- Validation for all questions on current step before proceeding
+- Submit button on final step
 
 **Server actions:**
 ```typescript
@@ -657,7 +742,7 @@ import {
 
 // Duplicate a question
 const result = await duplicateQuestion(questionId)
-// Returns: { success: true, question: { id, questionText, ... } }
+// Returns: { success: true, question: { id, questionText, pageId, ... } }
 
 // Reorder questions
 await reorderQuestions(surveyId, ['questionId1', 'questionId2', ...])
@@ -720,24 +805,27 @@ Collapsible accordion-style sidebar navigation:
 - Active section auto-expands on navigation
 
 **Ambassador sections:**
-- Learning (Classes, Surveys & Quizzes, Knowledge Base)
+- Assessments (Surveys & Quizzes)
+- Learning (Courses, Old Classes, Knowledge Base)
 - Business (Business Idea)
 - Tools (Time Clock, Schedule, Collaboration)
 - Account (Profile)
 
 **Coach sections:**
 - People (Ambassadors)
+- Assessments (Surveys & Quizzes)
 - Business (CRM, Projects, Business Excellence, Income & Goals)
-- Content (My Classes, Courses, Surveys & Quizzes, Knowledge Base)
+- Content (My Classes, Courses, Knowledge Base)
 - Communication (Collaboration, Messages)
 - Tools (Time, Schedule, Events, Sponsorship, Resource Center)
 
 **Admin sections:**
-- People (User Management, Coaches, Ambassadors)
-- Onboarding & Training (Onboarding Config, Amb. Onboarding, Courses & Quizzes, Surveys, Business Ideas)
+- People (Prospects, User Management, Coaches, Ambassadors)
+- Assessments (Surveys & Quizzes)
+- Onboarding & Training (Onboarding Config, Amb. Onboarding, Courses & Quizzes, Business Ideas)
 - Content (All Classes, Knowledge Base, Resource Centers)
-- Events & Finance (Events, Sponsorship Requests, Business Excellence)
-- Communication (Collaboration, Messages)
+- Events & Finance (Calendars, Events, Sponsorship Requests, Business Excellence)
+- Communication (Channels, Direct Messages, Files)
 - System (Feature Config, Reports, Audit Logs, Settings)
 
 ## Onboarding Journey Component
@@ -792,3 +880,161 @@ const showToast = useCallback((message: string, type: 'success' | 'error') => {
 - Green (success) or red (error) styling
 - Slide-in animation from bottom-right
 - Close button for manual dismiss
+
+## LMS (Learning Management System)
+
+Modern learning management system with hierarchical course structure, multiple content types, and progress tracking.
+
+**Key files:**
+- `src/lib/actions/lms/courses.ts` - Course CRUD operations
+- `src/lib/actions/lms/modules.ts` - Module management
+- `src/lib/actions/lms/lessons.ts` - Lesson management
+- `src/lib/actions/lms/content-blocks.ts` - Content block management
+- `src/lib/actions/lms/enrollment.ts` - Enrollment and progress tracking
+- `src/lib/actions/lms/analytics.ts` - Admin analytics
+
+**Route Structure:**
+```
+src/app/(dashboard)/admin/lms/
+├── page.tsx                    # Course list (server)
+├── lms-admin-client.tsx        # Course list (client)
+├── new/                        # Create course
+├── [courseId]/
+│   ├── page.tsx                # Course editor (server)
+│   └── course-editor-client.tsx # Editor (client)
+└── analytics/
+    ├── page.tsx                # Analytics dashboard (server)
+    └── lms-analytics-client.tsx # Analytics (client)
+
+src/app/(dashboard)/coach/learning/
+├── page.tsx                    # Course catalog (server)
+├── learning-catalog-client.tsx # Catalog (client)
+├── [courseId]/
+│   ├── page.tsx                # Course view (server)
+│   └── course-view-client.tsx  # Course view (client)
+│   └── [lessonId]/
+│       ├── page.tsx            # Lesson viewer (server)
+│       └── lesson-viewer-client.tsx # Viewer (client)
+
+src/app/(dashboard)/ambassador/learning/  # Same structure as coach
+```
+
+**Database Models:**
+
+| Model | Purpose |
+|-------|---------|
+| `LMSCourse` | Course container with title, description, thumbnail, status, allowedRoles |
+| `LMSModule` | Section/chapter within a course |
+| `LMSLesson` | Individual learning unit within a module |
+| `LMSContentBlock` | Content piece: VIDEO, TEXT, QUIZ, or DOCUMENT |
+| `LMSEnrollment` | User enrollment with overall progress |
+| `LMSLessonProgress` | Per-lesson completion tracking |
+| `LMSContentProgress` | Per-content block progress (video watch %, quiz scores) |
+
+**Content Types:**
+
+| Type | Content JSON | Completion Criteria |
+|------|--------------|---------------------|
+| VIDEO | `{ url, provider, duration }` | Watch 80%+ |
+| TEXT | `{ content, format }` | View/scroll |
+| QUIZ | `{ surveyId, passingScore }` | Links to Survey system |
+| DOCUMENT | `{ url, fileName, fileSize }` | Download/view |
+
+**Course Status Flow:**
+- `DRAFT` - Course is being built, not visible to learners
+- `PUBLISHED` - Course is visible and enrollable
+- `ARCHIVED` - Course is hidden but data preserved
+
+**Enrollment Status:**
+- `NOT_STARTED` - Enrolled but no progress
+- `IN_PROGRESS` - Started but not completed
+- `COMPLETED` - All lessons marked complete
+
+**Admin Actions:**
+```typescript
+import { createCourse, updateCourse, publishCourse, archiveCourse } from '@/lib/actions/lms/courses'
+import { createModule, reorderModules } from '@/lib/actions/lms/modules'
+import { createLesson, reorderLessons } from '@/lib/actions/lms/lessons'
+import { createContentBlock } from '@/lib/actions/lms/content-blocks'
+
+// Create a course
+const course = await createCourse({
+  title: 'Getting Started',
+  description: 'Introduction course',
+  allowedRoles: ['COACH', 'AMBASSADOR'],
+})
+
+// Add module
+const module = await createModule(course.id, { title: 'Module 1' })
+
+// Add lesson
+const lesson = await createLesson(module.id, { title: 'Lesson 1' })
+
+// Add content block
+await createContentBlock(lesson.id, {
+  type: 'VIDEO',
+  title: 'Welcome Video',
+  content: { url: 'https://youtube.com/...', provider: 'youtube' },
+})
+```
+
+**Learner Actions:**
+```typescript
+import {
+  getAvailableCourses,
+  enrollInCourse,
+  getLessonContent,
+  updateContentProgress,
+  markLessonComplete,
+} from '@/lib/actions/lms/enrollment'
+
+// Get courses for current user's role
+const courses = await getAvailableCourses()
+
+// Enroll in a course
+await enrollInCourse(courseId)
+
+// Track video progress
+await updateContentProgress(contentBlockId, 75) // 75% watched
+
+// Mark lesson complete
+await markLessonComplete(lessonId)
+```
+
+**Analytics Actions (Admin):**
+```typescript
+import {
+  getLMSOverviewStats,
+  getCourseAnalytics,
+  getAllEnrollments,
+  getRecentActivity,
+} from '@/lib/actions/lms/analytics'
+
+// Overview statistics
+const stats = await getLMSOverviewStats()
+// Returns: totalCourses, publishedCourses, totalEnrollments, completionRate, etc.
+
+// Per-course analytics
+const courseStats = await getCourseAnalytics()
+// Returns: enrollments, completion rates, avg progress per course
+```
+
+**Migration Script:**
+To migrate from old Course model to new LMS:
+```bash
+npx tsx scripts/migrate-courses-to-lms.ts
+```
+
+**Client Component Props:**
+The learning client components accept a `basePath` prop for role-agnostic navigation:
+```typescript
+// Coach uses default basePath
+<LearningCatalogClient courses={courses} enrollments={enrollments} />
+
+// Ambassador passes custom basePath
+<LearningCatalogClient
+  courses={courses}
+  enrollments={enrollments}
+  basePath="/ambassador/learning"
+/>
+```

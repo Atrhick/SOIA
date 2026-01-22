@@ -33,6 +33,10 @@ const updateSurveySchema = z.object({
   showResults: z.boolean().default(true),
   allowRetake: z.boolean().default(true),
   closesAt: z.string().optional().nullable(),
+  isPublic: z.boolean().optional(),
+  requiresProspectInfo: z.boolean().optional(),
+  showProgressBar: z.boolean().optional(),
+  contactInfoConfig: z.any().optional(),
 })
 
 const questionSchema = z.object({
@@ -65,6 +69,7 @@ export async function createSurvey(formData: FormData) {
   }
 
   const scoreMode = (formData.get('scoreMode') as string) || 'SCORE_ONLY'
+  const contactInfoConfigStr = formData.get('contactInfoConfig') as string | null
   const data = {
     title: formData.get('title') as string,
     description: formData.get('description') as string || undefined,
@@ -78,6 +83,9 @@ export async function createSurvey(formData: FormData) {
     showResults: formData.get('showResults') !== 'false',
     allowRetake: formData.get('allowRetake') !== 'false',
     closesAt: formData.get('closesAt') as string || undefined,
+    isPublic: formData.get('isPublic') === 'true',
+    requiresProspectInfo: formData.get('requiresProspectInfo') === 'true',
+    contactInfoConfig: contactInfoConfigStr ? JSON.parse(contactInfoConfigStr) : undefined,
   }
 
   const validated = createSurveySchema.safeParse(data)
@@ -98,6 +106,9 @@ export async function createSurvey(formData: FormData) {
         showResults: validated.data.showResults,
         allowRetake: validated.data.allowRetake,
         closesAt: validated.data.closesAt ? new Date(validated.data.closesAt) : null,
+        isPublic: data.isPublic,
+        requiresProspectInfo: data.requiresProspectInfo,
+        contactInfoConfig: data.contactInfoConfig,
         createdBy: session.user.id,
         status: 'DRAFT',
       },
@@ -128,6 +139,7 @@ export async function updateSurvey(surveyId: string, formData: FormData) {
   }
 
   const scoreMode = formData.get('scoreMode') as string | null
+  const contactInfoConfigRaw = formData.get('contactInfoConfig') as string | null
   const data = {
     title: formData.get('title') as string,
     description: formData.get('description') as string || undefined,
@@ -140,6 +152,10 @@ export async function updateSurvey(surveyId: string, formData: FormData) {
     showResults: formData.get('showResults') !== 'false',
     allowRetake: formData.get('allowRetake') !== 'false',
     closesAt: formData.get('closesAt') as string || null,
+    isPublic: formData.get('isPublic') === 'true',
+    requiresProspectInfo: formData.get('requiresProspectInfo') === 'true',
+    showProgressBar: formData.get('showProgressBar') !== 'false',
+    contactInfoConfig: contactInfoConfigRaw ? JSON.parse(contactInfoConfigRaw) : undefined,
   }
 
   const validated = updateSurveySchema.safeParse(data)
@@ -160,6 +176,10 @@ export async function updateSurvey(surveyId: string, formData: FormData) {
         showResults: validated.data.showResults,
         allowRetake: validated.data.allowRetake,
         closesAt: validated.data.closesAt ? new Date(validated.data.closesAt) : null,
+        isPublic: validated.data.isPublic,
+        requiresProspectInfo: validated.data.requiresProspectInfo,
+        showProgressBar: validated.data.showProgressBar,
+        contactInfoConfig: validated.data.contactInfoConfig,
       },
     })
 
@@ -298,6 +318,19 @@ export async function getSurveyById(surveyId: string) {
     const survey = await prisma.survey.findUnique({
       where: { id: surveyId },
       include: {
+        pages: {
+          include: {
+            questions: {
+              include: {
+                options: {
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
         questions: {
           include: {
             options: {
@@ -339,12 +372,40 @@ export async function getSurveyById(surveyId: string) {
         passingScore: survey.passingScore,
         showResults: survey.showResults,
         allowRetake: survey.allowRetake,
+        isPublic: survey.isPublic,
+        showProgressBar: survey.showProgressBar,
+        requiresProspectInfo: survey.requiresProspectInfo,
+        contactInfoConfig: survey.contactInfoConfig as { name: string; label: string; type: string; required: boolean; enabled: boolean }[] | null,
         publishedAt: survey.publishedAt?.toISOString() || null,
         closesAt: survey.closesAt?.toISOString() || null,
         createdAt: survey.createdAt.toISOString(),
         submissionCount: survey._count.submissions,
+        pages: survey.pages.map(p => ({
+          id: p.id,
+          title: p.title,
+          description: p.description,
+          sortOrder: p.sortOrder,
+          questions: p.questions.map(q => ({
+            id: q.id,
+            pageId: q.pageId,
+            questionText: q.questionText,
+            questionType: q.questionType,
+            isRequired: q.isRequired,
+            sortOrder: q.sortOrder,
+            likertConfig: q.likertConfig as { minLabel: string; maxLabel: string; minValue: number; maxValue: number } | null,
+            minLength: q.minLength,
+            maxLength: q.maxLength,
+            options: q.options.map(o => ({
+              id: o.id,
+              optionText: o.optionText,
+              isCorrect: session.user.role === 'ADMIN' ? o.isCorrect : undefined,
+              sortOrder: o.sortOrder,
+            })),
+          })),
+        })),
         questions: survey.questions.map(q => ({
           id: q.id,
+          pageId: q.pageId,
           questionText: q.questionText,
           questionType: q.questionType,
           isRequired: q.isRequired,
@@ -653,6 +714,7 @@ export async function duplicateQuestion(questionId: string) {
         likertConfig: duplicate.likertConfig,
         minLength: duplicate.minLength,
         maxLength: duplicate.maxLength,
+        pageId: duplicate.pageId,
         options: duplicate.options.map(o => ({
           id: o.id,
           optionText: o.optionText,
@@ -664,6 +726,249 @@ export async function duplicateQuestion(questionId: string) {
   } catch (error) {
     console.error('Error duplicating question:', error)
     return { error: 'Failed to duplicate question' }
+  }
+}
+
+// ============================================
+// SURVEY PAGE MANAGEMENT
+// ============================================
+
+export async function createSurveyPage(surveyId: string, data: { title?: string; description?: string }) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized - Admin only' }
+  }
+
+  try {
+    // Get max sort order for pages
+    const maxSortOrder = await prisma.surveyPage.aggregate({
+      where: { surveyId },
+      _max: { sortOrder: true },
+    })
+
+    const page = await prisma.surveyPage.create({
+      data: {
+        surveyId,
+        title: data.title || null,
+        description: data.description || null,
+        sortOrder: (maxSortOrder._max.sortOrder || 0) + 1,
+      },
+    })
+
+    revalidatePath(`/admin/surveys/${surveyId}`)
+    return {
+      success: true,
+      page: {
+        id: page.id,
+        title: page.title,
+        description: page.description,
+        sortOrder: page.sortOrder,
+      },
+    }
+  } catch (error) {
+    console.error('Error creating survey page:', error)
+    return { error: 'Failed to create page' }
+  }
+}
+
+export async function updateSurveyPage(pageId: string, data: { title?: string; description?: string }) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized - Admin only' }
+  }
+
+  try {
+    const page = await prisma.surveyPage.update({
+      where: { id: pageId },
+      data: {
+        title: data.title,
+        description: data.description,
+      },
+    })
+
+    revalidatePath(`/admin/surveys/${page.surveyId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating survey page:', error)
+    return { error: 'Failed to update page' }
+  }
+}
+
+export async function deleteSurveyPage(pageId: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized - Admin only' }
+  }
+
+  try {
+    const page = await prisma.surveyPage.findUnique({
+      where: { id: pageId },
+    })
+
+    if (!page) {
+      return { error: 'Page not found' }
+    }
+
+    // Move questions from this page to no page (standalone)
+    await prisma.surveyQuestion.updateMany({
+      where: { pageId },
+      data: { pageId: null },
+    })
+
+    await prisma.surveyPage.delete({
+      where: { id: pageId },
+    })
+
+    revalidatePath(`/admin/surveys/${page.surveyId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting survey page:', error)
+    return { error: 'Failed to delete page' }
+  }
+}
+
+export async function reorderSurveyPages(surveyId: string, pageIds: string[]) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized - Admin only' }
+  }
+
+  try {
+    await prisma.$transaction(
+      pageIds.map((id, index) =>
+        prisma.surveyPage.update({
+          where: { id },
+          data: { sortOrder: index },
+        })
+      )
+    )
+
+    revalidatePath(`/admin/surveys/${surveyId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Error reordering pages:', error)
+    return { error: 'Failed to reorder pages' }
+  }
+}
+
+export async function moveQuestionToPage(questionId: string, pageId: string | null) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized - Admin only' }
+  }
+
+  try {
+    const question = await prisma.surveyQuestion.findUnique({
+      where: { id: questionId },
+    })
+
+    if (!question) {
+      return { error: 'Question not found' }
+    }
+
+    // If moving to a page, get max sortOrder within that page
+    let newSortOrder = question.sortOrder
+    if (pageId) {
+      const maxSortOrder = await prisma.surveyQuestion.aggregate({
+        where: { pageId },
+        _max: { sortOrder: true },
+      })
+      newSortOrder = (maxSortOrder._max.sortOrder || 0) + 1
+    }
+
+    await prisma.surveyQuestion.update({
+      where: { id: questionId },
+      data: {
+        pageId,
+        sortOrder: newSortOrder,
+      },
+    })
+
+    revalidatePath(`/admin/surveys/${question.surveyId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Error moving question to page:', error)
+    return { error: 'Failed to move question' }
+  }
+}
+
+export async function addQuestionToPage(
+  surveyId: string,
+  pageId: string,
+  questionData: {
+    questionText: string
+    questionType: string
+    isRequired: boolean
+    options?: { optionText: string; isCorrect: boolean }[]
+    likertConfig?: { minLabel: string; maxLabel: string; minValue: number; maxValue: number }
+    minLength?: number
+    maxLength?: number
+  }
+) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized - Admin only' }
+  }
+
+  try {
+    // Get max sort order within the page
+    const maxSortOrder = await prisma.surveyQuestion.aggregate({
+      where: { pageId },
+      _max: { sortOrder: true },
+    })
+
+    const question = await prisma.surveyQuestion.create({
+      data: {
+        surveyId,
+        pageId,
+        questionText: questionData.questionText,
+        questionType: questionData.questionType as SurveyQuestionType,
+        isRequired: questionData.isRequired,
+        sortOrder: (maxSortOrder._max.sortOrder || 0) + 1,
+        likertConfig: questionData.likertConfig || undefined,
+        minLength: questionData.minLength,
+        maxLength: questionData.maxLength,
+        options: questionData.options ? {
+          createMany: {
+            data: questionData.options.map((opt, idx) => ({
+              optionText: opt.optionText,
+              isCorrect: opt.isCorrect,
+              sortOrder: idx,
+            })),
+          },
+        } : undefined,
+      },
+      include: {
+        options: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    })
+
+    revalidatePath(`/admin/surveys/${surveyId}`)
+    return {
+      success: true,
+      question: {
+        id: question.id,
+        pageId: question.pageId,
+        questionText: question.questionText,
+        questionType: question.questionType,
+        isRequired: question.isRequired,
+        sortOrder: question.sortOrder,
+        likertConfig: question.likertConfig,
+        minLength: question.minLength,
+        maxLength: question.maxLength,
+        options: question.options.map(o => ({
+          id: o.id,
+          optionText: o.optionText,
+          isCorrect: o.isCorrect,
+          sortOrder: o.sortOrder,
+        })),
+      },
+    }
+  } catch (error) {
+    console.error('Error adding question to page:', error)
+    return { error: 'Failed to add question' }
   }
 }
 
@@ -1061,6 +1366,19 @@ export async function getPublicSurvey(surveyId: string) {
         status: 'PUBLISHED',
       },
       include: {
+        pages: {
+          include: {
+            questions: {
+              include: {
+                options: {
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
         questions: {
           include: {
             options: {
@@ -1084,8 +1402,32 @@ export async function getPublicSurvey(surveyId: string) {
         type: survey.type,
         showProgressBar: survey.showProgressBar,
         requiresProspectInfo: survey.requiresProspectInfo,
+        contactInfoConfig: survey.contactInfoConfig as { name: string; label: string; type: string; required: boolean; enabled: boolean }[] | null,
+        pages: survey.pages.map(p => ({
+          id: p.id,
+          title: p.title,
+          description: p.description,
+          sortOrder: p.sortOrder,
+          questions: p.questions.map(q => ({
+            id: q.id,
+            pageId: q.pageId,
+            questionText: q.questionText,
+            questionType: q.questionType,
+            isRequired: q.isRequired,
+            sortOrder: q.sortOrder,
+            likertConfig: q.likertConfig as { minLabel: string; maxLabel: string; minValue: number; maxValue: number } | null,
+            minLength: q.minLength,
+            maxLength: q.maxLength,
+            options: q.options.map(o => ({
+              id: o.id,
+              optionText: o.optionText,
+              sortOrder: o.sortOrder,
+            })),
+          })),
+        })),
         questions: survey.questions.map(q => ({
           id: q.id,
+          pageId: q.pageId,
           questionText: q.questionText,
           questionType: q.questionType,
           isRequired: q.isRequired,
@@ -1195,6 +1537,7 @@ export async function submitPublicSurvey(
         surveyId,
         userId: null,
         userRole: 'PROSPECT',
+        contactEmail: prospectData?.email || null, // Store email for fallback lookups
         answers: {
           create: answers.map(a => ({
             questionId: a.questionId,

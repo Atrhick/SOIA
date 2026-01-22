@@ -40,6 +40,7 @@ The StageOneInAction Back Office provides:
 - **Collaboration** - Access to team channels with @mentions and emoji reactions
 - **Scheduling** - View calendar and RSVP to events
 - **Knowledge Base** - Browse articles and documentation
+- **LMS Courses** - Enroll in and complete structured learning courses
 
 **For Coaches:**
 - Complete onboarding and compliance tracking
@@ -56,6 +57,7 @@ The StageOneInAction Back Office provides:
 - **Time Tracking** - Clock in/out and project-based time logging
 - **Scheduling** - Calendar events and meeting management
 - **Knowledge Base** - Browse articles and documentation
+- **LMS Courses** - Enroll in and complete structured learning courses with video, text, quizzes
 
 **For Administrators:**
 - **Coach Prospect Pipeline** - Track prospective coaches from assessment through payment and account creation
@@ -74,6 +76,8 @@ The StageOneInAction Back Office provides:
 - Resource Center application review
 - Knowledge Base management - Create and publish articles for coaches/ambassadors
 - Collaboration management - Create discussion channels and manage shared documents
+- **LMS Management** - Create courses with modules, lessons, and content blocks (video, text, quiz, documents)
+- **LMS Analytics** - Track enrollments, completion rates, and learner progress
 - Reporting and exports
 
 **For Parents/Guardians:**
@@ -137,6 +141,8 @@ The StageOneInAction Back Office provides:
 | Knowledge Base | ✅ | ✅ | ✅ | Complete |
 | Surveys & Quizzes | ✅ | ✅ | ✅ | Complete |
 | Coach Prospect Pipeline | - | - | ✅ | Complete |
+| LMS Courses | ✅ | ✅ | ✅ | Complete |
+| LMS Analytics | - | - | ✅ | Complete |
 
 ### Future Enhancements
 
@@ -296,7 +302,11 @@ test_app/
 │   │   │   │   ├── classes/     # All classes overview
 │   │   │   │   ├── coaches/     # Coach management (list, detail, new)
 │   │   │   │   ├── collaboration/ # Channel management
-│   │   │   │   ├── courses/     # Course & quiz configuration
+│   │   │   │   ├── courses/     # Legacy course & quiz configuration
+│   │   │   │   ├── lms/         # LMS course management
+│   │   │   │   │   ├── new/     # Create new course
+│   │   │   │   │   ├── [courseId]/ # Course editor
+│   │   │   │   │   └── analytics/ # LMS analytics dashboard
 │   │   │   │   ├── events/      # Event management
 │   │   │   │   ├── features/    # Feature toggle configuration
 │   │   │   │   ├── knowledge-base/ # Article management
@@ -315,6 +325,9 @@ test_app/
 │   │   │   │   ├── classes/     # Browse and enroll in classes
 │   │   │   │   ├── collaboration/ # Team discussions
 │   │   │   │   ├── knowledge-base/ # Browse articles
+│   │   │   │   ├── learning/    # LMS course catalog and lessons
+│   │   │   │   │   ├── [courseId]/ # Course view
+│   │   │   │   │   └── [courseId]/[lessonId]/ # Lesson viewer
 │   │   │   │   ├── onboarding/  # Onboarding journey checklist
 │   │   │   │   ├── profile/     # Ambassador profile
 │   │   │   │   ├── schedule/    # Calendar view
@@ -326,11 +339,14 @@ test_app/
 │   │   │   │   ├── business-excellence/ # CRM, website, outreach
 │   │   │   │   ├── classes/     # Create and manage classes
 │   │   │   │   ├── collaboration/ # Team discussions
-│   │   │   │   ├── courses/     # Training courses
+│   │   │   │   ├── courses/     # Legacy training courses
 │   │   │   │   ├── crm/         # CRM contacts & deals
 │   │   │   │   ├── events/      # Event viewing & RSVP
 │   │   │   │   ├── income-goals/ # Income & goals tracking
 │   │   │   │   ├── knowledge-base/ # Browse articles
+│   │   │   │   ├── learning/    # LMS course catalog and lessons
+│   │   │   │   │   ├── [courseId]/ # Course view
+│   │   │   │   │   └── [courseId]/[lessonId]/ # Lesson viewer
 │   │   │   │   ├── messages/    # Messaging with admin
 │   │   │   │   ├── onboarding/  # Onboarding flow (profile, courses, quiz)
 │   │   │   │   ├── projects/    # Project management
@@ -358,7 +374,7 @@ test_app/
 │   │   │   ├── MessageBubble.tsx    # Styled message component
 │   │   │   └── index.ts         # Barrel exports
 │   │   ├── dashboard/           # Dashboard components
-│   │   │   ├── header.tsx       # Header with user menu & impersonation
+│   │   │   ├── header.tsx       # Header with user menu, impersonation & profile name display
 │   │   │   └── sidebar.tsx
 │   │   ├── providers.tsx        # SessionProvider wrapper
 │   │   └── ui/                  # Reusable UI components
@@ -405,7 +421,14 @@ test_app/
 │       │   ├── sponsorship.ts   # Sponsorship requests
 │       │   ├── surveys.ts       # Surveys & quizzes
 │       │   ├── time-clock.ts    # Time clock & entries
-│       │   └── users.ts         # User management & permissions
+│       │   ├── users.ts         # User management & permissions
+│       │   └── lms/             # LMS actions
+│       │       ├── courses.ts   # Course CRUD
+│       │       ├── modules.ts   # Module management
+│       │       ├── lessons.ts   # Lesson management
+│       │       ├── content-blocks.ts # Content block management
+│       │       ├── enrollment.ts # Enrollment & progress
+│       │       └── analytics.ts # LMS analytics
 │       ├── auth.ts              # NextAuth configuration
 │       ├── feature-names.ts     # Feature key constants
 │       ├── prisma.ts            # Prisma client singleton
@@ -480,6 +503,29 @@ test_app/
 | **KBCategory** | Knowledge base categories with hierarchy |
 | **KBArticle** | Knowledge base articles with publishing workflow |
 
+### Survey & Quiz Entities
+
+| Entity | Description |
+|--------|-------------|
+| **Survey** | Quiz or survey with settings (type, scoring mode, passing score) |
+| **SurveyPage** | Page/section grouping multiple questions with title and description |
+| **SurveyQuestion** | Question with type, pageId (nullable for standalone), and options |
+| **SurveyOption** | Answer options for choice questions (with isCorrect for quizzes) |
+| **SurveySubmission** | User submission with score, pass status, and contactEmail for public surveys |
+| **SurveyAnswer** | Individual question answers with selected options or text |
+
+### LMS (Learning Management System) Entities
+
+| Entity | Description |
+|--------|-------------|
+| **LMSCourse** | Course container with title, description, thumbnail, status (DRAFT/PUBLISHED/ARCHIVED), allowedRoles |
+| **LMSModule** | Section/chapter within a course with title and description |
+| **LMSLesson** | Individual learning unit within a module with estimated duration |
+| **LMSContentBlock** | Content piece with type (VIDEO, TEXT, QUIZ, DOCUMENT) and JSON content |
+| **LMSEnrollment** | User enrollment tracking overall progress and completion |
+| **LMSLessonProgress** | Per-lesson completion status and time spent |
+| **LMSContentProgress** | Per-content block progress (video watch %, quiz scores) |
+
 ### Coach Prospect Pipeline Entities
 
 | Entity | Description |
@@ -544,6 +590,15 @@ interface Session {
   }
 }
 ```
+
+### Header Profile Name
+
+The dashboard header displays the user's profile name instead of email:
+- **Coaches**: Fetches firstName + lastName from `CoachProfile`
+- **Ambassadors**: Fetches firstName + lastName from `Ambassador`
+- **Fallback**: Displays email if profile name not available
+
+The profile name is fetched in `src/app/(dashboard)/layout.tsx` and passed to the Header component.
 
 ---
 
@@ -640,8 +695,14 @@ The application primarily uses Next.js Server Actions for data mutations:
 | `scheduling.ts` | Calendar events and attendee management |
 | `knowledge-base.ts` | getKBCategories, getKBArticles, createKBArticle, updateKBArticle, publishKBArticle |
 | `surveys.ts` | createSurvey, addQuestion, updateQuestion, deleteQuestion, reorderQuestions, duplicateQuestion, submitSurvey, getSurveyResults, exportSurveyResultsCSV, getOrCreateCoachAssessment, getCoachAssessmentLink, submitPublicSurvey |
-| `prospects.ts` | createManualProspect, getProspect, getAllProspects, updateProspectStatus, getProspectStats |
+| `prospects.ts` | createManualProspect, getProspect, getAllProspects, updateProspectStatus, getProspectStats, deleteProspect, getProspectAssessmentResults |
 | `notifications.ts` | createNotification, getUnreadNotifications, markNotificationAsRead, getNotificationCount |
+| `lms/courses.ts` | createCourse, updateCourse, deleteCourse, publishCourse, unpublishCourse, archiveCourse, getCourse, getAllCourses |
+| `lms/modules.ts` | createModule, updateModule, deleteModule, reorderModules |
+| `lms/lessons.ts` | createLesson, updateLesson, deleteLesson, reorderLessons, moveLesson |
+| `lms/content-blocks.ts` | createContentBlock, updateContentBlock, deleteContentBlock, reorderContentBlocks, duplicateContentBlock |
+| `lms/enrollment.ts` | getAvailableCourses, getCourseForLearner, enrollInCourse, getLessonContent, updateContentProgress, markLessonComplete, getMyEnrollments |
+| `lms/analytics.ts` | getLMSOverviewStats, getCourseAnalytics, getCourseEnrollments, getAllEnrollments, getRecentActivity |
 
 ---
 
@@ -838,7 +899,7 @@ Admins can create and manage user accounts:
 
 ### Surveys & Quizzes
 
-Create and manage quizzes (scored) and surveys (feedback collection):
+Create and manage quizzes (scored) and surveys (feedback collection) with multi-question page support:
 
 **Survey Types:**
 - **Quiz** - Scored assessments with correct answers and passing threshold
@@ -867,6 +928,19 @@ Create and manage quizzes (scored) and surveys (feedback collection):
 7. Use copy button to duplicate similar questions
 8. Publish when ready
 
+**Page Management (Multi-Question Pages):**
+Pages allow grouping multiple questions on a single screen with section titles and descriptions.
+
+| Feature | Description |
+|---------|-------------|
+| Add Page/Section | Click purple button to create a new page |
+| Section Title | Optional title displayed as header (e.g., "Personal Information") |
+| Page Description | Optional instructions or context for respondents |
+| Move Questions | Use dropdown on each question to move between pages |
+| Add to Page | Click folder+ icon on page header to add question directly |
+| Mixed Mode | Combine pages with standalone questions (one per screen) |
+| Delete Page | Removes page, moves questions to standalone |
+
 **Survey Builder Features:**
 - Single-page workflow (create survey + add questions together)
 - Optimistic UI updates (no page refresh)
@@ -874,15 +948,48 @@ Create and manage quizzes (scored) and surveys (feedback collection):
 - Question duplication
 - Live preview for Likert scales
 - Collapsible settings panel
+- Page management with edit/delete buttons
+- Move-to-page dropdown on each question
+- Pages displayed with purple background for visual distinction
+- **Preview button** - Test survey without submitting responses
+
+**Preview Mode (Admin Only):**
+| Feature | Description |
+|---------|-------------|
+| Access | Click "Preview" button in editor or add `?preview=true` to URL |
+| Banner | Amber banner indicates preview mode is active |
+| Validation | Skip required fields for quick navigation |
+| Submission | Shows completion screen without saving to database |
+| Draft Support | Works with unpublished surveys |
+| Security | Only accessible to admin users |
+
+**Contact Info Configuration:**
+Collect respondent contact information before survey questions. Configure in Survey Settings panel.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| First Name | Required | Always collected when enabled |
+| Last Name | Required | Always collected when enabled |
+| Email | Required | Always collected when enabled |
+| Phone | Optional | Toggle on/off, can mark as required |
+| Referrer Name | Optional | Toggle on/off, can mark as required |
+
+**Additional Survey Settings:**
+| Setting | Description |
+|---------|-------------|
+| Public Survey | No login required (for public assessments) |
+| Show Progress Bar | Toggle progress bar visibility |
+| Collect Contact Info | Enable contact form before questions |
 
 **Coach/Ambassador Workflow:**
 1. View available surveys in their dashboard
 2. Click "Start" to begin a survey
-3. Answer questions one at a time (paginated display)
-4. Progress bar shows current question and completion percentage
-5. Use Previous/Next buttons to navigate
-6. Submit on final question and view results (if enabled)
-7. Retake if allowed
+3. Pages show all questions together; standalone questions show one per screen
+4. Page titles and descriptions displayed as section headers
+5. Progress bar shows current step and completion percentage
+6. Use Previous/Next buttons to navigate between steps
+7. Submit on final step and view results (if enabled)
+8. Retake if allowed
 
 **Results & Analytics (Admin):**
 - Overview tab: Total responses, pass rate (quizzes), role breakdown charts
@@ -922,9 +1029,23 @@ ACCEPTANCE_PENDING → PAYMENT_PENDING → PAYMENT_COMPLETED → ACCOUNT_CREATED
 - **Get Assessment Link** - Generates shareable URL with copy button
 - **Add Prospect** - Manual prospect creation form
 - **Pipeline View** - Filter prospects by status
-- **Prospect Detail** - View full info, assessment answers, status timeline
+- **Prospect Detail** - View full info with inline data display (assessment, business form, orientation, interview, payment)
 - **Generated Links Section** - Shows all generated links (business form, acceptance) with copy buttons for easy resending
 - **Status Management** - Update prospect status with notes; copy link buttons shown when tokens exist
+- **Delete Prospect** - Remove prospects with confirmation (blocked if coach account created)
+
+**Prospect Detail - Inline Data Display:**
+All submitted data is displayed inline for easy review:
+| Section | Data Displayed |
+|---------|---------------|
+| Assessment Responses | Auto-loaded question/answer pairs |
+| Business Development Form | Company name, bio, services, pricing |
+| Orientation Information | Date and notes |
+| Interview Information | Date and notes |
+| Terms & Payment | Acceptance timestamp, payment status |
+
+**Assessment Data Fallback:**
+For older prospects without `assessmentSubmissionId`, the system attempts to find submissions by matching the prospect's email against the `contactEmail` field in `SurveySubmission`.
 
 **Business Development Form:**
 - Public form accessed via token link (no login required)
@@ -941,6 +1062,83 @@ ACCEPTANCE_PENDING → PAYMENT_PENDING → PAYMENT_COMPLETED → ACCOUNT_CREATED
 | `/business-form/[token]` | Public business development form (no auth) |
 | `/acceptance/[token]` | Public acceptance letter with payment (no auth) |
 | `/book/[slug]` | Public calendar booking page (no auth) |
+
+### LMS (Learning Management System)
+
+A modern learning management system with hierarchical course structure, multiple content types, and comprehensive progress tracking.
+
+**Course Structure:**
+```
+LMSCourse (Course container)
+├── LMSModule (Section/Chapter)
+│   └── LMSLesson (Learning unit)
+│       └── LMSContentBlock (Video, Text, Quiz, Document)
+```
+
+**Content Types:**
+| Type | Description | Completion |
+|------|-------------|------------|
+| VIDEO | YouTube, Vimeo, or direct URL | Watch 80%+ |
+| TEXT | Rich text/markdown content | View/scroll |
+| QUIZ | Links to Survey system | Pass score |
+| DOCUMENT | Downloadable files | Download/view |
+
+**Course Status:**
+- `DRAFT` - Being built, not visible to learners
+- `PUBLISHED` - Visible and enrollable
+- `ARCHIVED` - Hidden but data preserved
+
+**Admin Workflow:**
+1. Navigate to Admin → LMS Courses
+2. Click "Create Course" to start new course
+3. Add modules to organize content
+4. Add lessons within each module
+5. Add content blocks (video, text, quiz, document) to lessons
+6. Set allowed roles (Coach, Ambassador, or both)
+7. Publish when ready
+
+**Content Block Types:**
+| Block | Configuration |
+|-------|--------------|
+| Video | Enter YouTube/Vimeo URL or direct video link |
+| Text | Rich text editor with markdown support |
+| Quiz | Select from existing Survey quizzes |
+| Document | Upload or link to downloadable files |
+
+**Learner Experience:**
+1. Browse available courses in Learning catalog
+2. View course details and curriculum
+3. Click "Enroll" to join a course
+4. Progress through lessons sequentially
+5. Watch videos, read text, take quizzes, download documents
+6. Mark lessons as complete
+7. Track overall progress percentage
+
+**Analytics Dashboard (Admin):**
+- Overview: Total courses, enrollments, completion rate
+- Course metrics: Enrollments, completion rates per course
+- Recent activity: Lesson and course completions
+- Enrollment details: Individual learner progress
+
+**Routes:**
+| Route | Description |
+|-------|-------------|
+| `/admin/lms` | Course management list |
+| `/admin/lms/new` | Create new course |
+| `/admin/lms/[courseId]` | Course editor |
+| `/admin/lms/analytics` | Analytics dashboard |
+| `/coach/learning` | Coach course catalog |
+| `/coach/learning/[courseId]` | Course view/enrollment |
+| `/coach/learning/[courseId]/[lessonId]` | Lesson viewer |
+| `/ambassador/learning` | Ambassador course catalog |
+| `/ambassador/learning/[courseId]` | Course view/enrollment |
+| `/ambassador/learning/[courseId]/[lessonId]` | Lesson viewer |
+
+**Migration from Legacy Courses:**
+Run the migration script to convert old Course/QuizQuestion data to new LMS structure:
+```bash
+npx tsx scripts/migrate-courses-to-lms.ts
+```
 
 ### Sidebar Navigation
 
