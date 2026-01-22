@@ -176,6 +176,10 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Link modal state
+  const [showLinkModal, setShowLinkModal] = useState<'business-form' | 'orientation' | 'acceptance' | null>(null)
+  const [modalLink, setModalLink] = useState<string | null>(null)
+
   // Assessment results state (auto-loaded)
   const [assessmentResults, setAssessmentResults] = useState<AssessmentResults | null>(null)
   const [isLoadingAssessment, setIsLoadingAssessment] = useState(false)
@@ -339,11 +343,28 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
       setError(result.error)
     } else if (result.token) {
       const link = `${window.location.origin}/business-form/${result.token}`
-      setGeneratedLink(link)
-      setSuccess('Business form link generated')
+      setModalLink(link)
+      setShowLinkModal('business-form')
       router.refresh()
     }
     setIsLoading(false)
+  }
+
+  const handleSendEmail = (link: string, type: 'business-form' | 'orientation' | 'acceptance') => {
+    const subject = type === 'business-form'
+      ? 'Complete Your Business Development Form - Stage One In Action'
+      : type === 'orientation'
+        ? 'Schedule Your Orientation - Stage One In Action'
+        : 'Acceptance Letter & Payment - Stage One In Action'
+
+    const body = type === 'business-form'
+      ? `Hi ${prospect.firstName},\n\nPlease complete your Business Development Form using the link below:\n\n${link}\n\nThis form helps us understand your business goals and how we can best support you.\n\nBest regards,\nStage One In Action Team`
+      : type === 'orientation'
+        ? `Hi ${prospect.firstName},\n\nPlease schedule your orientation using the link below:\n\n${link}\n\nWe look forward to meeting with you!\n\nBest regards,\nStage One In Action Team`
+        : `Hi ${prospect.firstName},\n\nCongratulations! Please review your acceptance letter and complete your payment using the link below:\n\n${link}\n\nWe're excited to have you join us!\n\nBest regards,\nStage One In Action Team`
+
+    const mailtoLink = `mailto:${prospect.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    window.open(mailtoLink, '_blank')
   }
 
   const handleScheduleInterview = async () => {
@@ -1459,6 +1480,66 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                     Delete Prospect
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Link Generated Modal */}
+      {showLinkModal && modalLink && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {showLinkModal === 'business-form' && 'Business Form Link Generated'}
+                {showLinkModal === 'orientation' && 'Orientation Link Generated'}
+                {showLinkModal === 'acceptance' && 'Acceptance Link Generated'}
+              </h3>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Send this link to <strong>{prospect.firstName} {prospect.lastName}</strong> ({prospect.email})
+            </p>
+
+            {/* Link Display */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-gray-600 break-all font-mono">{modalLink}</p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(modalLink)
+                  setSuccess('Link copied to clipboard!')
+                }}
+                className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy Link
+              </button>
+              <button
+                onClick={() => handleSendEmail(modalLink, showLinkModal)}
+                className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Send Email
+              </button>
+            </div>
+
+            {/* Close Button */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowLinkModal(null)
+                  setModalLink(null)
+                }}
+                className="w-full px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+              >
+                Close
               </button>
             </div>
           </div>
