@@ -793,8 +793,8 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
         )}
       </div>
 
-      {/* Recurring Slots Summary (for Booking calendars) */}
-      {calendar.type === 'BOOKING' && (
+      {/* Recurring Slots Summary (for Booking calendars) - only show if there are slots */}
+      {calendar.type === 'BOOKING' && calendar.slots.length > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Recurring Slots</h3>
           <div className="grid grid-cols-7 gap-4">

@@ -42,6 +42,16 @@ const MIGRATIONS = [
       END $$;
     `,
   },
+  {
+    id: '2026_01_21_delete_orientation_recurring_slots',
+    description: 'Delete recurring slots from orientation calendar (use events instead)',
+    sql: `
+      DELETE FROM "calendar_slots"
+      WHERE "calendarId" IN (
+        SELECT id FROM "admin_calendars" WHERE "publicSlug" = 'orientation'
+      );
+    `,
+  },
 ]
 
 // Create migrations tracking table if it doesn't exist
