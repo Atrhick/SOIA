@@ -482,12 +482,13 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             <button
               onClick={() => {
                 const link = `${window.location.origin}/business-form/${prospect.businessFormToken}`
-                copyToClipboard(link)
+                setModalLink(link)
+                setShowLinkModal('business-form')
               }}
               className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              <Copy className="h-4 w-4 mr-1" />
-              Copy Link
+              <Send className="h-4 w-4 mr-1" />
+              View / Send Link
             </button>
           </div>
         ) : (
@@ -508,12 +509,13 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
               <button
                 onClick={() => {
                   const link = `${window.location.origin}/business-form/${prospect.businessFormToken}`
-                  copyToClipboard(link)
+                  setModalLink(link)
+                  setShowLinkModal('business-form')
                 }}
                 className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
-                <Copy className="h-4 w-4 mr-1" />
-                Copy Link
+                <Send className="h-4 w-4 mr-1" />
+                View / Resend
               </button>
             )}
           </div>
@@ -556,12 +558,13 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             <button
               onClick={() => {
                 const link = `${window.location.origin}/acceptance/${prospect.acceptanceToken}`
-                copyToClipboard(link)
+                setModalLink(link)
+                setShowLinkModal('acceptance')
               }}
               className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              <Copy className="h-4 w-4 mr-1" />
-              Copy Link
+              <Send className="h-4 w-4 mr-1" />
+              View / Send Link
             </button>
           </div>
         ) : (
@@ -586,12 +589,13 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             <button
               onClick={() => {
                 const link = `${window.location.origin}/acceptance/${prospect.acceptanceToken}`
-                copyToClipboard(link)
+                setModalLink(link)
+                setShowLinkModal('acceptance')
               }}
               className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              <Copy className="h-4 w-4 mr-1" />
-              Copy Link
+              <Send className="h-4 w-4 mr-1" />
+              View / Resend
             </button>
           </div>
         ) : null
@@ -1125,12 +1129,13 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                     <button
                       onClick={() => {
                         const link = `${window.location.origin}/book/orientation/${prospect.orientationToken}`
-                        copyToClipboard(link)
+                        setModalLink(link)
+                        setShowLinkModal('orientation')
                       }}
                       className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
                     >
-                      <Copy className="h-4 w-4 mr-1" />
-                      Copy Link
+                      <Send className="h-4 w-4 mr-1" />
+                      View / Send
                     </button>
                   ) : (
                     <button
@@ -1166,12 +1171,13 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                   <button
                     onClick={() => {
                       const link = `${window.location.origin}/business-form/${prospect.businessFormToken}`
-                      copyToClipboard(link)
+                      setModalLink(link)
+                      setShowLinkModal('business-form')
                     }}
                     className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
                   >
-                    <Copy className="h-4 w-4 mr-1" />
-                    Copy
+                    <Send className="h-4 w-4 mr-1" />
+                    Send
                   </button>
                 </div>
               )}
@@ -1186,12 +1192,13 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                   <button
                     onClick={() => {
                       const link = `${window.location.origin}/acceptance/${prospect.acceptanceToken}`
-                      copyToClipboard(link)
+                      setModalLink(link)
+                      setShowLinkModal('acceptance')
                     }}
                     className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
                   >
-                    <Copy className="h-4 w-4 mr-1" />
-                    Copy
+                    <Send className="h-4 w-4 mr-1" />
+                    Send
                   </button>
                 </div>
               )}
