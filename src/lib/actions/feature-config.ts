@@ -61,7 +61,7 @@ export async function updateFeatureConfig(
   }
 ) {
   const session = await auth()
-  if (!session || session.user.role !== 'ADMIN') {
+  if (!session || session.user.role !== 'ADMIN' || session.user.isImpersonating) {
     return { error: 'Unauthorized' }
   }
 
@@ -103,7 +103,7 @@ export async function updateFeatureConfig(
 
 export async function toggleFeature(feature: string) {
   const session = await auth()
-  if (!session || session.user.role !== 'ADMIN') {
+  if (!session || session.user.role !== 'ADMIN' || session.user.isImpersonating) {
     return { error: 'Unauthorized' }
   }
 
@@ -185,18 +185,16 @@ export async function isFeatureEnabled(feature: string, role?: string, userId?: 
 
 export async function getEnabledFeaturesForRole(role: string, userId?: string) {
   try {
-    const configs = await prisma.featureConfig.findMany({
-      where: { isEnabled: true },
-    })
+    const [configs, overrides] = await Promise.all([
+      prisma.featureConfig.findMany({
+        where: { isEnabled: true },
+      }),
+      userId
+        ? prisma.userFeaturePermission.findMany({ where: { userId } })
+        : Promise.resolve([]),
+    ])
 
-    // Get user-specific overrides if userId provided
-    let userOverrides: { feature: string; granted: boolean }[] = []
-    if (userId) {
-      const overrides = await prisma.userFeaturePermission.findMany({
-        where: { userId }
-      })
-      userOverrides = overrides.map(o => ({ feature: o.feature, granted: o.granted }))
-    }
+    const userOverrides = overrides.map(o => ({ feature: o.feature, granted: o.granted }))
 
     return configs.filter((config) => {
       // Check for user override first

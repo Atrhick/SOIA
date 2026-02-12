@@ -8,7 +8,11 @@ import { z } from 'zod'
 
 const createCoachSchema = z.object({
   email: z.string().email('Valid email is required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number'),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   phone: z.string().optional(),
@@ -30,7 +34,7 @@ const updateCoachSchema = z.object({
 
 export async function createCoach(formData: FormData) {
   const session = await auth()
-  if (!session || session.user.role !== 'ADMIN') {
+  if (!session || session.user.role !== 'ADMIN' || session.user.isImpersonating) {
     return { error: 'Unauthorized - Admin only' }
   }
 
@@ -190,7 +194,7 @@ export async function updateCoachUserStatus(
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
 ) {
   const session = await auth()
-  if (!session || session.user.role !== 'ADMIN') {
+  if (!session || session.user.role !== 'ADMIN' || session.user.isImpersonating) {
     return { error: 'Unauthorized - Admin only' }
   }
 
@@ -312,12 +316,12 @@ export async function updateOnboardingTaskByAdmin(
 
 export async function resetCoachPassword(coachId: string, newPassword: string) {
   const session = await auth()
-  if (!session || session.user.role !== 'ADMIN') {
+  if (!session || session.user.role !== 'ADMIN' || session.user.isImpersonating) {
     return { error: 'Unauthorized - Admin only' }
   }
 
-  if (newPassword.length < 6) {
-    return { error: 'Password must be at least 6 characters' }
+  if (newPassword.length < 8) {
+    return { error: 'Password must be at least 8 characters' }
   }
 
   try {

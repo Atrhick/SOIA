@@ -40,6 +40,7 @@ model User {
   sentMessages       Message[]     @relation("SentMessages")
   messageThreads     MessageThread[] @relation("ThreadParticipants")
 
+  @@index([role, status])
   @@map("users")
 }
 
@@ -202,6 +203,8 @@ model Ambassador {
   businessIdea           BusinessIdea?
   classEnrollments       ClassEnrollment[]
 
+  @@index([coachId])
+  @@index([status])
   @@map("ambassadors")
 }
 
@@ -498,6 +501,8 @@ model LMSEnrollment {
   lessonProgress  LMSLessonProgress[]
 
   @@unique([courseId, userId])
+  @@index([userId])
+  @@index([courseId])
   @@map("lms_enrollments")
 }
 
@@ -974,6 +979,8 @@ model Message {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
+  @@index([threadId])
+  @@index([senderId])
   @@map("messages")
 }
 
@@ -1406,6 +1413,8 @@ model ChannelMember {
   lastReadAt DateTime             @default(now()) // For unread tracking
 
   @@unique([channelId, userId])
+  @@index([channelId])
+  @@index([userId])
   @@map("channel_members")
 }
 
@@ -1429,6 +1438,8 @@ model ChannelPost {
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
+  @@index([channelId])
+  @@index([authorId])
   @@map("channel_posts")
 }
 
@@ -1632,6 +1643,7 @@ model CalendarEvent {
   startTime      DateTime
   endTime        DateTime
   isAllDay       Boolean           @default(false)
+  timezone       String            @default("America/Los_Angeles")
 
   location       String?
   isOnline       Boolean           @default(false)
@@ -1640,6 +1652,7 @@ model CalendarEvent {
   // Recurrence
   isRecurring    Boolean           @default(false)
   recurrenceRule String?           // iCal RRULE format
+  seriesId       String?           // Groups events in the same recurring series
 
   // Link to Admin Calendar (optional)
   adminCalendarId String?
@@ -1891,6 +1904,8 @@ model SurveySubmission {
   answers         SurveyAnswer[]
 
   @@index([contactEmail])
+  @@index([surveyId])
+  @@unique([surveyId, contactEmail])
   @@map("survey_submissions")
 }
 
@@ -1977,6 +1992,7 @@ model Prospect {
   assessmentToken       String              @unique @default(cuid())
   orientationToken      String?             @unique
   businessFormToken     String?             @unique
+  bizDevInterviewToken  String?             @unique
   acceptanceToken       String?             @unique
 
   // Pipeline Status
@@ -1992,13 +2008,40 @@ model Prospect {
   orientationCompletedAt DateTime?
   orientationNotes      String?             @db.Text
 
-  // Business Development Form
+  // Business Development Form - Step 1: Business Identity
   companyName           String?
+  tagline               String?
   bio                   String?             @db.Text
+  businessType          String?             // "Coaching", "Consulting", "Training", etc.
+  businessTypeOther     String?             // Custom value when businessType is "Other"
+
+  // Business Development Form - Step 2: Online Presence
+  websiteUrl            String?
+  needsWebsiteHelp      Boolean?
+  instagramHandle       String?
+  facebookHandle        String?
+  linkedinHandle        String?
+  tiktokHandle          String?
+
+  // Business Development Form - Step 3: Services & Packages
+  servicePackages       Json?               // [{id, name, description, price, duration}]
+  servicesInterested    String[]            // Legacy field for backward compatibility
+  proposedCostOfServices String?            @db.Text  // Legacy field
+
+  // Business Development Form - Step 4: Target Audience & Differentiators
+  idealClient           String?             @db.Text
+  uniqueValue           String?             @db.Text  // What makes you unique
+  certifications        String?             @db.Text
+
+  // Business Development Form - Step 5: Goals
+  threeYearRevenueGoal  String?
+  threeYearClientGoal   String?
   visionStatement       String?             @db.Text
   missionStatement      String?             @db.Text
-  servicesInterested    String[]
-  proposedCostOfServices String?            @db.Text
+
+  // Business Development Form - Draft & Resume Support
+  businessFormDraft     Json?               // {currentStep, formData}
+  businessFormLastSavedAt DateTime?
   businessFormSubmittedAt DateTime?
 
   // Interview
@@ -2026,6 +2069,8 @@ model Prospect {
   statusHistory         ProspectStatusHistory[]
   calendarBookings      CalendarBooking[]
 
+  @@index([email])
+  @@index([status])
   @@map("prospects")
 }
 
@@ -2184,6 +2229,9 @@ model AdminCalendar {
   // Default meeting link for bookings
   meetingLink         String?
 
+  // Max days in advance prospects can book (null = unlimited)
+  maxBookingDays      Int?            @default(14)
+
   isActive        Boolean             @default(true)
   createdBy       String
   createdAt       DateTime            @default(now())
@@ -2282,4 +2330,16 @@ model CalendarAccess {
 
   @@unique([calendarId, userId])
   @@map("calendar_access")
+}
+
+model SitePage {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  content     String   @db.Text
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("site_pages")
 }

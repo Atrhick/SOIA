@@ -27,6 +27,7 @@ import {
   MessageSquare,
   CreditCard,
   Trash2,
+  RefreshCw,
 } from 'lucide-react'
 import { ProspectJourney, ProspectStep } from '@/components/ui/onboarding-journey'
 import { ProspectStatus } from '@prisma/client'
@@ -35,8 +36,11 @@ import {
   completeOrientation,
   generateBusinessFormToken,
   generateOrientationToken,
-  scheduleInterview,
+  generateBizDevInterviewToken,
   completeInterview,
+  cancelInterviewBooking,
+  checkPriorBookingAvailability,
+  revertInterviewDecision,
   generateAcceptanceToken,
   createCoachFromProspect,
   deleteProspect,
@@ -45,6 +49,7 @@ import {
 import {
   getAvailableOrientationSlots,
   scheduleOrientationFromCalendar,
+  scheduleInterviewDirect,
 } from '@/lib/actions/admin-calendars'
 
 interface StatusHistory {
@@ -63,6 +68,14 @@ interface Payment {
   paidAt: string | null
 }
 
+interface ServicePackage {
+  id: string
+  name: string
+  description: string
+  price: string
+  duration?: string
+}
+
 interface Prospect {
   id: string
   firstName: string
@@ -75,6 +88,7 @@ interface Prospect {
   assessmentToken: string
   orientationToken: string | null
   businessFormToken: string | null
+  bizDevInterviewToken: string | null
   acceptanceToken: string | null
   assessmentSurveyId: string | null
   assessmentSubmissionId: string | null
@@ -82,12 +96,29 @@ interface Prospect {
   orientationScheduledAt: string | null
   orientationCompletedAt: string | null
   orientationNotes: string | null
+  // Business Form - Legacy fields
   companyName: string | null
   bio: string | null
   visionStatement: string | null
   missionStatement: string | null
   servicesInterested: string[]
   proposedCostOfServices: string | null
+  // Business Form - New fields
+  tagline: string | null
+  businessType: string | null
+  businessTypeOther: string | null
+  websiteUrl: string | null
+  needsWebsiteHelp: boolean | null
+  instagramHandle: string | null
+  facebookHandle: string | null
+  linkedinHandle: string | null
+  tiktokHandle: string | null
+  servicePackages: ServicePackage[] | null
+  idealClient: string | null
+  uniqueValue: string | null
+  certifications: string | null
+  threeYearRevenueGoal: string | null
+  threeYearClientGoal: string | null
   businessFormSubmittedAt: string | null
   interviewScheduledAt: string | null
   interviewCompletedAt: string | null
@@ -101,6 +132,21 @@ interface Prospect {
   createdAt: string
   updatedAt: string
   statusHistory: StatusHistory[]
+  interviewBooking: {
+    id: string
+    calendarId: string
+    startTime: string
+    endTime: string
+    meetingLink: string | null
+  } | null
+  interviewBookingHistory: {
+    id: string
+    status: string
+    startTime: string
+    endTime: string
+    createdAt: string
+    cancellationReason: string | null
+  }[]
 }
 
 interface AssessmentAnswer {
@@ -133,8 +179,8 @@ const STATUS_LABELS: Record<ProspectStatus, string> = {
   ORIENTATION_COMPLETED: 'Orientation Completed',
   BUSINESS_FORM_PENDING: 'Business Form Pending',
   BUSINESS_FORM_SUBMITTED: 'Business Form Submitted',
-  INTERVIEW_SCHEDULED: 'Interview Scheduled',
-  INTERVIEW_COMPLETED: 'Interview Completed',
+  INTERVIEW_SCHEDULED: 'Biz Dev Interview Scheduled',
+  INTERVIEW_COMPLETED: 'Biz Dev Interview Completed',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
   ACCEPTANCE_PENDING: 'Acceptance Pending',
@@ -170,14 +216,28 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
   const [selectedOrientationSlot, setSelectedOrientationSlot] = useState<OrientationSlot | null>(null)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [orientationMeetingLink, setOrientationMeetingLink] = useState<string | null>(null)
+
   const [scheduledMeetingLink, setScheduledMeetingLink] = useState<string | null>(null)
+
+  // Interview direct scheduling state
+  const [interviewDate, setInterviewDate] = useState('')
+  const [interviewStartTime, setInterviewStartTime] = useState('')
+  const [interviewEndTime, setInterviewEndTime] = useState('')
 
   // Delete confirmation state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Cancel interview state
+  const [showCancelInterviewConfirm, setShowCancelInterviewConfirm] = useState(false)
+  const [isCancellingInterview, setIsCancellingInterview] = useState(false)
+
+  // Interview decision modal state
+  const [showDecisionModal, setShowDecisionModal] = useState<'APPROVED' | 'REJECTED' | null>(null)
+  const [decisionNotes, setDecisionNotes] = useState('')
+
   // Link modal state
-  const [showLinkModal, setShowLinkModal] = useState<'business-form' | 'orientation' | 'acceptance' | null>(null)
+  const [showLinkModal, setShowLinkModal] = useState<'business-form' | 'orientation' | 'biz-dev-interview' | 'acceptance' | null>(null)
   const [modalLink, setModalLink] = useState<string | null>(null)
 
   // Assessment results state (auto-loaded)
@@ -215,9 +275,10 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
   // Build prospect journey steps based on current status
   const getStepStatus = (stepStatuses: ProspectStatus[]): ProspectStep['status'] => {
     if (prospect.status === 'REJECTED') {
-      // If rejected, mark all steps up to interview as completed, rest as skipped
-      const rejectedAfter: ProspectStatus[] = ['APPROVED', 'ACCEPTANCE_PENDING', 'PAYMENT_PENDING', 'PAYMENT_COMPLETED', 'ACCOUNT_CREATED']
+      // If rejected, mark the decision step as rejected, skip everything after
+      const rejectedAfter: ProspectStatus[] = ['ACCEPTANCE_PENDING', 'PAYMENT_PENDING', 'PAYMENT_COMPLETED', 'ACCOUNT_CREATED']
       if (stepStatuses.some(s => rejectedAfter.includes(s))) return 'skipped'
+      if (stepStatuses.includes('APPROVED') || stepStatuses.includes('REJECTED')) return 'rejected'
     }
 
     const statusOrder: ProspectStatus[] = [
@@ -234,8 +295,9 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
     const maxStepIndex = Math.max(...stepIndices)
     const minStepIndex = Math.min(...stepIndices)
 
-    if (currentIndex > maxStepIndex) return 'completed'
-    if (currentIndex >= minStepIndex && currentIndex <= maxStepIndex) return 'current'
+    if (currentIndex >= maxStepIndex) return 'completed'
+    if (currentIndex === minStepIndex - 1) return 'current'
+    if (currentIndex >= minStepIndex) return 'current'
     return 'pending'
   }
 
@@ -243,7 +305,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
     { id: 'assessment', title: 'Assessment', shortTitle: 'Assessment', icon: ClipboardList, status: getStepStatus(['ASSESSMENT_PENDING', 'ASSESSMENT_COMPLETED']) },
     { id: 'orientation', title: 'Orientation', shortTitle: 'Orientation', icon: Video, status: getStepStatus(['ORIENTATION_SCHEDULED', 'ORIENTATION_COMPLETED']) },
     { id: 'business-form', title: 'Business Form', shortTitle: 'Biz Form', icon: Briefcase, status: getStepStatus(['BUSINESS_FORM_PENDING', 'BUSINESS_FORM_SUBMITTED']) },
-    { id: 'interview', title: 'Interview', shortTitle: 'Interview', icon: MessageSquare, status: getStepStatus(['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED']) },
+    { id: 'interview', title: 'Biz Dev Interview', shortTitle: 'Biz Dev', icon: MessageSquare, status: getStepStatus(['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED']) },
     { id: 'decision', title: 'Decision', shortTitle: 'Decision', icon: prospect.status === 'REJECTED' ? XCircle : CheckCircle, status: getStepStatus(['APPROVED', 'REJECTED']) },
   ]
 
@@ -272,6 +334,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
     }
   }, [])
 
+  // Fetch available interview slots when modal opens
   // Auto-load assessment results on mount if prospect has completed assessment
   // (either has assessmentSubmissionId or assessmentCompletedAt indicating they took the assessment)
   useEffect(() => {
@@ -296,6 +359,15 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
       setScheduledMeetingLink(null)
     }
   }, [showScheduleModal, fetchOrientationSlots])
+
+  useEffect(() => {
+    if (showScheduleModal === 'interview') {
+      // Reset date/time fields when modal opens
+      setInterviewDate('')
+      setInterviewStartTime('')
+      setInterviewEndTime('')
+    }
+  }, [showScheduleModal])
 
   const handleScheduleOrientation = async () => {
     if (!selectedOrientationSlot) return
@@ -350,48 +422,95 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
     setIsLoading(false)
   }
 
-  const handleSendEmail = (link: string, type: 'business-form' | 'orientation' | 'acceptance') => {
-    const subject = type === 'business-form'
-      ? 'Complete Your Business Development Form - Stage One In Action'
-      : type === 'orientation'
-        ? 'Schedule Your Orientation - Stage One In Action'
-        : 'Acceptance Letter & Payment - Stage One In Action'
+  const handleSendEmail = (link: string, type: 'business-form' | 'orientation' | 'biz-dev-interview' | 'acceptance') => {
+    let subject: string
+    let body: string
 
-    const body = type === 'business-form'
-      ? `Hi ${prospect.firstName},\n\nPlease complete your Business Development Form using the link below:\n\n${link}\n\nThis form helps us understand your business goals and how we can best support you.\n\nBest regards,\nStage One In Action Team`
-      : type === 'orientation'
-        ? `Hi ${prospect.firstName},\n\nPlease schedule your orientation using the link below:\n\n${link}\n\nWe look forward to meeting with you!\n\nBest regards,\nStage One In Action Team`
-        : `Hi ${prospect.firstName},\n\nCongratulations! Please review your acceptance letter and complete your payment using the link below:\n\n${link}\n\nWe're excited to have you join us!\n\nBest regards,\nStage One In Action Team`
+    switch (type) {
+      case 'business-form':
+        subject = 'Complete Your Business Development Form - Stage One In Action'
+        body = `Hi ${prospect.firstName},\n\nPlease complete your Business Development Form using the link below:\n\n${link}\n\nThis form helps us understand your business goals and how we can best support you.\n\nBest regards,\nStage One In Action Team`
+        break
+      case 'orientation':
+        subject = 'Schedule Your Orientation - Stage One In Action'
+        body = `Hi ${prospect.firstName},\n\nPlease schedule your orientation using the link below:\n\n${link}\n\nWe look forward to meeting with you!\n\nBest regards,\nStage One In Action Team`
+        break
+      case 'biz-dev-interview':
+        subject = 'Schedule Your Business Development Interview - Stage One In Action'
+        body = `Hi ${prospect.firstName},\n\nPlease schedule your Business Development Interview using the link below:\n\n${link}\n\nThis interview is an important step in your onboarding journey. We're looking forward to discussing your business goals!\n\nBest regards,\nStage One In Action Team`
+        break
+      case 'acceptance':
+        subject = 'Acceptance Letter & Payment - Stage One In Action'
+        body = `Hi ${prospect.firstName},\n\nCongratulations! Please review your acceptance letter and complete your payment using the link below:\n\n${link}\n\nWe're excited to have you join us!\n\nBest regards,\nStage One In Action Team`
+        break
+    }
 
     const mailtoLink = `mailto:${prospect.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     window.open(mailtoLink, '_blank')
   }
 
   const handleScheduleInterview = async () => {
-    if (!scheduledDate) return
+    if (!interviewDate || !interviewStartTime || !interviewEndTime) return
     setIsLoading(true)
     setError(null)
 
-    const result = await scheduleInterview(prospect.id, new Date(scheduledDate))
+    // Validate end time is after start time
+    const startDateTime = new Date(`${interviewDate}T${interviewStartTime}`)
+    const endDateTime = new Date(`${interviewDate}T${interviewEndTime}`)
+    if (endDateTime <= startDateTime) {
+      setError('End time must be after start time')
+      setIsLoading(false)
+      return
+    }
+
+    // Validate not in the past
+    if (startDateTime < new Date()) {
+      setError('Cannot schedule an interview in the past')
+      setIsLoading(false)
+      return
+    }
+
+    // If rescheduling, cancel existing booking first
+    if (isRescheduling) {
+      const cancelResult = await cancelInterviewBooking(prospect.id, 'Rescheduled by admin')
+      if (cancelResult.error) {
+        setError(cancelResult.error)
+        setIsLoading(false)
+        return
+      }
+    }
+
+    const result = await scheduleInterviewDirect(
+      prospect.id,
+      startDateTime.toISOString(),
+      endDateTime.toISOString(),
+    )
     if ('error' in result && result.error) {
       setError(result.error)
     } else {
-      setSuccess('Interview scheduled successfully')
+      setSuccess(isRescheduling ? 'Interview rescheduled successfully' : 'Biz Dev Interview scheduled successfully')
       setShowScheduleModal(null)
+      setInterviewDate('')
+      setInterviewStartTime('')
+      setInterviewEndTime('')
+      setIsRescheduling(false)
       router.refresh()
     }
     setIsLoading(false)
   }
 
-  const handleCompleteInterview = async (interviewResult: 'APPROVED' | 'REJECTED') => {
+  const handleCompleteInterview = async () => {
+    if (!showDecisionModal) return
     setIsLoading(true)
     setError(null)
 
-    const result = await completeInterview(prospect.id, interviewResult, notes)
+    const result = await completeInterview(prospect.id, showDecisionModal, decisionNotes || undefined)
     if ('error' in result && result.error) {
       setError(result.error)
     } else {
-      setSuccess(`Interview completed - Prospect ${interviewResult.toLowerCase()}`)
+      setSuccess(`Biz Dev Interview completed - Prospect ${showDecisionModal.toLowerCase()}`)
+      setShowDecisionModal(null)
+      setDecisionNotes('')
       router.refresh()
     }
     setIsLoading(false)
@@ -451,6 +570,79 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
     }
   }
 
+
+  const handleCancelInterview = async () => {
+    setIsCancellingInterview(true)
+    setError(null)
+
+    const result = await cancelInterviewBooking(prospect.id)
+    if (result.error) {
+      setError(result.error)
+      setIsCancellingInterview(false)
+      setShowCancelInterviewConfirm(false)
+    } else {
+      setSuccess('Interview cancelled successfully')
+      setShowCancelInterviewConfirm(false)
+      setIsCancellingInterview(false)
+      router.refresh()
+    }
+  }
+
+  const [isRescheduling, setIsRescheduling] = useState(false)
+
+  const handleRescheduleInterview = () => {
+    setIsRescheduling(true)
+    setShowScheduleModal('interview')
+  }
+
+  const [showRevertModal, setShowRevertModal] = useState(false)
+  const [isReverting, setIsReverting] = useState(false)
+  const [isCheckingBooking, setIsCheckingBooking] = useState(false)
+  const [priorBookingInfo, setPriorBookingInfo] = useState<{
+    available: boolean
+    reason?: string
+    booking?: { startTime: string; endTime: string }
+  } | null>(null)
+
+  const handleOpenRevertModal = async () => {
+    setShowRevertModal(true)
+    setIsCheckingBooking(true)
+    setPriorBookingInfo(null)
+
+    const result = await checkPriorBookingAvailability(prospect.id)
+    if ('error' in result && result.error) {
+      setPriorBookingInfo({ available: false, reason: 'error' })
+    } else {
+      setPriorBookingInfo(result as { available: boolean; reason?: string; booking?: { startTime: string; endTime: string } })
+    }
+    setIsCheckingBooking(false)
+  }
+
+  const handleRevertDecision = async (restorePrior: boolean) => {
+    setIsReverting(true)
+    setError(null)
+
+    const result = await revertInterviewDecision(prospect.id, restorePrior)
+    if ('error' in result && result.error) {
+      setError(result.error)
+      setIsReverting(false)
+      return
+    }
+
+    if (result.rebooked) {
+      setSuccess('Decision reverted - prior appointment restored')
+      setShowRevertModal(false)
+      router.refresh()
+    } else {
+      setSuccess('Decision reverted')
+      setShowRevertModal(false)
+      router.refresh()
+      setTimeout(() => {
+        setShowScheduleModal('interview')
+      }, 500)
+    }
+    setIsReverting(false)
+  }
 
   const getNextActions = () => {
     switch (prospect.status) {
@@ -527,14 +719,14 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
           >
             <Calendar className="h-4 w-4 mr-2" />
-            Schedule Interview
+            Schedule Biz Dev Interview
           </button>
         )
       case 'INTERVIEW_SCHEDULED':
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => handleCompleteInterview('APPROVED')}
+              onClick={() => setShowDecisionModal('APPROVED')}
               disabled={isLoading}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
             >
@@ -542,40 +734,67 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
               Approve
             </button>
             <button
-              onClick={() => handleCompleteInterview('REJECTED')}
+              onClick={() => setShowDecisionModal('REJECTED')}
               disabled={isLoading}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
             >
               <XCircle className="h-4 w-4 mr-2" />
               Reject
             </button>
+            <button
+              onClick={handleRescheduleInterview}
+              disabled={isLoading}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reschedule
+            </button>
+            <button
+              onClick={() => setShowCancelInterviewConfirm(true)}
+              disabled={isLoading}
+              className="inline-flex items-center px-3 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 disabled:opacity-50"
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Cancel Interview
+            </button>
           </div>
         )
       case 'APPROVED':
-        return prospect.acceptanceToken ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Acceptance letter sent</span>
+        return (
+          <div className="space-y-2">
+            {prospect.acceptanceToken ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Acceptance letter sent</span>
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/acceptance/${prospect.acceptanceToken}`
+                    setModalLink(link)
+                    setShowLinkModal('acceptance')
+                  }}
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Send className="h-4 w-4 mr-1" />
+                  View / Send Link
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleGenerateAcceptanceLink}
+                disabled={isLoading}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send Acceptance Letter
+              </button>
+            )}
             <button
-              onClick={() => {
-                const link = `${window.location.origin}/acceptance/${prospect.acceptanceToken}`
-                setModalLink(link)
-                setShowLinkModal('acceptance')
-              }}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() => handleOpenRevertModal()}
+              className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50"
             >
-              <Send className="h-4 w-4 mr-1" />
-              View / Send Link
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Revert Decision
             </button>
           </div>
-        ) : (
-          <button
-            onClick={handleGenerateAcceptanceLink}
-            disabled={isLoading}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
-          >
-            <Send className="h-4 w-4 mr-2" />
-            Send Acceptance Letter
-          </button>
         )
       case 'ACCEPTANCE_PENDING':
       case 'PAYMENT_PENDING':
@@ -619,6 +838,16 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             <ExternalLink className="h-4 w-4 mr-2" />
             View Coach Profile
           </Link>
+        )
+      case 'REJECTED':
+        return (
+          <button
+            onClick={() => handleOpenRevertModal()}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Revert Decision
+          </button>
         )
       default:
         return null
@@ -720,6 +949,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
         preOnboardingSteps={preOnboardingSteps}
         onboardingSteps={onboardingSteps}
         coachProfileId={prospect.coachProfileId}
+        isRejected={prospect.status === 'REJECTED'}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -843,12 +1073,12 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             )}
           </div>
 
-          {/* Interview Information - Show if any interview data exists */}
+          {/* Biz Dev Interview Information - Show if any interview data exists */}
           {(prospect.interviewScheduledAt || prospect.interviewCompletedAt || prospect.interviewNotes || prospect.interviewResult) && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <MessageSquare className="h-5 w-5 text-primary-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Interview Information</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Biz Dev Interview Information</h2>
               </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -890,7 +1120,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                 </div>
                 {prospect.interviewNotes && (
                   <div>
-                    <label className="text-sm text-gray-500">Interview Notes</label>
+                    <label className="text-sm text-gray-500">Biz Dev Interview Notes</label>
                     <div className="mt-1 p-3 bg-gray-50 rounded-lg">
                       <p className="text-gray-700 whitespace-pre-wrap">{prospect.interviewNotes}</p>
                     </div>
@@ -915,43 +1145,123 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             </div>
 
             {prospect.companyName || prospect.bio || prospect.visionStatement ? (
-              <div className="space-y-4">
-                {prospect.companyName && (
-                  <div>
-                    <label className="text-sm text-gray-500">Company Name</label>
-                    <div className="flex items-center text-gray-900 mt-1">
-                      <Building className="h-4 w-4 mr-2 text-gray-400" />
-                      {prospect.companyName}
+              <div className="space-y-6">
+                {/* Business Identity Section */}
+                <div className="border-b border-gray-100 pb-4">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Business Identity</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {prospect.companyName && (
+                      <div>
+                        <label className="text-sm text-gray-500">Company Name</label>
+                        <div className="flex items-center text-gray-900 mt-1">
+                          <Building className="h-4 w-4 mr-2 text-gray-400" />
+                          {prospect.companyName}
+                        </div>
+                      </div>
+                    )}
+                    {prospect.tagline && (
+                      <div>
+                        <label className="text-sm text-gray-500">Tagline</label>
+                        <p className="text-gray-900 mt-1">{prospect.tagline}</p>
+                      </div>
+                    )}
+                    {prospect.businessType && (
+                      <div>
+                        <label className="text-sm text-gray-500">Business Type</label>
+                        <span className="inline-flex mt-1 px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                          {prospect.businessType === 'Other' && prospect.businessTypeOther
+                            ? prospect.businessTypeOther
+                            : prospect.businessType}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {prospect.bio && (
+                    <div className="mt-4">
+                      <label className="text-sm text-gray-500">Professional Bio</label>
+                      <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-gray-700 whitespace-pre-wrap">{prospect.bio}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Online Presence Section */}
+                {(prospect.websiteUrl || prospect.instagramHandle || prospect.facebookHandle || prospect.linkedinHandle || prospect.tiktokHandle || prospect.needsWebsiteHelp) && (
+                  <div className="border-b border-gray-100 pb-4">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Online Presence</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {prospect.websiteUrl && (
+                        <div>
+                          <label className="text-sm text-gray-500">Website</label>
+                          <a href={prospect.websiteUrl.startsWith('http') ? prospect.websiteUrl : `https://${prospect.websiteUrl}`} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline mt-1 block">
+                            {prospect.websiteUrl}
+                          </a>
+                        </div>
+                      )}
+                      {prospect.needsWebsiteHelp && (
+                        <div>
+                          <label className="text-sm text-gray-500">Website Help</label>
+                          <span className="inline-flex mt-1 px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">
+                            Needs website assistance
+                          </span>
+                        </div>
+                      )}
+                      {prospect.instagramHandle && (
+                        <div>
+                          <label className="text-sm text-gray-500">Instagram</label>
+                          <p className="text-gray-900 mt-1">{prospect.instagramHandle}</p>
+                        </div>
+                      )}
+                      {prospect.facebookHandle && (
+                        <div>
+                          <label className="text-sm text-gray-500">Facebook</label>
+                          <p className="text-gray-900 mt-1">{prospect.facebookHandle}</p>
+                        </div>
+                      )}
+                      {prospect.linkedinHandle && (
+                        <div>
+                          <label className="text-sm text-gray-500">LinkedIn</label>
+                          <p className="text-gray-900 mt-1">{prospect.linkedinHandle}</p>
+                        </div>
+                      )}
+                      {prospect.tiktokHandle && (
+                        <div>
+                          <label className="text-sm text-gray-500">TikTok</label>
+                          <p className="text-gray-900 mt-1">{prospect.tiktokHandle}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-                {prospect.bio && (
-                  <div>
-                    <label className="text-sm text-gray-500">Bio</label>
-                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.bio}</p>
+
+                {/* Services & Packages Section */}
+                {prospect.servicePackages && prospect.servicePackages.length > 0 && (
+                  <div className="border-b border-gray-100 pb-4">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Services & Packages</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {prospect.servicePackages.map((pkg) => (
+                        <div key={pkg.id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-medium text-gray-900">{pkg.name}</h4>
+                            <span className="text-primary-600 font-semibold">{pkg.price}</span>
+                          </div>
+                          {pkg.description && (
+                            <p className="text-sm text-gray-600 mb-2">{pkg.description}</p>
+                          )}
+                          {pkg.duration && (
+                            <p className="text-xs text-gray-500">Duration: {pkg.duration}</p>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
-                {prospect.visionStatement && (
-                  <div>
-                    <label className="text-sm text-gray-500">Vision Statement</label>
-                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.visionStatement}</p>
-                    </div>
-                  </div>
-                )}
-                {prospect.missionStatement && (
-                  <div>
-                    <label className="text-sm text-gray-500">Mission Statement</label>
-                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-gray-700 whitespace-pre-wrap">{prospect.missionStatement}</p>
-                    </div>
-                  </div>
-                )}
+
+                {/* Legacy Services (for backward compatibility) */}
                 {prospect.servicesInterested.length > 0 && (
-                  <div>
-                    <label className="text-sm text-gray-500">Services Interested</label>
+                  <div className="border-b border-gray-100 pb-4">
+                    <label className="text-sm text-gray-500">Services Interested (Legacy)</label>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {prospect.servicesInterested.map((service, i) => (
                         <span
@@ -965,11 +1275,79 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                   </div>
                 )}
                 {prospect.proposedCostOfServices && (
-                  <div>
-                    <label className="text-sm text-gray-500">Proposed Pricing</label>
+                  <div className="border-b border-gray-100 pb-4">
+                    <label className="text-sm text-gray-500">Proposed Pricing (Legacy)</label>
                     <div className="mt-1 p-3 bg-gray-50 rounded-lg">
                       <p className="text-gray-700 whitespace-pre-wrap">{prospect.proposedCostOfServices}</p>
                     </div>
+                  </div>
+                )}
+
+                {/* Target Audience Section */}
+                {(prospect.idealClient || prospect.uniqueValue || prospect.certifications) && (
+                  <div className="border-b border-gray-100 pb-4">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Target Audience & Differentiators</h3>
+                    {prospect.idealClient && (
+                      <div className="mb-4">
+                        <label className="text-sm text-gray-500">Ideal Client</label>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-gray-700 whitespace-pre-wrap">{prospect.idealClient}</p>
+                        </div>
+                      </div>
+                    )}
+                    {prospect.uniqueValue && (
+                      <div className="mb-4">
+                        <label className="text-sm text-gray-500">What Makes Them Unique</label>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-gray-700 whitespace-pre-wrap">{prospect.uniqueValue}</p>
+                        </div>
+                      </div>
+                    )}
+                    {prospect.certifications && (
+                      <div>
+                        <label className="text-sm text-gray-500">Certifications & Credentials</label>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-gray-700 whitespace-pre-wrap">{prospect.certifications}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Goals Section */}
+                {(prospect.threeYearRevenueGoal || prospect.threeYearClientGoal || prospect.visionStatement || prospect.missionStatement) && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Goals & Vision</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      {prospect.threeYearRevenueGoal && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <label className="text-sm text-green-700 font-medium">3-Year Revenue Goal</label>
+                          <p className="text-lg font-semibold text-green-900 mt-1">{prospect.threeYearRevenueGoal}</p>
+                        </div>
+                      )}
+                      {prospect.threeYearClientGoal && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <label className="text-sm text-blue-700 font-medium">3-Year Client Goal</label>
+                          <p className="text-lg font-semibold text-blue-900 mt-1">{prospect.threeYearClientGoal}</p>
+                        </div>
+                      )}
+                    </div>
+                    {prospect.visionStatement && (
+                      <div className="mb-4">
+                        <label className="text-sm text-gray-500">Vision Statement</label>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-gray-700 whitespace-pre-wrap">{prospect.visionStatement}</p>
+                        </div>
+                      </div>
+                    )}
+                    {prospect.missionStatement && (
+                      <div>
+                        <label className="text-sm text-gray-500">Mission Statement</label>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-gray-700 whitespace-pre-wrap">{prospect.missionStatement}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1105,26 +1483,126 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
               </div>
             </div>
           )}
+        </div>
 
-          {/* Generated Links Section */}
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Status Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Prospect Links</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              Share these links with the prospect to complete their onboarding steps.
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Status</h2>
+            <div className="text-center py-4">
+              <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                prospect.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                prospect.status === 'ACCOUNT_CREATED' ? 'bg-green-100 text-green-800' :
+                'bg-blue-100 text-blue-800'
+              }`}>
+                {STATUS_LABELS[prospect.status]}
+              </div>
+            </div>
+
+            {/* Interview details when scheduled */}
+            {prospect.status === 'INTERVIEW_SCHEDULED' && (
+              <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                {/* Use booking time if available, fallback to interviewScheduledAt */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">Scheduled</label>
+                  <div className="flex items-center text-sm text-gray-900 mt-1">
+                    <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                    {formatDate(prospect.interviewBooking?.startTime || prospect.interviewScheduledAt)}
+                  </div>
+                </div>
+
+                {prospect.interviewBooking?.meetingLink && (
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase tracking-wide">Meeting Link</label>
+                    <a
+                      href={prospect.interviewBooking.meetingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-sm text-primary-600 hover:text-primary-700 mt-1"
+                    >
+                      <Video className="h-4 w-4 mr-2" />
+                      Join Meeting
+                      <ExternalLink className="h-3 w-3 ml-1" />
+                    </a>
+                  </div>
+                )}
+
+                {prospect.interviewBooking?.calendarId && (
+                  <Link
+                    href={`/admin/calendars/${prospect.interviewBooking.calendarId}?returnTo=${encodeURIComponent(`/admin/prospects/${prospect.id}`)}&returnLabel=${encodeURIComponent(`${prospect.firstName} ${prospect.lastName}`)}`}
+                    className="flex items-center justify-center gap-2 w-full px-3 py-2 mt-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    View Calendar
+                  </Link>
+                )}
+
+              </div>
+            )}
+
+            {/* Booking history - shown for any status with bookings */}
+            {prospect.interviewBookingHistory.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <label className="text-xs text-gray-500 uppercase tracking-wide">Booking History</label>
+                <div className="mt-1 space-y-1.5">
+                  {prospect.interviewBookingHistory
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .map(b => {
+                      const isRescheduled = b.status === 'CANCELLED' && b.cancellationReason?.toLowerCase().includes('reschedule')
+                      const isCancelled = b.status === 'CANCELLED' && !isRescheduled
+                      const isCompleted = b.status === 'COMPLETED'
+                      const isNoShow = b.status === 'NO_SHOW'
+                      const isActive = b.status === 'PENDING' || b.status === 'CONFIRMED'
+
+                      return (
+                        <div key={b.id} className={`flex items-center text-xs rounded-md px-2 py-1 ${
+                          isActive ? 'bg-blue-50 text-blue-700' :
+                          isCompleted ? 'bg-green-50 text-green-700' :
+                          isRescheduled ? 'bg-amber-50 text-amber-700' :
+                          isNoShow ? 'bg-orange-50 text-orange-700' :
+                          'bg-red-50 text-red-600'
+                        }`}>
+                          {isActive && <Clock className="h-3 w-3 mr-1.5 flex-shrink-0" />}
+                          {isCompleted && <CheckCircle className="h-3 w-3 mr-1.5 flex-shrink-0" />}
+                          {isRescheduled && <RefreshCw className="h-3 w-3 mr-1.5 flex-shrink-0" />}
+                          {isNoShow && <AlertCircle className="h-3 w-3 mr-1.5 flex-shrink-0" />}
+                          {isCancelled && <XCircle className="h-3 w-3 mr-1.5 flex-shrink-0" />}
+                          <span className={isRescheduled || isCancelled ? 'line-through' : ''}>
+                            {formatDate(b.startTime)}
+                          </span>
+                          <span className="ml-auto font-medium text-[10px] uppercase">
+                            {isActive ? 'Scheduled' :
+                             isCompleted ? 'Attended' :
+                             isRescheduled ? 'Rescheduled' :
+                             isNoShow ? 'No Show' :
+                             'Cancelled'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Prospect Links - Action Panel */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Prospect Links</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Share these links with the prospect to complete onboarding steps.
             </p>
             <div className="space-y-3">
               {/* Orientation Booking Link - show after assessment completion */}
               {prospect.assessmentCompletedAt && !prospect.orientationCompletedAt && (
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div>
-                    <p className="text-sm font-medium text-green-800">Orientation Booking</p>
-                    <p className="text-xs text-green-600">
-                      {prospect.orientationToken
-                        ? 'Prospect can self-schedule their orientation call'
-                        : 'Generate a secure link for the prospect to book orientation'
-                      }
-                    </p>
-                  </div>
+                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm font-medium text-green-800 mb-1">Orientation Booking</p>
+                  <p className="text-xs text-green-600 mb-2">
+                    {prospect.orientationToken
+                      ? 'Self-schedule orientation'
+                      : 'Generate booking link'
+                    }
+                  </p>
                   {prospect.orientationToken ? (
                     <button
                       onClick={() => {
@@ -1132,7 +1610,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                         setModalLink(link)
                         setShowLinkModal('orientation')
                       }}
-                      className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
+                      className="w-full inline-flex items-center justify-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
                     >
                       <Send className="h-4 w-4 mr-1" />
                       View / Send
@@ -1152,7 +1630,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                         setIsLoading(false)
                       }}
                       disabled={isLoading}
-                      className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                      className="w-full inline-flex items-center justify-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
                     >
                       <Send className="h-4 w-4 mr-1" />
                       Generate Link
@@ -1161,41 +1639,82 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                 </div>
               )}
               {prospect.businessFormToken && (
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Business Development Form</p>
-                    <p className="text-xs text-gray-500 truncate max-w-md">
-                      /business-form/{prospect.businessFormToken}
-                    </p>
-                  </div>
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm font-medium text-gray-700 mb-1">Business Form</p>
+                  <p className="text-xs text-gray-500 mb-2 truncate">
+                    {prospect.businessFormSubmittedAt ? 'Submitted' : 'Pending completion'}
+                  </p>
                   <button
                     onClick={() => {
                       const link = `${window.location.origin}/business-form/${prospect.businessFormToken}`
                       setModalLink(link)
                       setShowLinkModal('business-form')
                     }}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
+                    className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
                   >
                     <Send className="h-4 w-4 mr-1" />
                     Send
                   </button>
                 </div>
               )}
+              {/* Biz Dev Interview Booking Link - show after business form submission */}
+              {prospect.businessFormSubmittedAt && !prospect.interviewCompletedAt && (
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-sm font-medium text-amber-800 mb-1">Biz Dev Interview</p>
+                  <p className="text-xs text-amber-600 mb-2">
+                    {prospect.bizDevInterviewToken
+                      ? 'Self-schedule interview'
+                      : 'Generate booking link'
+                    }
+                  </p>
+                  {prospect.bizDevInterviewToken ? (
+                    <button
+                      onClick={() => {
+                        const link = `${window.location.origin}/book/biz-dev-interview/${prospect.bizDevInterviewToken}`
+                        setModalLink(link)
+                        setShowLinkModal('biz-dev-interview')
+                      }}
+                      className="w-full inline-flex items-center justify-center px-3 py-1.5 bg-amber-600 text-white rounded-md text-sm font-medium hover:bg-amber-700"
+                    >
+                      <Send className="h-4 w-4 mr-1" />
+                      View / Send
+                    </button>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        setIsLoading(true)
+                        const result = await generateBizDevInterviewToken(prospect.id)
+                        if (result.error) {
+                          setError(result.error)
+                        } else if (result.token) {
+                          const link = `${window.location.origin}/book/biz-dev-interview/${result.token}`
+                          copyToClipboard(link)
+                          router.refresh()
+                        }
+                        setIsLoading(false)
+                      }}
+                      disabled={isLoading}
+                      className="w-full inline-flex items-center justify-center px-3 py-1.5 bg-amber-600 text-white rounded-md text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      <Send className="h-4 w-4 mr-1" />
+                      Generate Link
+                    </button>
+                  )}
+                </div>
+              )}
               {prospect.acceptanceToken && (
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Acceptance & Payment</p>
-                    <p className="text-xs text-gray-500 truncate max-w-md">
-                      /acceptance/{prospect.acceptanceToken}
-                    </p>
-                  </div>
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm font-medium text-gray-700 mb-1">Acceptance & Payment</p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    {prospect.termsAcceptedAt ? 'Terms accepted' : 'Pending acceptance'}
+                  </p>
                   <button
                     onClick={() => {
                       const link = `${window.location.origin}/acceptance/${prospect.acceptanceToken}`
                       setModalLink(link)
                       setShowLinkModal('acceptance')
                     }}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
+                    className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-white"
                   >
                     <Send className="h-4 w-4 mr-1" />
                     Send
@@ -1204,27 +1723,10 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
               )}
               {/* Show message if no links available yet */}
               {!prospect.assessmentCompletedAt && !prospect.businessFormToken && !prospect.acceptanceToken && (
-                <p className="text-sm text-gray-500 italic">
-                  Links will appear here as the prospect progresses through onboarding.
+                <p className="text-xs text-gray-500 italic">
+                  Links will appear as the prospect progresses.
                 </p>
               )}
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Status Card */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Status</h2>
-            <div className="text-center py-4">
-              <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
-                prospect.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                prospect.status === 'ACCOUNT_CREATED' ? 'bg-green-100 text-green-800' :
-                'bg-blue-100 text-blue-800'
-              }`}>
-                {STATUS_LABELS[prospect.status]}
-              </div>
             </div>
           </div>
 
@@ -1403,40 +1905,101 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
         </div>
       )}
 
-      {/* Schedule Interview Modal */}
+      {/* Schedule Biz Dev Interview Modal */}
       {showScheduleModal === 'interview' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Schedule Interview
-            </h3>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {isRescheduling ? 'Reschedule Biz Dev Interview' : 'Schedule Biz Dev Interview'}
+              </h3>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Pick a date and time for the interview with {prospect.firstName} {prospect.lastName}.
+            </p>
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date & Time
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                 <input
-                  type="datetime-local"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  type="date"
+                  value={interviewDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setInterviewDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
                 />
               </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowScheduleModal(null)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleScheduleInterview}
-                  disabled={!scheduledDate || isLoading}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
-                >
-                  {isLoading ? 'Scheduling...' : 'Schedule'}
-                </button>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    value={interviewStartTime}
+                    onChange={(e) => {
+                      setInterviewStartTime(e.target.value)
+                      // Auto-set end time to 1 hour later
+                      if (e.target.value) {
+                        const [h, m] = e.target.value.split(':').map(Number)
+                        const endH = (h + 1) % 24
+                        setInterviewEndTime(`${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                  <input
+                    type="time"
+                    value={interviewEndTime}
+                    min={interviewStartTime}
+                    onChange={(e) => setInterviewEndTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                  />
+                </div>
               </div>
+
+              {/* Preview */}
+              {interviewDate && interviewStartTime && interviewEndTime && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm font-medium text-amber-800">
+                    {new Date(interviewDate + 'T00:00:00').toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </p>
+                  <p className="text-sm text-amber-700">
+                    {new Date(`2000-01-01T${interviewStartTime}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    {' - '}
+                    {new Date(`2000-01-01T${interviewEndTime}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+              <button
+                onClick={() => {
+                  setShowScheduleModal(null)
+                  setIsRescheduling(false)
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleScheduleInterview}
+                disabled={!interviewDate || !interviewStartTime || !interviewEndTime || isLoading}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+              >
+                {isLoading ? (isRescheduling ? 'Rescheduling...' : 'Scheduling...') : (isRescheduling ? 'Reschedule Interview' : 'Schedule Interview')}
+              </button>
             </div>
           </div>
         </div>
@@ -1487,6 +2050,245 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
                     Delete Prospect
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Interview Confirmation Modal */}
+      {showCancelInterviewConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Cancel Interview
+              </h3>
+            </div>
+            <p className="text-gray-600 mb-2">
+              Are you sure you want to cancel the Biz Dev Interview?
+            </p>
+            {prospect.interviewScheduledAt && (
+              <p className="text-sm text-gray-500 mb-4">
+                Scheduled for <strong>{formatDate(prospect.interviewScheduledAt)}</strong>
+              </p>
+            )}
+            <p className="text-sm text-amber-600 mb-6">
+              The booking will be cancelled and the prospect will be moved back to &quot;Business Form Submitted&quot; status.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowCancelInterviewConfirm(false)}
+                disabled={isCancellingInterview}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Keep Interview
+              </button>
+              <button
+                onClick={handleCancelInterview}
+                disabled={isCancellingInterview}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              >
+                {isCancellingInterview ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin inline" />
+                    Cancelling...
+                  </>
+                ) : (
+                  'Cancel Interview'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interview Decision Modal */}
+      {showDecisionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                showDecisionModal === 'APPROVED' ? 'bg-green-100' : 'bg-red-100'
+              }`}>
+                {showDecisionModal === 'APPROVED' ? (
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-600" />
+                )}
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {showDecisionModal === 'APPROVED' ? 'Approve Prospect' : 'Reject Prospect'}
+              </h3>
+            </div>
+            <p className="text-gray-600 mb-4">
+              {showDecisionModal === 'APPROVED'
+                ? `Are you sure you want to approve ${prospect.firstName} ${prospect.lastName}? They will move to the acceptance and payment stage.`
+                : `Are you sure you want to reject ${prospect.firstName} ${prospect.lastName}? This will end their onboarding process.`
+              }
+            </p>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <textarea
+                value={decisionNotes}
+                onChange={(e) => setDecisionNotes(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                placeholder={showDecisionModal === 'APPROVED'
+                  ? 'e.g. Strong business plan, great interview...'
+                  : 'e.g. Reason for rejection...'
+                }
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowDecisionModal(null)
+                  setDecisionNotes('')
+                }}
+                disabled={isLoading}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCompleteInterview}
+                disabled={isLoading}
+                className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white disabled:opacity-50 ${
+                  showDecisionModal === 'APPROVED'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin inline" />
+                    Processing...
+                  </>
+                ) : showDecisionModal === 'APPROVED' ? (
+                  'Confirm Approval'
+                ) : (
+                  'Confirm Rejection'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revert Decision Modal */}
+      {showRevertModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <RefreshCw className="h-5 w-5 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Revert Decision
+              </h3>
+            </div>
+
+            <p className="text-gray-600 mb-4">
+              Revert the {prospect.status === 'REJECTED' ? 'rejection' : 'approval'} of <strong>{prospect.firstName} {prospect.lastName}</strong>? Decision notes will be cleared.
+            </p>
+
+            {/* Loading state */}
+            {isCheckingBooking && (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-amber-600 mr-2" />
+                <span className="text-sm text-gray-500">Checking prior appointment...</span>
+              </div>
+            )}
+
+            {/* Prior booking IS available */}
+            {!isCheckingBooking && priorBookingInfo?.available && priorBookingInfo.booking && (
+              <div className="space-y-3">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-800">Prior appointment is available</span>
+                  </div>
+                  <div className="flex items-center text-sm text-green-700">
+                    <Calendar className="h-4 w-4 mr-2 text-green-500" />
+                    {formatDate(priorBookingInfo.booking.startTime)}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => handleRevertDecision(true)}
+                    disabled={isReverting}
+                    className="w-full px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {isReverting ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin inline" />Restoring...</>
+                    ) : (
+                      <><CheckCircle className="h-4 w-4 mr-2 inline" />Restore This Appointment</>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleRevertDecision(false)}
+                    disabled={isReverting}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {isReverting ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin inline" />Processing...</>
+                    ) : (
+                      <><Calendar className="h-4 w-4 mr-2 inline" />Schedule a New Interview</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Prior booking NOT available */}
+            {!isCheckingBooking && priorBookingInfo && !priorBookingInfo.available && (
+              <div className="space-y-3">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm font-medium text-amber-800">Prior appointment unavailable</span>
+                  </div>
+                  <p className="text-xs text-amber-700">
+                    {priorBookingInfo.reason === 'past'
+                      ? 'The previous appointment date has already passed.'
+                      : priorBookingInfo.reason === 'taken'
+                        ? 'The previous time slot has been booked by someone else.'
+                        : priorBookingInfo.reason === 'moved'
+                          ? 'The calendar event has been moved to a different time.'
+                          : priorBookingInfo.reason === 'deleted'
+                            ? 'The calendar slot no longer exists.'
+                            : 'No prior appointment was found.'}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => handleRevertDecision(false)}
+                  disabled={isReverting}
+                  className="w-full px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {isReverting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin inline" />Processing...</>
+                  ) : (
+                    <><Calendar className="h-4 w-4 mr-2 inline" />Revert &amp; Schedule New Interview</>
+                  )}
+                </button>
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowRevertModal(false)}
+                disabled={isReverting}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
               </button>
             </div>
           </div>

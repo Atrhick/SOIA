@@ -5,9 +5,10 @@ import { CalendarDetailClient } from './calendar-detail-client'
 
 interface PageProps {
   params: { id: string }
+  searchParams: { returnTo?: string; returnLabel?: string }
 }
 
-export default async function CalendarDetailPage({ params }: PageProps) {
+export default async function CalendarDetailPage({ params, searchParams }: PageProps) {
   const session = await auth()
 
   if (!session || session.user.role !== 'ADMIN') {
@@ -36,11 +37,17 @@ export default async function CalendarDetailPage({ params }: PageProps) {
     }),
   ])
 
+  // Validate returnTo is a safe internal path
+  const returnTo = searchParams.returnTo?.startsWith('/admin/') ? searchParams.returnTo : undefined
+  const returnLabel = returnTo ? (searchParams.returnLabel || 'Back') : undefined
+
   return (
     <CalendarDetailClient
       calendar={calendarResult.calendar}
       bookings={bookingsResult.bookings || []}
       events={eventsResult.events || []}
+      returnTo={returnTo}
+      returnLabel={returnLabel}
     />
   )
 }

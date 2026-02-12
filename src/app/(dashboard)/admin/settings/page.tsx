@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { getSitePages } from '@/lib/actions/site-pages'
 import { SettingsClient } from './settings-client'
 
 async function getSystemStats() {
@@ -49,7 +50,15 @@ export default async function SettingsPage() {
     redirect('/login')
   }
 
-  const stats = await getSystemStats()
+  const [stats, sitePagesResult] = await Promise.all([
+    getSystemStats(),
+    getSitePages(),
+  ])
 
-  return <SettingsClient stats={stats} />
+  return (
+    <SettingsClient
+      stats={stats}
+      sitePages={sitePagesResult.pages || []}
+    />
+  )
 }

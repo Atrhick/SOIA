@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { PaymentMethod, ProspectPaymentStatus } from '@prisma/client'
 
-const PROGRAM_FEE = parseFloat(process.env.COACH_PROGRAM_FEE || '500')
+const PROGRAM_FEE = parseFloat(process.env.COACH_PROGRAM_FEE || '1500')
 
 // ============================================
 // INITIALIZE PAYMENT

@@ -15,7 +15,7 @@ export function ManualPaymentClient() {
   const token = searchParams.get('token')
   const [copied, setCopied] = useState<string | null>(null)
 
-  const programFee = process.env.NEXT_PUBLIC_COACH_PROGRAM_FEE || '500'
+  const programFee = process.env.NEXT_PUBLIC_COACH_PROGRAM_FEE || '1500'
 
   const bankDetails = {
     bankName: 'StageOneInAction Bank',

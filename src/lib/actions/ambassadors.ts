@@ -44,33 +44,36 @@ export async function createAmbassador(formData: FormData) {
   }
 
   try {
-    const ambassador = await prisma.ambassador.create({
-      data: {
-        coachId: coachProfile.id,
-        firstName: validated.data.firstName,
-        lastName: validated.data.lastName,
-        email: validated.data.email || null,
-        phone: validated.data.phone || null,
-        region: validated.data.region || null,
-        notes: validated.data.notes || null,
-        status: 'PENDING',
-        assessmentStatus: 'NOT_SUBMITTED',
-      },
-    })
+    const result = await prisma.$transaction(async (tx) => {
+      const ambassador = await tx.ambassador.create({
+        data: {
+          coachId: coachProfile.id,
+          firstName: validated.data.firstName,
+          lastName: validated.data.lastName,
+          email: validated.data.email || null,
+          phone: validated.data.phone || null,
+          region: validated.data.region || null,
+          notes: validated.data.notes || null,
+          status: 'PENDING',
+          assessmentStatus: 'NOT_SUBMITTED',
+        },
+      })
 
-    // Log the action
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: 'CREATE_AMBASSADOR',
-        entityType: 'Ambassador',
-        entityId: ambassador.id,
-        details: `Created ambassador: ${validated.data.firstName} ${validated.data.lastName}`,
-      },
+      await tx.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: 'CREATE_AMBASSADOR',
+          entityType: 'Ambassador',
+          entityId: ambassador.id,
+          details: `Created ambassador: ${validated.data.firstName} ${validated.data.lastName}`,
+        },
+      })
+
+      return ambassador
     })
 
     revalidatePath('/coach/ambassadors')
-    return { success: true, ambassadorId: ambassador.id }
+    return { success: true, ambassadorId: result.id }
   } catch (error) {
     console.error('Error creating ambassador:', error)
     return { error: 'Failed to create ambassador' }
@@ -161,19 +164,20 @@ export async function deleteAmbassador(ambassadorId: string) {
   }
 
   try {
-    await prisma.ambassador.delete({
-      where: { id: ambassadorId },
-    })
+    await prisma.$transaction(async (tx) => {
+      await tx.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: 'DELETE_AMBASSADOR',
+          entityType: 'Ambassador',
+          entityId: ambassadorId,
+          details: `Deleted ambassador: ${ambassador.firstName} ${ambassador.lastName}`,
+        },
+      })
 
-    // Log the action
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: 'DELETE_AMBASSADOR',
-        entityType: 'Ambassador',
-        entityId: ambassadorId,
-        details: `Deleted ambassador: ${ambassador.firstName} ${ambassador.lastName}`,
-      },
+      await tx.ambassador.delete({
+        where: { id: ambassadorId },
+      })
     })
 
     revalidatePath('/coach/ambassadors')
@@ -195,20 +199,21 @@ export async function updateAmbassadorStatus(
   }
 
   try {
-    const ambassador = await prisma.ambassador.update({
-      where: { id: ambassadorId },
-      data: { status },
-    })
+    await prisma.$transaction(async (tx) => {
+      await tx.ambassador.update({
+        where: { id: ambassadorId },
+        data: { status },
+      })
 
-    // Log the action
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: 'UPDATE_AMBASSADOR_STATUS',
-        entityType: 'Ambassador',
-        entityId: ambassadorId,
-        details: `Updated status to: ${status}`,
-      },
+      await tx.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: 'UPDATE_AMBASSADOR_STATUS',
+          entityType: 'Ambassador',
+          entityId: ambassadorId,
+          details: `Updated status to: ${status}`,
+        },
+      })
     })
 
     revalidatePath('/admin/ambassadors')

@@ -32,11 +32,13 @@ interface Prospect {
 interface Props {
   prospect: Prospect
   token: string
+  acceptanceLetter?: string
+  refundPolicyText?: string
 }
 
 type PaymentMethod = 'stripe' | 'paypal' | 'manual'
 
-export function AcceptanceClient({ prospect, token }: Props) {
+export function AcceptanceClient({ prospect, token, acceptanceLetter, refundPolicyText }: Props) {
   const router = useRouter()
   const [step, setStep] = useState<'terms' | 'payment'>(prospect.termsAcceptedAt ? 'payment' : 'terms')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -50,7 +52,7 @@ export function AcceptanceClient({ prospect, token }: Props) {
   // Payment state
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null)
 
-  const programFee = process.env.NEXT_PUBLIC_COACH_PROGRAM_FEE || '500'
+  const programFee = process.env.NEXT_PUBLIC_COACH_PROGRAM_FEE || '1500'
 
   const handleAcceptTerms = async () => {
     if (!termsAccepted || !privacyAccepted || !nonRefundAcknowledged) {
@@ -151,24 +153,18 @@ export function AcceptanceClient({ prospect, token }: Props) {
             <p className="text-gray-700">
               Dear {prospect.firstName},
             </p>
-            <p className="text-gray-700">
-              We are pleased to welcome you to the StageOneInAction Coaching Program.
-              As a member of our community, you will have access to comprehensive training,
-              resources, and support to build your coaching practice.
-            </p>
-            <p className="text-gray-700">
-              The program fee is <strong>${programFee} USD</strong> and includes:
-            </p>
-            <ul className="text-gray-700">
-              <li>Complete coaching certification program</li>
-              <li>Personal development workbook</li>
-              <li>Access to our coaching platform</li>
-              <li>Ongoing mentorship and support</li>
-              <li>Marketing and business development resources</li>
-            </ul>
-            <p className="text-gray-700">
-              Please review and accept the following terms to proceed.
-            </p>
+            <div className="text-gray-700 whitespace-pre-wrap">
+              {acceptanceLetter || `We are pleased to welcome you to the StageOneInAction Coaching Program. As a member of our community, you will have access to comprehensive training, resources, and support to build your coaching practice.
+
+The program fee is $${programFee} USD and includes:
+- Complete coaching certification program
+- Personal development workbook
+- Access to our coaching platform
+- Ongoing mentorship and support
+- Marketing and business development resources
+
+Please review and accept the following terms to proceed.`}
+            </div>
           </div>
 
           {/* Terms Checkboxes */}
@@ -228,7 +224,7 @@ export function AcceptanceClient({ prospect, token }: Props) {
                   <span className="font-medium text-gray-900">Non-Refundable Policy</span>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">
-                  I understand that the program fee is <strong>non-refundable</strong> once payment is made.
+                  {refundPolicyText || 'I understand that the program fee is non-refundable once payment is made.'}
                 </p>
               </div>
             </label>

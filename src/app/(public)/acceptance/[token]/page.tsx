@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getProspectByToken } from '@/lib/actions/prospects'
+import { getSitePage } from '@/lib/actions/site-pages'
 import { AcceptanceClient } from './acceptance-client'
 
 export default async function AcceptancePage({
@@ -29,5 +30,18 @@ export default async function AcceptancePage({
     )
   }
 
-  return <AcceptanceClient prospect={result.prospect} token={params.token} />
+  // Fetch dynamic page content
+  const [acceptanceLetterResult, refundPolicyResult] = await Promise.all([
+    getSitePage('acceptance-letter'),
+    getSitePage('refund-policy'),
+  ])
+
+  return (
+    <AcceptanceClient
+      prospect={result.prospect}
+      token={params.token}
+      acceptanceLetter={acceptanceLetterResult.page?.content || ''}
+      refundPolicyText={refundPolicyResult.page?.content || ''}
+    />
+  )
 }

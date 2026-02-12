@@ -16,6 +16,23 @@ This is a **Next.js 14** web application for managing coaches and ambassadors in
 - **Admin-Configurable Business Tools**: 6 feature modules (CRM, Project Management, Collaboration, Time Clock, Scheduling, Knowledge Base) with per-role and per-user access control
 - **User Management**: Admins can create user accounts and configure per-user feature permissions (grant/deny access)
 
+## Current Work: Feature Analysis
+
+**IMPORTANT:** We are conducting a feature-by-feature review to verify business logic and functionality.
+
+**Reference Document:** `docs/PROJECT_PLAN.md` - Contains the "Feature Analysis & Business Logic Review" section
+
+**Current Status:**
+- Feature 1: Authentication - ❓ Needs Clarification (business logic questions documented)
+- Features 2-24: ⏳ Pending Review
+
+**To Continue:**
+1. Open `docs/PROJECT_PLAN.md` and find the "Feature Analysis" section
+2. Review the pending questions for Authentication (or next feature in queue)
+3. User provides answers to business logic questions
+4. Verify implementation matches requirements
+5. Update feature status and move to next feature
+
 ## Tech Stack
 
 - **Framework:** Next.js 14 with App Router
@@ -600,9 +617,9 @@ await createManualProspect({
 **Prospect Detail Page - Inline Data Display:**
 The prospect detail page shows ALL submitted data inline (not in modals) for easy review:
 - **Assessment Responses** - Auto-loaded on page mount, shows question/answer pairs
-- **Business Development Form** - Company name, bio, services, pricing (if submitted)
+- **Business Development Form** - Company name, tagline, business type (displays custom value if "Other" was selected), bio, online presence, services, pricing, goals (if submitted)
 - **Orientation Information** - Date and notes
-- **Interview Information** - Date and notes
+- **Biz Dev Interview Information** - Date and notes
 - **Terms & Payment** - Terms acceptance timestamp and payment details
 
 **Assessment Fallback Lookup:**
@@ -615,9 +632,45 @@ For older prospects that may not have `assessmentSubmissionId` populated:
 **Business Development Form:**
 - Public form accessed via token (no login required)
 - Route: `/business-form/[token]`
-- Fields: Company name, bio, vision/mission statements, services, pricing
-- **"Other" service option** - Prospects can select "Other" and enter a custom service not in the predefined list
-- Predefined services: Life Coaching, Mentoring Services, Training & Workshops, Business Consulting, Public Speaking, Writing & Content
+- Multi-step form with 5 sections: Business Identity, Online Presence, Services & Packages, Target Audience, Goals
+- Auto-saves progress every 3 seconds with debouncing
+- **"Other" business type option** - When "Other" is selected under Business Type, a text input appears to enter a custom business type (stored in `businessTypeOther` field)
+- Predefined business types: Life Coaching, Business Coaching, Executive Coaching, Health & Wellness Coaching, Career Coaching, Relationship Coaching, Financial Coaching, Consulting, Training & Workshops, Speaking & Keynotes, Other
+- **Website URL** - Accepts URLs with or without `https://` prefix (auto-prepends if missing)
+- **Save & Exit** - Shows confirmation dialog with options to continue editing or copy link for later
+- **Resume Support** - Prospects can return to the same link and continue where they left off
+
+**Link Modal with Email:**
+When admin generates or views prospect links (business form, orientation, acceptance), a modal appears with:
+- Copy Link button to copy the URL to clipboard
+- Send Email button that opens the user's email client with pre-filled subject and body
+- The modal displays the full link for reference
+
+**Key State in prospect-detail-client.tsx:**
+```typescript
+const [showLinkModal, setShowLinkModal] = useState<'business-form' | 'orientation' | 'acceptance' | null>(null)
+const [modalLink, setModalLink] = useState<string | null>(null)
+
+const handleSendEmail = (link: string, type: 'business-form' | 'orientation' | 'acceptance') => {
+  const subject = type === 'business-form'
+    ? 'Complete Your Business Development Form - Stage One In Action'
+    : type === 'orientation'
+      ? 'Schedule Your Orientation - Stage One In Action'
+      : 'Acceptance Letter & Payment - Stage One In Action'
+  // Opens mailto: link with pre-filled content
+}
+```
+
+**Token-Based Orientation Booking:**
+- Route: `/book/orientation/[token]`
+- Prospects can book orientation appointments using their `orientationToken`
+- Links to the coach's orientation calendar
+- Creates CalendarBooking with prospect's info
+
+**Program Fee:**
+- Environment variable: `COACH_PROGRAM_FEE` (server-side) and `NEXT_PUBLIC_COACH_PROGRAM_FEE` (client-side)
+- Default value: `1500` USD
+- Used in acceptance page and payment processing
 
 ## Surveys & Quizzes
 
@@ -1038,3 +1091,80 @@ The learning client components accept a `basePath` prop for role-agnostic naviga
   basePath="/ambassador/learning"
 />
 ```
+
+## Calendar Events as Bookable Availability
+
+CalendarEvents can be used as bookable availability for prospects. When an admin creates a CalendarEvent on a calendar, it automatically becomes available as a bookable slot.
+
+**Key files:**
+- `src/lib/actions/admin-calendars.ts` - Modified to include events as bookable slots
+
+**How It Works:**
+- `getAvailableDatesForMonth()` fetches CalendarEvents and includes dates with events in the available dates
+- `getAvailableSlots()` returns events as slots with `id: event_${event.id}` prefix
+- `createPublicBooking()` handles event bookings when slotId starts with `event_`
+- Events have a capacity of 1 by default
+
+**Database Changes:**
+```prisma
+model CalendarBooking {
+  ...
+  eventId         String?
+  event           CalendarEvent?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  ...
+}
+
+model CalendarEvent {
+  ...
+  bookings       CalendarBooking[]
+  ...
+}
+```
+
+## Migration API Endpoint
+
+A secure endpoint for running database migrations on production without direct database access.
+
+**Key file:** `src/app/api/admin/migrate/route.ts`
+
+**Endpoint:** `GET/POST /api/admin/migrate`
+- GET: Returns migration status (pending, completed, available migrations)
+- POST: Runs all pending migrations
+
+**Authentication:**
+- Admin session (via NextAuth)
+- Or `MIGRATION_SECRET` environment variable in `x-migration-secret` header
+
+**Adding New Migrations:**
+```typescript
+const MIGRATIONS = [
+  {
+    id: '2026_01_21_add_orientation_token',
+    description: 'Add orientationToken to Prospect',
+    sql: 'ALTER TABLE "Prospect" ADD COLUMN IF NOT EXISTS "orientationToken" TEXT',
+  },
+  // Add more migrations here
+]
+```
+
+**Usage:**
+```bash
+# Check migration status
+curl -H "x-migration-secret: YOUR_SECRET" https://your-app.com/api/admin/migrate
+
+# Run pending migrations
+curl -X POST -H "x-migration-secret: YOUR_SECRET" https://your-app.com/api/admin/migrate
+```
+
+## Environment Variables
+
+Key environment variables for the application:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | - |
+| `NEXTAUTH_SECRET` | Secret for NextAuth JWT | - |
+| `NEXTAUTH_URL` | Application URL | http://localhost:3000 |
+| `COACH_PROGRAM_FEE` | Program fee in USD (server-side) | 1500 |
+| `NEXT_PUBLIC_COACH_PROGRAM_FEE` | Program fee in USD (client-side) | 1500 |
+| `MIGRATION_SECRET` | Secret for migration API authentication | - |

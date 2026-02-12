@@ -73,8 +73,8 @@ const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string; icon
   ORIENTATION_COMPLETED: { label: 'Orientation Completed', color: 'bg-purple-100 text-purple-800', icon: CheckCircle },
   BUSINESS_FORM_PENDING: { label: 'Business Form Pending', color: 'bg-yellow-100 text-yellow-800', icon: FileText },
   BUSINESS_FORM_SUBMITTED: { label: 'Business Form Submitted', color: 'bg-yellow-100 text-yellow-800', icon: CheckCircle },
-  INTERVIEW_SCHEDULED: { label: 'Interview Scheduled', color: 'bg-orange-100 text-orange-800', icon: Calendar },
-  INTERVIEW_COMPLETED: { label: 'Interview Completed', color: 'bg-orange-100 text-orange-800', icon: CheckCircle },
+  INTERVIEW_SCHEDULED: { label: 'Biz Dev Interview Scheduled', color: 'bg-orange-100 text-orange-800', icon: Calendar },
+  INTERVIEW_COMPLETED: { label: 'Biz Dev Interview Completed', color: 'bg-orange-100 text-orange-800', icon: CheckCircle },
   APPROVED: { label: 'Approved', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-800', icon: XCircle },
   ACCEPTANCE_PENDING: { label: 'Acceptance Pending', color: 'bg-indigo-100 text-indigo-800', icon: FileText },
@@ -252,7 +252,7 @@ export function ProspectsClient({ prospects, stats }: ProspectsClientProps) {
             <Calendar className="h-8 w-8 text-orange-500" />
             <span className="text-2xl font-bold text-gray-900">{stats.interviewPending}</span>
           </div>
-          <p className="text-sm text-gray-500 mt-2">Pending Interviews</p>
+          <p className="text-sm text-gray-500 mt-2">Pending Biz Dev Interviews</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">

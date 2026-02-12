@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { CalendarType, CalendarVisibility, BookingStatus } from '@prisma/client'
+import { calendarEvents } from '@/lib/calendar-events'
 
 // ============================================
 // ADMIN CALENDAR MANAGEMENT
@@ -51,6 +52,7 @@ export async function createAdminCalendar(data: {
   slotDurationMinutes?: number
   bufferMinutes?: number
   maxBookingsPerSlot?: number
+  maxBookingDays?: number
   requiresApproval?: boolean
   isPublicBookable?: boolean
   publicSlug?: string
@@ -81,6 +83,7 @@ export async function createAdminCalendar(data: {
         slotDurationMinutes: data.slotDurationMinutes || 60,
         bufferMinutes: data.bufferMinutes || 0,
         maxBookingsPerSlot: data.maxBookingsPerSlot || 1,
+        maxBookingDays: data.maxBookingDays ?? 14,
         requiresApproval: data.requiresApproval || false,
         isPublicBookable: data.isPublicBookable || false,
         publicSlug: data.publicSlug,
@@ -107,6 +110,7 @@ export async function updateAdminCalendar(
     slotDurationMinutes?: number
     bufferMinutes?: number
     maxBookingsPerSlot?: number
+    maxBookingDays?: number | null
     requiresApproval?: boolean
     isPublicBookable?: boolean
     publicSlug?: string
@@ -245,6 +249,10 @@ export async function addCalendarSlot(data: {
     })
 
     revalidatePath(`/admin/calendars/${data.calendarId}`)
+
+    // Emit real-time update
+    calendarEvents.emit(data.calendarId, { type: 'slot_added', payload: { slotId: slot.id } })
+
     return { slot }
   } catch (error) {
     console.error('Error adding slot:', error)
@@ -299,6 +307,10 @@ export async function deleteCalendarSlot(slotId: string) {
     })
 
     revalidatePath(`/admin/calendars/${slot.calendarId}`)
+
+    // Emit real-time update
+    calendarEvents.emit(slot.calendarId, { type: 'slot_deleted', payload: { slotId } })
+
     return { success: true }
   } catch (error) {
     console.error('Error deleting slot:', error)
@@ -317,9 +329,11 @@ export async function addCalendarEvent(data: {
   startTime: string
   endTime: string
   isAllDay?: boolean
+  timezone?: string
   location?: string
   isOnline?: boolean
   meetingLink?: string
+  seriesId?: string
 }) {
   const session = await auth()
   if (!session || session.user.role !== 'ADMIN') {
@@ -329,20 +343,27 @@ export async function addCalendarEvent(data: {
   try {
     const event = await prisma.calendarEvent.create({
       data: {
-        adminCalendarId: data.calendarId,
+        adminCalendar: { connect: { id: data.calendarId } },
         creatorId: session.user.id,
         title: data.title,
         description: data.description,
         startTime: new Date(data.startTime),
         endTime: new Date(data.endTime),
         isAllDay: data.isAllDay || false,
+        timezone: data.timezone || 'America/Los_Angeles',
         location: data.location,
         isOnline: data.isOnline || false,
         meetingLink: data.meetingLink,
+        isRecurring: !!data.seriesId,
+        seriesId: data.seriesId,
       },
     })
 
     revalidatePath(`/admin/calendars/${data.calendarId}`)
+
+    // Emit real-time update
+    calendarEvents.emit(data.calendarId, { type: 'event_added', payload: { eventId: event.id } })
+
     return { event }
   } catch (error) {
     console.error('Error adding event:', error)
@@ -358,6 +379,7 @@ export async function updateCalendarEvent(
     startTime?: string
     endTime?: string
     isAllDay?: boolean
+    timezone?: string
     location?: string
     isOnline?: boolean
     meetingLink?: string
@@ -369,22 +391,64 @@ export async function updateCalendarEvent(
   }
 
   try {
+    const newStartTime = data.startTime ? new Date(data.startTime) : undefined
+    const newEndTime = data.endTime ? new Date(data.endTime) : undefined
+
     const event = await prisma.calendarEvent.update({
       where: { id: eventId },
       data: {
         title: data.title,
         description: data.description,
-        startTime: data.startTime ? new Date(data.startTime) : undefined,
-        endTime: data.endTime ? new Date(data.endTime) : undefined,
+        startTime: newStartTime,
+        endTime: newEndTime,
         isAllDay: data.isAllDay,
+        timezone: data.timezone,
         location: data.location,
         isOnline: data.isOnline,
         meetingLink: data.meetingLink,
       },
     })
 
+    // If the event time changed, update any active bookings linked to this event
+    if (newStartTime || newEndTime) {
+      const activeBookings = await prisma.calendarBooking.findMany({
+        where: {
+          eventId,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+        },
+      })
+
+      for (const booking of activeBookings) {
+        await prisma.calendarBooking.update({
+          where: { id: booking.id },
+          data: {
+            startTime: newStartTime || booking.startTime,
+            endTime: newEndTime || booking.endTime,
+            bookingDate: newStartTime || booking.bookingDate,
+          },
+        })
+
+        // If booking is linked to a prospect, update interviewScheduledAt
+        if (booking.prospectId && newStartTime) {
+          await prisma.prospect.updateMany({
+            where: {
+              id: booking.prospectId,
+              status: 'INTERVIEW_SCHEDULED',
+            },
+            data: {
+              interviewScheduledAt: newStartTime,
+            },
+          })
+          revalidatePath(`/admin/prospects/${booking.prospectId}`)
+        }
+      }
+    }
+
     if (event.adminCalendarId) {
       revalidatePath(`/admin/calendars/${event.adminCalendarId}`)
+
+      // Emit real-time update
+      calendarEvents.emit(event.adminCalendarId, { type: 'event_updated', payload: { eventId: event.id } })
     }
     return { event }
   } catch (error) {
@@ -406,6 +470,9 @@ export async function deleteCalendarEvent(eventId: string) {
 
     if (event.adminCalendarId) {
       revalidatePath(`/admin/calendars/${event.adminCalendarId}`)
+
+      // Emit real-time update
+      calendarEvents.emit(event.adminCalendarId, { type: 'event_deleted', payload: { eventId } })
     }
     return { success: true }
   } catch (error) {
@@ -454,6 +521,7 @@ export async function getCalendarBookings(calendarId: string, dateRange?: { star
     return {
       bookings: bookings.map((b) => ({
         ...b,
+        eventId: b.eventId,
         bookingDate: b.bookingDate.toISOString(),
         startTime: b.startTime.toISOString(),
         endTime: b.endTime.toISOString(),
@@ -504,6 +572,10 @@ export async function updateBookingStatus(
     })
 
     revalidatePath(`/admin/calendars/${booking.calendarId}`)
+
+    // Emit real-time update
+    calendarEvents.emit(booking.calendarId, { type: 'booking_updated', payload: { bookingId, status } })
+
     return { booking }
   } catch (error) {
     console.error('Error updating booking status:', error)
@@ -579,9 +651,20 @@ export async function getAvailableDatesForMonth(calendarId: string, year: number
 
     // Get the first and last day of the month
     const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
+    let lastDay = new Date(year, month + 1, 0)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+
+    // Calculate max booking date based on calendar's maxBookingDays setting
+    let maxBookingDate: Date | null = null
+    if (calendar.maxBookingDays && calendar.maxBookingDays > 0) {
+      maxBookingDate = new Date(today)
+      maxBookingDate.setDate(maxBookingDate.getDate() + calendar.maxBookingDays)
+      // If maxBookingDate is before end of month, use it as the limit
+      if (maxBookingDate < lastDay) {
+        lastDay = maxBookingDate
+      }
+    }
 
     // Get all existing bookings for this month
     const existingBookings = await prisma.calendarBooking.findMany({
@@ -673,7 +756,11 @@ export async function getAvailableDatesForMonth(calendarId: string, year: number
     }
 
     console.log('[getAvailableDatesForMonth] Found available dates:', availableDates.length, availableDates.slice(0, 5))
-    return { availableDates }
+    return {
+      availableDates,
+      maxBookingDays: calendar.maxBookingDays,
+      maxBookingDate: maxBookingDate?.toISOString() || null,
+    }
   } catch (error) {
     console.error('Error fetching available dates:', error)
     return { error: 'Failed to fetch available dates' }
@@ -705,6 +792,18 @@ export async function getAvailableSlots(calendarId: string, date: string) {
 
     if (!calendar) {
       return { error: 'Calendar not found' }
+    }
+
+    // Validate date is within booking window
+    if (calendar.maxBookingDays && calendar.maxBookingDays > 0) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const maxBookingDate = new Date(today)
+      maxBookingDate.setDate(maxBookingDate.getDate() + calendar.maxBookingDays)
+
+      if (targetDate > maxBookingDate) {
+        return { error: 'This date is outside the booking window' }
+      }
     }
 
     console.log('[getAvailableSlots] Found slots:', calendar.slots.length, calendar.slots.map(s => ({ id: s.id, dayOfWeek: s.dayOfWeek, time: s.startTime })))
@@ -793,6 +892,7 @@ export async function createPublicBooking(data: {
   bookerPhone?: string
   prospectId?: string
   notes?: string
+  bookingType?: 'orientation' | 'biz-dev-interview'
 }) {
   try {
     const bookingDate = new Date(data.date + 'T00:00:00')
@@ -803,6 +903,23 @@ export async function createPublicBooking(data: {
     let calendarCreatedBy: string | null = null
     let actualSlotId: string | null = null
     let actualEventId: string | null = null
+
+    // Validate booking date is within the calendar's booking window
+    const calendar = await prisma.adminCalendar.findUnique({
+      where: { id: data.calendarId },
+      select: { maxBookingDays: true },
+    })
+
+    if (calendar?.maxBookingDays && calendar.maxBookingDays > 0) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const maxBookingDate = new Date(today)
+      maxBookingDate.setDate(maxBookingDate.getDate() + calendar.maxBookingDays)
+
+      if (bookingDate > maxBookingDate) {
+        return { error: 'This date is outside the booking window. Please select an earlier date.' }
+      }
+    }
 
     // Check if this is an event booking (slotId starts with 'event_')
     if (data.slotId.startsWith('event_')) {
@@ -893,41 +1010,94 @@ export async function createPublicBooking(data: {
       },
     })
 
-    // If this is a prospect booking orientation, update prospect status
+    // If this is a prospect booking, update prospect status based on booking type
     if (data.prospectId) {
-      await prisma.prospect.update({
+      const prospect = await prisma.prospect.findUnique({
         where: { id: data.prospectId },
-        data: {
-          orientationScheduledAt: startTime,
-          status: 'ORIENTATION_SCHEDULED',
-        },
+        select: { status: true },
       })
 
-      // Add status history
-      await prisma.prospectStatusHistory.create({
-        data: {
-          prospectId: data.prospectId,
-          fromStatus: 'ASSESSMENT_COMPLETED',
-          toStatus: 'ORIENTATION_SCHEDULED',
-          notes: `Orientation scheduled for ${startTime.toISOString()}`,
-        },
-      })
-
-      // Create admin notification
-      if (calendarCreatedBy) {
-        await prisma.adminNotification.create({
+      if (data.bookingType === 'biz-dev-interview') {
+        // Biz Dev Interview booking
+        await prisma.prospect.update({
+          where: { id: data.prospectId },
           data: {
-            userId: calendarCreatedBy,
-            type: 'PROSPECT_STATUS_CHANGED',
-            title: 'New Orientation Booking',
-            message: `${data.bookerName} has scheduled an orientation for ${startTime.toLocaleDateString()}`,
-            entityType: 'Prospect',
-            entityId: data.prospectId,
-            actionUrl: `/admin/prospects/${data.prospectId}`,
+            interviewScheduledAt: startTime,
+            status: 'INTERVIEW_SCHEDULED',
           },
         })
+
+        // Add status history
+        await prisma.prospectStatusHistory.create({
+          data: {
+            prospectId: data.prospectId,
+            fromStatus: prospect?.status || 'BUSINESS_FORM_SUBMITTED',
+            toStatus: 'INTERVIEW_SCHEDULED',
+            notes: `Biz Dev Interview scheduled for ${startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`,
+          },
+        })
+
+        // Create admin notification
+        if (calendarCreatedBy) {
+          await prisma.adminNotification.create({
+            data: {
+              userId: calendarCreatedBy,
+              type: 'PROSPECT_STATUS_CHANGED',
+              title: 'New Biz Dev Interview Booking',
+              message: `${data.bookerName} has scheduled a Biz Dev Interview for ${startTime.toLocaleDateString()}`,
+              entityType: 'Prospect',
+              entityId: data.prospectId,
+              actionUrl: `/admin/prospects/${data.prospectId}`,
+            },
+          })
+        }
+      } else {
+        // Default: Orientation booking
+        await prisma.prospect.update({
+          where: { id: data.prospectId },
+          data: {
+            orientationScheduledAt: startTime,
+            status: 'ORIENTATION_SCHEDULED',
+          },
+        })
+
+        // Add status history
+        await prisma.prospectStatusHistory.create({
+          data: {
+            prospectId: data.prospectId,
+            fromStatus: prospect?.status || 'ASSESSMENT_COMPLETED',
+            toStatus: 'ORIENTATION_SCHEDULED',
+            notes: `Orientation scheduled for ${startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`,
+          },
+        })
+
+        // Create admin notification
+        if (calendarCreatedBy) {
+          await prisma.adminNotification.create({
+            data: {
+              userId: calendarCreatedBy,
+              type: 'PROSPECT_STATUS_CHANGED',
+              title: 'New Orientation Booking',
+              message: `${data.bookerName} has scheduled an orientation for ${startTime.toLocaleDateString()}`,
+              entityType: 'Prospect',
+              entityId: data.prospectId,
+              actionUrl: `/admin/prospects/${data.prospectId}`,
+            },
+          })
+        }
       }
     }
+
+    // Emit real-time update for all connected clients
+    calendarEvents.emit(data.calendarId, {
+      type: 'booking_created',
+      payload: {
+        bookingId: booking.id,
+        slotId: actualSlotId,
+        eventId: actualEventId,
+        date: bookingDate.toISOString(),
+      },
+    })
 
     return {
       booking: {
@@ -965,6 +1135,22 @@ export async function getAdminCalendarEvents(calendarId: string, dateRange?: { s
 
     const events = await prisma.calendarEvent.findMany({
       where,
+      include: {
+        bookings: {
+          where: { status: { in: ['PENDING', 'CONFIRMED'] } },
+          select: {
+            id: true,
+            bookerName: true,
+            bookerEmail: true,
+            status: true,
+            prospectId: true,
+            prospect: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+          },
+          take: 5,
+        },
+      },
       orderBy: { startTime: 'asc' },
     })
 
@@ -976,10 +1162,23 @@ export async function getAdminCalendarEvents(calendarId: string, dateRange?: { s
         startTime: e.startTime.toISOString(),
         endTime: e.endTime.toISOString(),
         isAllDay: e.isAllDay,
+        timezone: e.timezone,
         location: e.location,
         isOnline: e.isOnline,
         meetingLink: e.meetingLink,
+        isRecurring: e.isRecurring,
+        seriesId: e.seriesId,
         createdAt: e.createdAt.toISOString(),
+        booking: e.bookings.length > 0 ? {
+          id: e.bookings[0].id,
+          bookerName: e.bookings[0].bookerName,
+          bookerEmail: e.bookings[0].bookerEmail,
+          status: e.bookings[0].status,
+          prospectId: e.bookings[0].prospectId,
+          prospectName: e.bookings[0].prospect
+            ? `${e.bookings[0].prospect.firstName} ${e.bookings[0].prospect.lastName}`
+            : null,
+        } : null,
       })),
     }
   } catch (error) {
@@ -1426,7 +1625,7 @@ export async function scheduleOrientationFromCalendar(
         fromStatus: prospect.status,
         toStatus: 'ORIENTATION_SCHEDULED',
         changedBy: session.user.id,
-        notes: `Orientation scheduled for ${startTime.toLocaleString()}`,
+        notes: `Orientation scheduled for ${startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`,
       },
     })
 
@@ -1465,5 +1664,670 @@ export async function updateCalendarMeetingLink(calendarId: string, meetingLink:
   } catch (error) {
     console.error('Error updating meeting link:', error)
     return { error: 'Failed to update meeting link' }
+  }
+}
+
+// ============================================
+// RECURRING EVENT MANAGEMENT
+// ============================================
+
+export async function deleteRecurringEventSeries(
+  eventId: string,
+  scope: 'this' | 'following' | 'all'
+) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Get the event to find its series
+    const event = await prisma.calendarEvent.findUnique({
+      where: { id: eventId },
+    })
+
+    if (!event) {
+      return { error: 'Event not found' }
+    }
+
+    const calendarId = event.adminCalendarId
+
+    if (scope === 'this') {
+      // Delete only this event
+      await prisma.calendarEvent.delete({
+        where: { id: eventId },
+      })
+    } else if (scope === 'following' && event.seriesId) {
+      // Delete this event and all following events in the series
+      await prisma.calendarEvent.deleteMany({
+        where: {
+          seriesId: event.seriesId,
+          startTime: {
+            gte: event.startTime,
+          },
+        },
+      })
+    } else if (scope === 'all' && event.seriesId) {
+      // Delete all events in the series
+      await prisma.calendarEvent.deleteMany({
+        where: {
+          seriesId: event.seriesId,
+        },
+      })
+    }
+
+    if (calendarId) {
+      revalidatePath(`/admin/calendars/${calendarId}`)
+    }
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting recurring event:', error)
+    return { error: 'Failed to delete event(s)' }
+  }
+}
+
+export async function updateRecurringEventSeries(
+  eventId: string,
+  scope: 'this' | 'following' | 'all',
+  data: {
+    title?: string
+    description?: string
+    startTime?: string
+    endTime?: string
+    timezone?: string
+    location?: string
+    isOnline?: boolean
+    meetingLink?: string
+  }
+) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Get the event to find its series
+    const event = await prisma.calendarEvent.findUnique({
+      where: { id: eventId },
+    })
+
+    if (!event) {
+      return { error: 'Event not found' }
+    }
+
+    const calendarId = event.adminCalendarId
+
+    if (scope === 'this') {
+      // Update only this event
+      await prisma.calendarEvent.update({
+        where: { id: eventId },
+        data: {
+          title: data.title,
+          description: data.description,
+          startTime: data.startTime ? new Date(data.startTime) : undefined,
+          endTime: data.endTime ? new Date(data.endTime) : undefined,
+          timezone: data.timezone,
+          location: data.location,
+          isOnline: data.isOnline,
+          meetingLink: data.meetingLink,
+        },
+      })
+    } else if (scope === 'following' && event.seriesId) {
+      // Update this event and all following events in the series
+      const eventsToUpdate = await prisma.calendarEvent.findMany({
+        where: {
+          seriesId: event.seriesId,
+          startTime: {
+            gte: event.startTime,
+          },
+        },
+      })
+
+      // Calculate time difference if times are being updated
+      let timeDiff = 0
+      if (data.startTime) {
+        const newStart = new Date(data.startTime)
+        timeDiff = newStart.getTime() - event.startTime.getTime()
+      }
+
+      for (const evt of eventsToUpdate) {
+        const updateData: Record<string, unknown> = {
+          title: data.title,
+          description: data.description,
+          timezone: data.timezone,
+          location: data.location,
+          isOnline: data.isOnline,
+          meetingLink: data.meetingLink,
+        }
+
+        // Adjust times proportionally
+        if (data.startTime && data.endTime) {
+          updateData.startTime = new Date(evt.startTime.getTime() + timeDiff)
+          updateData.endTime = new Date(evt.endTime.getTime() + timeDiff)
+        }
+
+        await prisma.calendarEvent.update({
+          where: { id: evt.id },
+          data: updateData,
+        })
+      }
+    } else if (scope === 'all' && event.seriesId) {
+      // Update all events in the series
+      const eventsToUpdate = await prisma.calendarEvent.findMany({
+        where: {
+          seriesId: event.seriesId,
+        },
+      })
+
+      // Calculate time difference if times are being updated
+      let timeDiff = 0
+      if (data.startTime) {
+        const newStart = new Date(data.startTime)
+        timeDiff = newStart.getTime() - event.startTime.getTime()
+      }
+
+      for (const evt of eventsToUpdate) {
+        const updateData: Record<string, unknown> = {
+          title: data.title,
+          description: data.description,
+          timezone: data.timezone,
+          location: data.location,
+          isOnline: data.isOnline,
+          meetingLink: data.meetingLink,
+        }
+
+        // Adjust times proportionally
+        if (data.startTime && data.endTime) {
+          updateData.startTime = new Date(evt.startTime.getTime() + timeDiff)
+          updateData.endTime = new Date(evt.endTime.getTime() + timeDiff)
+        }
+
+        await prisma.calendarEvent.update({
+          where: { id: evt.id },
+          data: updateData,
+        })
+      }
+    }
+
+    if (calendarId) {
+      revalidatePath(`/admin/calendars/${calendarId}`)
+    }
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating recurring event:', error)
+    return { error: 'Failed to update event(s)' }
+  }
+}
+
+export async function getEventSeriesInfo(eventId: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const event = await prisma.calendarEvent.findUnique({
+      where: { id: eventId },
+    })
+
+    if (!event || !event.seriesId) {
+      return { isRecurring: false }
+    }
+
+    // Count total events in series
+    const totalEvents = await prisma.calendarEvent.count({
+      where: { seriesId: event.seriesId },
+    })
+
+    // Count following events (including this one)
+    const followingEvents = await prisma.calendarEvent.count({
+      where: {
+        seriesId: event.seriesId,
+        startTime: {
+          gte: event.startTime,
+        },
+      },
+    })
+
+    return {
+      isRecurring: true,
+      seriesId: event.seriesId,
+      totalEvents,
+      followingEvents,
+    }
+  } catch (error) {
+    console.error('Error fetching event series info:', error)
+    return { error: 'Failed to fetch event info' }
+  }
+}
+
+// ============================================
+// REAL-TIME REFRESH FOR CALENDAR DATA
+// ============================================
+
+export async function refreshCalendarData(calendarId: string, dateRange?: { start: string; end: string }) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const now = new Date()
+    const start = dateRange?.start || new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const end = dateRange?.end || new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
+
+    const [bookingsResult, eventsResult] = await Promise.all([
+      getCalendarBookings(calendarId, { start, end }),
+      getAdminCalendarEvents(calendarId, { start, end }),
+    ])
+
+    return {
+      bookings: bookingsResult.bookings || [],
+      events: eventsResult.events || [],
+    }
+  } catch (error) {
+    console.error('Error refreshing calendar data:', error)
+    return { error: 'Failed to refresh calendar data' }
+  }
+}
+
+// ============================================
+// BIZ DEV INTERVIEW CALENDAR
+// ============================================
+
+export async function getOrCreateBizDevInterviewCalendar() {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Check if biz dev interview calendar exists
+    let calendar = await prisma.adminCalendar.findFirst({
+      where: {
+        publicSlug: 'biz-dev-interview',
+      },
+    })
+
+    if (!calendar) {
+      // Create the biz dev interview calendar
+      calendar = await prisma.adminCalendar.create({
+        data: {
+          name: 'Biz Dev Interview',
+          description: 'Schedule your business development interview with SOIA.',
+          type: 'BOOKING',
+          visibility: 'PUBLIC',
+          color: '#F59E0B', // Amber/Orange
+          slotDurationMinutes: 60,
+          bufferMinutes: 0,
+          maxBookingsPerSlot: 1,
+          requiresApproval: false,
+          isPublicBookable: true,
+          publicSlug: 'biz-dev-interview',
+          createdBy: session.user.id,
+        },
+      })
+
+      // Add default slots: Tuesdays and Thursdays at 10am PST
+      await prisma.calendarSlot.createMany({
+        data: [
+          {
+            calendarId: calendar.id,
+            dayOfWeek: 2, // Tuesday
+            startTime: '10:00',
+            endTime: '11:00',
+            timezone: 'America/Los_Angeles',
+            maxBookings: 1,
+            isRecurring: true,
+          },
+          {
+            calendarId: calendar.id,
+            dayOfWeek: 4, // Thursday
+            startTime: '10:00',
+            endTime: '11:00',
+            timezone: 'America/Los_Angeles',
+            maxBookings: 1,
+            isRecurring: true,
+          },
+        ],
+      })
+    }
+
+    revalidatePath('/admin/calendars')
+    return {
+      calendar: {
+        id: calendar.id,
+        name: calendar.name,
+        publicSlug: calendar.publicSlug,
+        meetingLink: calendar.meetingLink,
+      },
+    }
+  } catch (error) {
+    console.error('Error getting/creating biz dev interview calendar:', error)
+    return { error: 'Failed to get biz dev interview calendar' }
+  }
+}
+
+export async function getAvailableBizDevInterviewSlots(daysAhead: number = 30) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const calendar = await prisma.adminCalendar.findFirst({
+      where: { publicSlug: 'biz-dev-interview' },
+      include: {
+        slots: {
+          where: { isActive: true },
+        },
+      },
+    })
+
+    if (!calendar) {
+      // Auto-create if not exists
+      const result = await getOrCreateBizDevInterviewCalendar()
+      if (result.error) return { error: result.error }
+      // Retry after creation
+      return getAvailableBizDevInterviewSlots(daysAhead)
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const endDate = new Date(today)
+    endDate.setDate(endDate.getDate() + daysAhead)
+
+    // Get existing bookings for this period
+    const existingBookings = await prisma.calendarBooking.findMany({
+      where: {
+        calendarId: calendar.id,
+        bookingDate: {
+          gte: today,
+          lte: endDate,
+        },
+        status: { in: ['PENDING', 'CONFIRMED'] },
+      },
+      select: {
+        slotId: true,
+        bookingDate: true,
+      },
+    })
+
+    // Group bookings by date and slot
+    const bookingsByDateSlot = new Map<string, number>()
+    existingBookings.forEach((b) => {
+      const dateStr = `${b.bookingDate.getFullYear()}-${String(b.bookingDate.getMonth() + 1).padStart(2, '0')}-${String(b.bookingDate.getDate()).padStart(2, '0')}`
+      const key = `${dateStr}-${b.slotId}`
+      bookingsByDateSlot.set(key, (bookingsByDateSlot.get(key) || 0) + 1)
+    })
+
+    // Build list of available slots
+    const availableSlots: {
+      date: string
+      dayOfWeek: number
+      slotId: string
+      startTime: string
+      endTime: string
+      timezone: string
+    }[] = []
+
+    for (let d = new Date(today); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay()
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+      const slotsForDay = calendar.slots.filter((s) => s.dayOfWeek === dayOfWeek)
+
+      for (const slot of slotsForDay) {
+        const key = `${dateStr}-${slot.id}`
+        const currentBookings = bookingsByDateSlot.get(key) || 0
+        if (currentBookings < slot.maxBookings) {
+          availableSlots.push({
+            date: dateStr,
+            dayOfWeek,
+            slotId: slot.id,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            timezone: slot.timezone,
+          })
+        }
+      }
+    }
+
+    return {
+      slots: availableSlots,
+      meetingLink: calendar.meetingLink,
+    }
+  } catch (error) {
+    console.error('Error fetching available biz dev interview slots:', error)
+    return { error: 'Failed to fetch available slots' }
+  }
+}
+
+export async function scheduleBizDevInterviewFromCalendar(
+  prospectId: string,
+  slotId: string,
+  date: string
+) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Get the slot details
+    const slot = await prisma.calendarSlot.findUnique({
+      where: { id: slotId },
+      include: { calendar: true },
+    })
+
+    if (!slot) {
+      return { error: 'Slot not found' }
+    }
+
+    // Get prospect
+    const prospect = await prisma.prospect.findUnique({
+      where: { id: prospectId },
+    })
+
+    if (!prospect) {
+      return { error: 'Prospect not found' }
+    }
+
+    // Create booking datetime
+    const bookingDate = new Date(date)
+    const [startHour, startMinute] = slot.startTime.split(':').map(Number)
+    const [endHour, endMinute] = slot.endTime.split(':').map(Number)
+
+    const startTime = new Date(bookingDate)
+    startTime.setHours(startHour, startMinute, 0, 0)
+
+    const endTime = new Date(bookingDate)
+    endTime.setHours(endHour, endMinute, 0, 0)
+
+    // Check availability
+    const existingBookings = await prisma.calendarBooking.count({
+      where: {
+        slotId,
+        bookingDate,
+        status: { in: ['PENDING', 'CONFIRMED'] },
+      },
+    })
+
+    if (existingBookings >= slot.maxBookings) {
+      return { error: 'This slot is no longer available' }
+    }
+
+    // Create booking
+    const booking = await prisma.calendarBooking.create({
+      data: {
+        calendarId: slot.calendarId,
+        slotId,
+        bookingDate,
+        startTime,
+        endTime,
+        timezone: slot.timezone,
+        bookerName: `${prospect.firstName} ${prospect.lastName}`,
+        bookerEmail: prospect.email,
+        bookerPhone: prospect.phone,
+        prospectId,
+        status: 'CONFIRMED',
+        confirmedAt: new Date(),
+        confirmedBy: session.user.id,
+      },
+    })
+
+    // Update prospect status
+    await prisma.prospect.update({
+      where: { id: prospectId },
+      data: {
+        interviewScheduledAt: startTime,
+        status: 'INTERVIEW_SCHEDULED',
+      },
+    })
+
+    // Add status history
+    await prisma.prospectStatusHistory.create({
+      data: {
+        prospectId,
+        fromStatus: prospect.status,
+        toStatus: 'INTERVIEW_SCHEDULED',
+        changedBy: session.user.id,
+        notes: `Biz Dev Interview scheduled for ${startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`,
+      },
+    })
+
+    revalidatePath(`/admin/prospects/${prospectId}`)
+    revalidatePath('/admin/prospects')
+
+    return {
+      booking: {
+        id: booking.id,
+        date: bookingDate.toISOString(),
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      },
+      meetingLink: slot.calendar.meetingLink,
+    }
+  } catch (error) {
+    console.error('Error scheduling biz dev interview:', error)
+    return { error: 'Failed to schedule biz dev interview' }
+  }
+}
+
+export async function scheduleInterviewDirect(
+  prospectId: string,
+  startTime: string,
+  endTime: string,
+) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const prospect = await prisma.prospect.findUnique({
+      where: { id: prospectId },
+    })
+
+    if (!prospect) {
+      return { error: 'Prospect not found' }
+    }
+
+    // Get or create the biz dev interview calendar
+    let calendar = await prisma.adminCalendar.findFirst({
+      where: { publicSlug: 'biz-dev-interview' },
+    })
+
+    if (!calendar) {
+      calendar = await prisma.adminCalendar.create({
+        data: {
+          name: 'Biz Dev Interview',
+          description: 'Schedule your business development interview with SOIA.',
+          type: 'BOOKING',
+          visibility: 'PUBLIC',
+          color: '#F59E0B',
+          slotDurationMinutes: 60,
+          bufferMinutes: 0,
+          maxBookingsPerSlot: 1,
+          requiresApproval: false,
+          isPublicBookable: true,
+          publicSlug: 'biz-dev-interview',
+          createdBy: session.user.id,
+        },
+      })
+    }
+
+    const start = new Date(startTime)
+    const end = new Date(endTime)
+
+    // Create a calendar event
+    const event = await prisma.calendarEvent.create({
+      data: {
+        adminCalendar: { connect: { id: calendar.id } },
+        creatorId: session.user.id,
+        title: `Interview - ${prospect.firstName} ${prospect.lastName}`,
+        startTime: start,
+        endTime: end,
+        isAllDay: false,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles',
+        isOnline: !!calendar.meetingLink,
+        meetingLink: calendar.meetingLink,
+      },
+    })
+
+    // Create the booking linked to the event
+    const booking = await prisma.calendarBooking.create({
+      data: {
+        calendarId: calendar.id,
+        eventId: event.id,
+        bookingDate: start,
+        startTime: start,
+        endTime: end,
+        timezone: event.timezone,
+        bookerName: `${prospect.firstName} ${prospect.lastName}`,
+        bookerEmail: prospect.email,
+        bookerPhone: prospect.phone,
+        prospectId,
+        status: 'CONFIRMED',
+        confirmedAt: new Date(),
+        confirmedBy: session.user.id,
+      },
+    })
+
+    // Update prospect status
+    await prisma.prospect.update({
+      where: { id: prospectId },
+      data: {
+        interviewScheduledAt: start,
+        status: 'INTERVIEW_SCHEDULED',
+      },
+    })
+
+    // Add status history
+    await prisma.prospectStatusHistory.create({
+      data: {
+        prospectId,
+        fromStatus: prospect.status,
+        toStatus: 'INTERVIEW_SCHEDULED',
+        changedBy: session.user.id,
+        notes: `Biz Dev Interview scheduled for ${start.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`,
+      },
+    })
+
+    revalidatePath(`/admin/prospects/${prospectId}`)
+    revalidatePath('/admin/prospects')
+    revalidatePath(`/admin/calendars/${calendar.id}`)
+
+    return {
+      booking: {
+        id: booking.id,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+      },
+      meetingLink: calendar.meetingLink,
+    }
+  } catch (error) {
+    console.error('Error scheduling interview directly:', error)
+    return { error: 'Failed to schedule interview' }
   }
 }

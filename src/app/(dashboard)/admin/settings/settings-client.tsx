@@ -15,13 +15,30 @@ import {
   XCircle,
   ExternalLink,
   Info,
+  FileText,
+  Pencil,
+  Save,
+  Loader2,
+  X,
+  Eye,
 } from 'lucide-react'
+import { updateSitePage } from '@/lib/actions/site-pages'
 
 interface FeatureConfig {
   feature: string
   isEnabled: boolean
   enabledForCoaches: boolean
   enabledForAmbassadors: boolean
+}
+
+interface SitePage {
+  id: string
+  slug: string
+  title: string
+  content: string
+  updatedBy: string | null
+  updatedAt: string
+  createdAt: string
 }
 
 interface SystemStats {
@@ -35,6 +52,7 @@ interface SystemStats {
 
 interface SettingsClientProps {
   stats: SystemStats
+  sitePages: SitePage[]
 }
 
 const FEATURE_LABELS: Record<string, string> = {
@@ -46,8 +64,100 @@ const FEATURE_LABELS: Record<string, string> = {
   KNOWLEDGE_BASE: 'Knowledge Base',
 }
 
-export function SettingsClient({ stats }: SettingsClientProps) {
-  const [activeTab, setActiveTab] = useState<'general' | 'features' | 'system'>('general')
+const PAGE_LABELS: Record<string, { label: string; description: string; previewPath: string | null }> = {
+  'terms': {
+    label: 'Terms of Service',
+    description: 'Legal terms that prospects must accept before payment',
+    previewPath: '/terms',
+  },
+  'privacy': {
+    label: 'Privacy Policy',
+    description: 'Privacy policy that prospects must accept before payment',
+    previewPath: '/privacy',
+  },
+  'refund-policy': {
+    label: 'Non-Refundable Policy',
+    description: 'Refund policy acknowledgment text shown on the acceptance page',
+    previewPath: null,
+  },
+  'acceptance-letter': {
+    label: 'Acceptance Letter',
+    description: 'Welcome letter shown to approved prospects on the acceptance page',
+    previewPath: null,
+  },
+}
+
+export function SettingsClient({ stats, sitePages }: SettingsClientProps) {
+  const [activeTab, setActiveTab] = useState<'general' | 'features' | 'system' | 'legal'>('general')
+  const [editingPage, setEditingPage] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editContent, setEditContent] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
+  const [pages, setPages] = useState(sitePages)
+
+  const handleEditPage = (page: SitePage) => {
+    setEditingPage(page.slug)
+    setEditTitle(page.title)
+    setEditContent(page.content)
+    setSaveError(null)
+    setSaveSuccess(null)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingPage(null)
+    setEditTitle('')
+    setEditContent('')
+    setSaveError(null)
+    setSaveSuccess(null)
+  }
+
+  const handleSavePage = async () => {
+    if (!editingPage) return
+
+    setIsSaving(true)
+    setSaveError(null)
+    setSaveSuccess(null)
+
+    try {
+      const result = await updateSitePage(editingPage, {
+        title: editTitle,
+        content: editContent,
+      })
+
+      if (result.error) {
+        setSaveError(result.error)
+      } else if (result.page) {
+        setPages((prev) =>
+          prev.map((p) =>
+            p.slug === editingPage
+              ? { ...p, title: result.page!.title, content: result.page!.content, updatedAt: result.page!.updatedAt }
+              : p
+          )
+        )
+        setSaveSuccess('Page saved successfully')
+        setTimeout(() => {
+          setEditingPage(null)
+          setSaveSuccess(null)
+        }, 1500)
+      }
+    } catch {
+      setSaveError('Failed to save. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -83,6 +193,17 @@ export function SettingsClient({ stats }: SettingsClientProps) {
           >
             <Shield className="h-4 w-4 inline-block mr-2" />
             Features
+          </button>
+          <button
+            onClick={() => setActiveTab('legal')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'legal'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FileText className="h-4 w-4 inline-block mr-2" />
+            Legal Pages
           </button>
           <button
             onClick={() => setActiveTab('system')}
@@ -280,6 +401,164 @@ export function SettingsClient({ stats }: SettingsClientProps) {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Legal Pages Tab */}
+      {activeTab === 'legal' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">Legal & Acceptance Pages</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage the content shown on the prospect acceptance page, terms of service, and privacy policy.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {pages.map((page) => {
+                const meta = PAGE_LABELS[page.slug]
+                const isEditing = editingPage === page.slug
+
+                return (
+                  <div
+                    key={page.id}
+                    className={`border rounded-lg transition-all ${
+                      isEditing ? 'border-primary-300 bg-primary-50/30' : 'border-gray-200'
+                    }`}
+                  >
+                    {/* Page Header */}
+                    <div className="flex items-center justify-between p-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-gray-400" />
+                          <h3 className="font-medium text-gray-900">
+                            {meta?.label || page.title}
+                          </h3>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-0.5 ml-6">
+                          {meta?.description || `Slug: ${page.slug}`}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1 ml-6">
+                          Last updated: {formatDate(page.updatedAt)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {meta?.previewPath && !isEditing && (
+                          <a
+                            href={meta.previewPath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Preview
+                          </a>
+                        )}
+                        {isEditing ? (
+                          <button
+                            onClick={handleCancelEdit}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Cancel
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleEditPage(page)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-primary-600 border border-primary-300 rounded-md hover:bg-primary-50"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Editor */}
+                    {isEditing && (
+                      <div className="px-4 pb-4 space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Page Title
+                          </label>
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Content
+                          </label>
+                          <textarea
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            rows={12}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm font-mono"
+                            placeholder="Enter page content..."
+                          />
+                          <p className="text-xs text-gray-400 mt-1">
+                            Plain text. Use line breaks for paragraphs. For terms and privacy pages, numbered sections are recommended.
+                          </p>
+                        </div>
+
+                        {saveError && (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                            {saveError}
+                          </div>
+                        )}
+
+                        {saveSuccess && (
+                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-600 text-sm flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4" />
+                            {saveSuccess}
+                          </div>
+                        )}
+
+                        <div className="flex justify-end">
+                          <button
+                            onClick={handleSavePage}
+                            disabled={isSaving}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-4 w-4" />
+                                Save Changes
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Info about acceptance page */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex">
+              <Info className="h-5 w-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-medium text-blue-800">How these pages are used</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  The <strong>Acceptance Letter</strong> and <strong>Non-Refundable Policy</strong> are displayed
+                  on the prospect acceptance page when a prospect is approved. The <strong>Terms of Service</strong> and{' '}
+                  <strong>Privacy Policy</strong> are linked from the acceptance page and accessible as standalone public pages.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}

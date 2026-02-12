@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { ProspectStatus } from '@prisma/client'
+import crypto from 'crypto'
 
 // ============================================
 // SCHEMAS
@@ -22,13 +23,96 @@ const createProspectSchema = z.object({
   assessmentSubmissionId: z.string().optional(),
 })
 
-const businessFormSchema = z.object({
+// Legacy schema - kept for backward compatibility
+const businessFormSchemaLegacy = z.object({
   companyName: z.string().min(1, 'Company name is required'),
   bio: z.string().min(10, 'Bio must be at least 10 characters'),
   visionStatement: z.string().min(10, 'Vision statement is required'),
   missionStatement: z.string().min(10, 'Mission statement is required'),
   servicesInterested: z.array(z.string()).min(1, 'Select at least one service'),
   proposedCostOfServices: z.string().min(1, 'Please describe your proposed pricing'),
+})
+
+// Service package schema (strict - for final submission)
+const servicePackageSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, 'Package name is required'),
+  description: z.string(),
+  price: z.string().min(1, 'Price is required'),
+  duration: z.string().optional(),
+})
+
+// Service package schema (lenient - for draft saving)
+const servicePackageDraftSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  price: z.string(),
+  duration: z.string().optional(),
+})
+
+// Draft schema - allows partial data for saving progress
+const businessFormDraftSchema = z.object({
+  currentStep: z.number().min(0).max(4),
+  // Step 1: Business Identity
+  companyName: z.string().optional(),
+  tagline: z.string().optional(),
+  bio: z.string().optional(),
+  businessType: z.string().optional(),
+  businessTypeOther: z.string().optional(),
+  // Step 2: Online Presence
+  websiteUrl: z.string().optional(),
+  needsWebsiteHelp: z.boolean().optional(),
+  instagramHandle: z.string().optional(),
+  facebookHandle: z.string().optional(),
+  linkedinHandle: z.string().optional(),
+  tiktokHandle: z.string().optional(),
+  // Step 3: Services & Packages
+  servicePackages: z.array(servicePackageDraftSchema).optional(),
+  // Step 4: Target Audience
+  idealClient: z.string().optional(),
+  uniqueValue: z.string().optional(),
+  certifications: z.string().optional(),
+  // Step 5: Goals
+  threeYearRevenueGoal: z.string().optional(),
+  threeYearClientGoal: z.string().optional(),
+  visionStatement: z.string().optional(),
+  missionStatement: z.string().optional(),
+})
+
+// Full submission schema - validates all required fields
+const businessFormSchema = z.object({
+  // Step 1: Business Identity - Required
+  companyName: z.string().min(1, 'Company name is required'),
+  tagline: z.string().optional(),
+  bio: z.string().min(10, 'Bio must be at least 10 characters'),
+  businessType: z.string().min(1, 'Business type is required'),
+  businessTypeOther: z.string().optional(),
+  // Step 2: Online Presence - Optional (accepts with or without http://)
+  websiteUrl: z.string().optional().transform((val) => {
+    if (!val || val.trim() === '') return undefined
+    // Add https:// if no protocol specified
+    if (!/^https?:\/\//i.test(val)) {
+      return `https://${val}`
+    }
+    return val
+  }),
+  needsWebsiteHelp: z.boolean().optional(),
+  instagramHandle: z.string().optional(),
+  facebookHandle: z.string().optional(),
+  linkedinHandle: z.string().optional(),
+  tiktokHandle: z.string().optional(),
+  // Step 3: Services & Packages - At least one required
+  servicePackages: z.array(servicePackageSchema).min(1, 'Add at least one service package'),
+  // Step 4: Target Audience - Required
+  idealClient: z.string().min(10, 'Describe your ideal client (at least 10 characters)'),
+  uniqueValue: z.string().min(10, 'Describe what makes you unique (at least 10 characters)'),
+  certifications: z.string().optional(),
+  // Step 5: Goals - Required
+  threeYearRevenueGoal: z.string().min(1, 'Revenue goal is required'),
+  threeYearClientGoal: z.string().min(1, 'Client goal is required'),
+  visionStatement: z.string().min(10, 'Vision statement is required (at least 10 characters)'),
+  missionStatement: z.string().min(10, 'Mission statement is required (at least 10 characters)'),
 })
 
 const acceptTermsSchema = z.object({
@@ -172,6 +256,12 @@ export async function getProspect(id: string) {
             user: { select: { email: true } },
           },
         },
+        calendarBookings: {
+          include: {
+            calendar: { select: { id: true, name: true, meetingLink: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     })
 
@@ -188,11 +278,15 @@ export async function getProspect(id: string) {
         orientationScheduledAt: prospect.orientationScheduledAt?.toISOString() || null,
         orientationCompletedAt: prospect.orientationCompletedAt?.toISOString() || null,
         businessFormSubmittedAt: prospect.businessFormSubmittedAt?.toISOString() || null,
+        businessFormLastSavedAt: prospect.businessFormLastSavedAt?.toISOString() || null,
         interviewScheduledAt: prospect.interviewScheduledAt?.toISOString() || null,
         interviewCompletedAt: prospect.interviewCompletedAt?.toISOString() || null,
         termsAcceptedAt: prospect.termsAcceptedAt?.toISOString() || null,
         privacyAcceptedAt: prospect.privacyAcceptedAt?.toISOString() || null,
         nonRefundAcknowledgedAt: prospect.nonRefundAcknowledgedAt?.toISOString() || null,
+        // Cast JSON fields to proper types
+        servicePackages: prospect.servicePackages as { id: string; name: string; description: string; price: string; duration?: string }[] | null,
+        businessFormDraft: prospect.businessFormDraft as Record<string, unknown> | null,
         payment: prospect.payment ? {
           ...prospect.payment,
           amount: prospect.payment.amount.toNumber(),
@@ -206,6 +300,34 @@ export async function getProspect(id: string) {
           ...h,
           createdAt: h.createdAt.toISOString(),
         })),
+        // Active interview booking
+        interviewBooking: (() => {
+          const booking = prospect.calendarBookings.find(b =>
+            (b.calendar.name === 'Biz Dev Interview' || b.calendar.name?.toLowerCase().includes('interview')) &&
+            (b.status === 'PENDING' || b.status === 'CONFIRMED')
+          )
+          if (!booking) return null
+          return {
+            id: booking.id,
+            calendarId: booking.calendarId,
+            startTime: booking.startTime.toISOString(),
+            endTime: booking.endTime.toISOString(),
+            meetingLink: booking.calendar.meetingLink,
+          }
+        })(),
+        // History of all interview bookings (for showing reschedule history)
+        interviewBookingHistory: prospect.calendarBookings
+          .filter(b =>
+            b.calendar.name === 'Biz Dev Interview' || b.calendar.name?.toLowerCase().includes('interview')
+          )
+          .map(b => ({
+            id: b.id,
+            status: b.status,
+            startTime: b.startTime.toISOString(),
+            endTime: b.endTime.toISOString(),
+            createdAt: b.createdAt.toISOString(),
+            cancellationReason: b.cancellationReason || null,
+          })),
       },
     }
   } catch (error) {
@@ -215,6 +337,11 @@ export async function getProspect(id: string) {
 }
 
 export async function getProspectByToken(token: string, tokenType: 'assessment' | 'orientation' | 'business' | 'acceptance') {
+  // Validate token format before querying DB
+  if (!token || typeof token !== 'string' || token.length < 10 || token.length > 100) {
+    return { error: 'Invalid or expired link' }
+  }
+
   try {
     const whereClause = tokenType === 'assessment'
       ? { assessmentToken: token }
@@ -395,7 +522,7 @@ export async function scheduleOrientation(id: string, scheduledAt: Date) {
   }
 
   try {
-    const result = await updateProspectStatus(id, 'ORIENTATION_SCHEDULED', `Orientation scheduled for ${scheduledAt.toISOString()}`)
+    const result = await updateProspectStatus(id, 'ORIENTATION_SCHEDULED', `Orientation scheduled for ${scheduledAt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`)
     if (result.error) return result
 
     await prisma.prospect.update({
@@ -458,7 +585,7 @@ export async function generateOrientationToken(prospectId: string) {
       return { success: true, token: existingProspect.orientationToken }
     }
 
-    const token = `or_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+    const token = `or_${crypto.randomBytes(24).toString('hex')}`
 
     await prisma.prospect.update({
       where: { id: prospectId },
@@ -472,6 +599,66 @@ export async function generateOrientationToken(prospectId: string) {
   } catch (error) {
     console.error('Error generating orientation token:', error)
     return { error: 'Failed to generate orientation link' }
+  }
+}
+
+export async function generateBizDevInterviewToken(prospectId: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Check if prospect already has a token
+    const existingProspect = await prisma.prospect.findUnique({
+      where: { id: prospectId },
+      select: { bizDevInterviewToken: true, status: true },
+    })
+
+    if (existingProspect?.bizDevInterviewToken) {
+      return { success: true, token: existingProspect.bizDevInterviewToken }
+    }
+
+    const token = `bdi_${crypto.randomBytes(24).toString('hex')}`
+
+    await prisma.prospect.update({
+      where: { id: prospectId },
+      data: {
+        bizDevInterviewToken: token,
+      },
+    })
+
+    revalidatePath('/admin/prospects')
+    return { success: true, token }
+  } catch (error) {
+    console.error('Error generating biz dev interview token:', error)
+    return { error: 'Failed to generate biz dev interview link' }
+  }
+}
+
+export async function getProspectByBizDevInterviewToken(token: string) {
+  try {
+    const prospect = await prisma.prospect.findUnique({
+      where: { bizDevInterviewToken: token },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        status: true,
+        interviewScheduledAt: true,
+      },
+    })
+
+    if (!prospect) {
+      return { error: 'Invalid token' }
+    }
+
+    return { prospect }
+  } catch (error) {
+    console.error('Error fetching prospect by biz dev interview token:', error)
+    return { error: 'Failed to fetch prospect' }
   }
 }
 
@@ -517,7 +704,7 @@ export async function generateBusinessFormToken(prospectId: string) {
   }
 
   try {
-    const token = `bf_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+    const token = `bf_${crypto.randomBytes(24).toString('hex')}`
 
     await prisma.prospect.update({
       where: { id: prospectId },
@@ -540,6 +727,122 @@ export async function generateBusinessFormToken(prospectId: string) {
   } catch (error) {
     console.error('Error generating business form token:', error)
     return { error: 'Failed to generate business form link' }
+  }
+}
+
+export async function saveBusinessFormDraft(
+  token: string,
+  data: z.infer<typeof businessFormDraftSchema>
+) {
+  try {
+    const validated = businessFormDraftSchema.safeParse(data)
+    if (!validated.success) {
+      return { error: validated.error.issues[0]?.message || 'Invalid data' }
+    }
+
+    const prospect = await prisma.prospect.findFirst({
+      where: { businessFormToken: token },
+    })
+
+    if (!prospect) {
+      return { error: 'Invalid or expired link' }
+    }
+
+    await prisma.prospect.update({
+      where: { id: prospect.id },
+      data: {
+        businessFormDraft: validated.data,
+        businessFormLastSavedAt: new Date(),
+      },
+    })
+
+    return { success: true, lastSavedAt: new Date().toISOString() }
+  } catch (error) {
+    console.error('Error saving business form draft:', error)
+    return { error: 'Failed to save draft' }
+  }
+}
+
+export async function loadBusinessFormDraft(token: string) {
+  try {
+    const prospect = await prisma.prospect.findFirst({
+      where: { businessFormToken: token },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        businessFormDraft: true,
+        businessFormLastSavedAt: true,
+        businessFormSubmittedAt: true,
+        // Also include any previously saved fields
+        companyName: true,
+        tagline: true,
+        bio: true,
+        businessType: true,
+        businessTypeOther: true,
+        websiteUrl: true,
+        needsWebsiteHelp: true,
+        instagramHandle: true,
+        facebookHandle: true,
+        linkedinHandle: true,
+        tiktokHandle: true,
+        servicePackages: true,
+        idealClient: true,
+        uniqueValue: true,
+        certifications: true,
+        threeYearRevenueGoal: true,
+        threeYearClientGoal: true,
+        visionStatement: true,
+        missionStatement: true,
+      },
+    })
+
+    if (!prospect) {
+      return { error: 'Invalid or expired link' }
+    }
+
+    // If form was already submitted, don't allow edits
+    if (prospect.businessFormSubmittedAt) {
+      return { error: 'Business form has already been submitted' }
+    }
+
+    // Return the draft data if exists, otherwise return any saved field data
+    const draft = prospect.businessFormDraft as z.infer<typeof businessFormDraftSchema> | null
+
+    return {
+      prospect: {
+        firstName: prospect.firstName,
+        lastName: prospect.lastName,
+        email: prospect.email,
+      },
+      draft: draft || {
+        currentStep: 0,
+        companyName: prospect.companyName || '',
+        tagline: prospect.tagline || '',
+        bio: prospect.bio || '',
+        businessType: prospect.businessType || '',
+        businessTypeOther: prospect.businessTypeOther || '',
+        websiteUrl: prospect.websiteUrl || '',
+        needsWebsiteHelp: prospect.needsWebsiteHelp || false,
+        instagramHandle: prospect.instagramHandle || '',
+        facebookHandle: prospect.facebookHandle || '',
+        linkedinHandle: prospect.linkedinHandle || '',
+        tiktokHandle: prospect.tiktokHandle || '',
+        servicePackages: (prospect.servicePackages as unknown[]) || [],
+        idealClient: prospect.idealClient || '',
+        uniqueValue: prospect.uniqueValue || '',
+        certifications: prospect.certifications || '',
+        threeYearRevenueGoal: prospect.threeYearRevenueGoal || '',
+        threeYearClientGoal: prospect.threeYearClientGoal || '',
+        visionStatement: prospect.visionStatement || '',
+        missionStatement: prospect.missionStatement || '',
+      },
+      lastSavedAt: prospect.businessFormLastSavedAt?.toISOString() || null,
+    }
+  } catch (error) {
+    console.error('Error loading business form draft:', error)
+    return { error: 'Failed to load draft' }
   }
 }
 
@@ -566,6 +869,7 @@ export async function submitBusinessForm(
       data: {
         ...validated.data,
         businessFormSubmittedAt: new Date(),
+        businessFormDraft: undefined, // Clear draft after submission
         status: 'BUSINESS_FORM_SUBMITTED',
         statusHistory: {
           create: {
@@ -615,7 +919,7 @@ export async function scheduleInterview(id: string, scheduledAt: Date) {
   }
 
   try {
-    const result = await updateProspectStatus(id, 'INTERVIEW_SCHEDULED', `Interview scheduled for ${scheduledAt.toISOString()}`)
+    const result = await updateProspectStatus(id, 'INTERVIEW_SCHEDULED', `Interview scheduled for ${scheduledAt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`)
     if (result.error) return result
 
     await prisma.prospect.update({
@@ -655,11 +959,304 @@ export async function completeInterview(
       },
     })
 
+    // Update active interview bookings on the calendar
+    const activeBookings = await prisma.calendarBooking.findMany({
+      where: {
+        prospectId: id,
+        status: { in: ['PENDING', 'CONFIRMED'] },
+        calendar: {
+          OR: [
+            { name: 'Biz Dev Interview' },
+            { publicSlug: 'biz-dev-interview' },
+          ],
+        },
+      },
+    })
+
+    for (const booking of activeBookings) {
+      if (result === 'APPROVED') {
+        await prisma.calendarBooking.update({
+          where: { id: booking.id },
+          data: {
+            status: 'COMPLETED',
+          },
+        })
+      } else {
+        await prisma.calendarBooking.update({
+          where: { id: booking.id },
+          data: {
+            status: 'CANCELLED',
+            cancelledBy: session.user.id,
+            cancelledAt: new Date(),
+            cancellationReason: 'Prospect rejected',
+          },
+        })
+      }
+    }
+
     revalidatePath('/admin/prospects')
     return { success: true }
   } catch (error) {
     console.error('Error completing interview:', error)
     return { error: 'Failed to complete interview' }
+  }
+}
+
+export async function checkPriorBookingAvailability(prospectId: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const lastBooking = await prisma.calendarBooking.findFirst({
+      where: {
+        prospectId,
+        calendar: {
+          OR: [
+            { name: 'Biz Dev Interview' },
+            { publicSlug: 'biz-dev-interview' },
+          ],
+        },
+        status: { in: ['CANCELLED', 'COMPLETED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { event: true },
+    })
+
+    if (!lastBooking || new Date(lastBooking.startTime) <= new Date()) {
+      return {
+        available: false,
+        reason: lastBooking ? 'past' : 'none',
+      }
+    }
+
+    // Check if the slot/event is still free
+    let slotAvailable = true
+    let unavailableReason = ''
+
+    if (lastBooking.eventId) {
+      const otherBookings = await prisma.calendarBooking.count({
+        where: {
+          eventId: lastBooking.eventId,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          id: { not: lastBooking.id },
+        },
+      })
+      if (otherBookings > 0) {
+        slotAvailable = false
+        unavailableReason = 'taken'
+      }
+      if (lastBooking.event && lastBooking.event.startTime.getTime() !== lastBooking.startTime.getTime()) {
+        slotAvailable = false
+        unavailableReason = 'moved'
+      }
+    } else if (lastBooking.slotId) {
+      const slot = await prisma.calendarSlot.findUnique({ where: { id: lastBooking.slotId } })
+      if (slot) {
+        const otherBookings = await prisma.calendarBooking.count({
+          where: {
+            slotId: lastBooking.slotId,
+            bookingDate: lastBooking.bookingDate,
+            status: { in: ['PENDING', 'CONFIRMED'] },
+            id: { not: lastBooking.id },
+          },
+        })
+        if (otherBookings >= slot.maxBookings) {
+          slotAvailable = false
+          unavailableReason = 'taken'
+        }
+      } else {
+        slotAvailable = false
+        unavailableReason = 'deleted'
+      }
+    }
+
+    return {
+      available: slotAvailable,
+      reason: slotAvailable ? undefined : unavailableReason,
+      booking: {
+        startTime: lastBooking.startTime.toISOString(),
+        endTime: lastBooking.endTime.toISOString(),
+      },
+    }
+  } catch (error) {
+    console.error('Error checking prior booking:', error)
+    return { error: 'Failed to check booking availability' }
+  }
+}
+
+export async function revertInterviewDecision(prospectId: string, restorePriorBooking: boolean) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const prospect = await prisma.prospect.findUnique({
+      where: { id: prospectId },
+    })
+
+    if (!prospect) {
+      return { error: 'Prospect not found' }
+    }
+
+    if (prospect.status !== 'APPROVED' && prospect.status !== 'REJECTED') {
+      return { error: 'Prospect is not in an approved or rejected status' }
+    }
+
+    const previousDecision = prospect.status
+    let rebooked = false
+
+    if (restorePriorBooking) {
+      // Find and re-activate the most recent interview booking
+      const lastBooking = await prisma.calendarBooking.findFirst({
+        where: {
+          prospectId,
+          calendar: {
+            OR: [
+              { name: 'Biz Dev Interview' },
+              { publicSlug: 'biz-dev-interview' },
+            ],
+          },
+          status: { in: ['CANCELLED', 'COMPLETED'] },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      if (lastBooking && new Date(lastBooking.startTime) > new Date()) {
+        await prisma.calendarBooking.update({
+          where: { id: lastBooking.id },
+          data: {
+            status: 'CONFIRMED',
+            cancelledBy: null,
+            cancelledAt: null,
+            cancellationReason: null,
+          },
+        })
+
+        await prisma.prospect.update({
+          where: { id: prospectId },
+          data: {
+            status: 'INTERVIEW_SCHEDULED',
+            interviewCompletedAt: null,
+            interviewNotes: null,
+            interviewResult: null,
+            interviewScheduledAt: lastBooking.startTime,
+          },
+        })
+        rebooked = true
+      }
+    }
+
+    // If not restoring or restore failed, revert to BUSINESS_FORM_SUBMITTED
+    if (!rebooked) {
+      await prisma.prospect.update({
+        where: { id: prospectId },
+        data: {
+          status: 'BUSINESS_FORM_SUBMITTED',
+          interviewCompletedAt: null,
+          interviewNotes: null,
+          interviewResult: null,
+          interviewScheduledAt: null,
+        },
+      })
+    }
+
+    const revertStatus = rebooked ? 'INTERVIEW_SCHEDULED' : 'BUSINESS_FORM_SUBMITTED'
+    await prisma.prospectStatusHistory.create({
+      data: {
+        prospectId,
+        fromStatus: previousDecision,
+        toStatus: revertStatus,
+        changedBy: session.user.id,
+        notes: rebooked
+          ? `Decision reverted from ${previousDecision} - prior appointment restored`
+          : `Decision reverted from ${previousDecision} - needs new appointment`,
+      },
+    })
+
+    revalidatePath(`/admin/prospects/${prospectId}`)
+    revalidatePath('/admin/prospects')
+    return { success: true, rebooked }
+  } catch (error) {
+    console.error('Error reverting interview decision:', error)
+    return { error: 'Failed to revert decision' }
+  }
+}
+
+export async function cancelInterviewBooking(prospectId: string, reason?: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const prospect = await prisma.prospect.findUnique({
+      where: { id: prospectId },
+      include: {
+        calendarBookings: {
+          where: {
+            status: { in: ['PENDING', 'CONFIRMED'] },
+            calendar: {
+              OR: [
+                { name: 'Biz Dev Interview' },
+                { publicSlug: 'biz-dev-interview' },
+              ],
+            },
+          },
+        },
+      },
+    })
+
+    if (!prospect) {
+      return { error: 'Prospect not found' }
+    }
+
+    if (prospect.status !== 'INTERVIEW_SCHEDULED') {
+      return { error: 'Prospect is not in interview scheduled status' }
+    }
+
+    // Cancel all active interview bookings
+    for (const booking of prospect.calendarBookings) {
+      await prisma.calendarBooking.update({
+        where: { id: booking.id },
+        data: {
+          status: 'CANCELLED',
+          cancelledBy: session.user.id,
+          cancelledAt: new Date(),
+          cancellationReason: reason || 'Interview cancelled by admin',
+        },
+      })
+    }
+
+    // Revert prospect status to BUSINESS_FORM_SUBMITTED
+    await prisma.prospect.update({
+      where: { id: prospectId },
+      data: {
+        status: 'BUSINESS_FORM_SUBMITTED',
+        interviewScheduledAt: null,
+      },
+    })
+
+    // Add status history
+    await prisma.prospectStatusHistory.create({
+      data: {
+        prospectId,
+        fromStatus: 'INTERVIEW_SCHEDULED',
+        toStatus: 'BUSINESS_FORM_SUBMITTED',
+        changedBy: session.user.id,
+        notes: 'Biz Dev Interview cancelled by admin',
+      },
+    })
+
+    revalidatePath(`/admin/prospects/${prospectId}`)
+    revalidatePath('/admin/prospects')
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error cancelling interview booking:', error)
+    return { error: 'Failed to cancel interview' }
   }
 }
 
@@ -674,7 +1271,7 @@ export async function generateAcceptanceToken(prospectId: string) {
   }
 
   try {
-    const token = `ac_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+    const token = `ac_${crypto.randomBytes(24).toString('hex')}`
 
     await prisma.prospect.update({
       where: { id: prospectId },
@@ -785,7 +1382,7 @@ export async function createCoachFromProspect(
     }
 
     // Generate password if not provided
-    const tempPassword = password || `Welcome${Math.random().toString(36).substring(2, 10)}!`
+    const tempPassword = password || `Coach${crypto.randomBytes(6).toString('hex').toUpperCase()}!${crypto.randomInt(1000, 9999)}`
     const hashedPassword = await bcrypt.hash(tempPassword, 12)
 
     // Create user and coach profile in transaction

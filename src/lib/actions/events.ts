@@ -60,6 +60,15 @@ export async function createEvent(formData: FormData) {
     return { error: validated.error.issues[0]?.message || 'Invalid input' }
   }
 
+  // Validate endDate > startDate if both provided
+  if (validated.data.endDate) {
+    const start = new Date(validated.data.startDate)
+    const end = new Date(validated.data.endDate)
+    if (end <= start) {
+      return { error: 'End date must be after start date' }
+    }
+  }
+
   try {
     await prisma.event.create({
       data: {
@@ -102,6 +111,15 @@ export async function updateEvent(eventId: string, formData: FormData) {
   const validated = createEventSchema.safeParse(data)
   if (!validated.success) {
     return { error: validated.error.issues[0]?.message || 'Invalid input' }
+  }
+
+  // Validate endDate > startDate if both provided
+  if (validated.data.endDate) {
+    const start = new Date(validated.data.startDate)
+    const end = new Date(validated.data.endDate)
+    if (end <= start) {
+      return { error: 'End date must be after start date' }
+    }
   }
 
   try {

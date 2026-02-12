@@ -56,6 +56,10 @@ export async function getImpersonationData(userId: string) {
     return { error: 'Unauthorized' }
   }
 
+  if (session.user.isImpersonating) {
+    return { error: 'Cannot impersonate while already impersonating. Switch back first.' }
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {

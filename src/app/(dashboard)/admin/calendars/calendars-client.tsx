@@ -35,6 +35,7 @@ interface AdminCalendarData {
   visibility: CalendarVisibility
   color: string
   slotDurationMinutes: number | null
+  maxBookingDays: number | null
   isPublicBookable: boolean
   publicSlug: string | null
   isActive: boolean
@@ -82,6 +83,7 @@ export function CalendarsClient({ calendars: initialCalendars }: Props) {
     visibility: 'GLOBAL' as CalendarVisibility,
     color: '#3B82F6',
     slotDurationMinutes: 60,
+    maxBookingDays: 14,
     isPublicBookable: false,
     publicSlug: '',
   })
@@ -98,6 +100,7 @@ export function CalendarsClient({ calendars: initialCalendars }: Props) {
       visibility: newCalendar.visibility,
       color: newCalendar.color,
       slotDurationMinutes: newCalendar.type === 'BOOKING' ? newCalendar.slotDurationMinutes : undefined,
+      maxBookingDays: newCalendar.type === 'BOOKING' && newCalendar.isPublicBookable ? newCalendar.maxBookingDays : undefined,
       isPublicBookable: newCalendar.isPublicBookable,
       publicSlug: newCalendar.publicSlug || undefined,
     })
@@ -116,6 +119,7 @@ export function CalendarsClient({ calendars: initialCalendars }: Props) {
       visibility: 'GLOBAL',
       color: '#3B82F6',
       slotDurationMinutes: 60,
+      maxBookingDays: 14,
       isPublicBookable: false,
       publicSlug: '',
     })
@@ -502,23 +506,46 @@ export function CalendarsClient({ calendars: initialCalendars }: Props) {
                   </div>
 
                   {newCalendar.isPublicBookable && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Public URL Slug
-                      </label>
-                      <div className="flex items-center">
-                        <span className="px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-500">
-                          /book/
-                        </span>
-                        <input
-                          type="text"
-                          value={newCalendar.publicSlug}
-                          onChange={(e) => setNewCalendar({ ...newCalendar, publicSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="orientation"
-                        />
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Public URL Slug
+                        </label>
+                        <div className="flex items-center">
+                          <span className="px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-500">
+                            /book/
+                          </span>
+                          <input
+                            type="text"
+                            value={newCalendar.publicSlug}
+                            onChange={(e) => setNewCalendar({ ...newCalendar, publicSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="orientation"
+                          />
+                        </div>
                       </div>
-                    </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Max Booking Window
+                        </label>
+                        <select
+                          value={newCalendar.maxBookingDays || 0}
+                          onChange={(e) => setNewCalendar({ ...newCalendar, maxBookingDays: Number(e.target.value) || 0 })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        >
+                          <option value={7}>7 days (1 week)</option>
+                          <option value={14}>14 days (2 weeks)</option>
+                          <option value={21}>21 days (3 weeks)</option>
+                          <option value={30}>30 days (1 month)</option>
+                          <option value={60}>60 days (2 months)</option>
+                          <option value={0}>Unlimited</option>
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">
+                          How far in advance prospects can book appointments
+                        </p>
+                      </div>
+                    </>
                   )}
                 </>
               )}

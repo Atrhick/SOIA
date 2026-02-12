@@ -94,45 +94,48 @@ export async function submitBusinessIdea() {
     return { error: 'No business idea to submit' }
   }
 
-  if (ambassador.businessIdea.status !== 'DRAFT' && ambassador.businessIdea.status !== 'NEEDS_REVISION') {
+  const businessIdea = ambassador.businessIdea
+  if (businessIdea.status !== 'DRAFT' && businessIdea.status !== 'NEEDS_REVISION') {
     return { error: 'Business idea has already been submitted' }
   }
 
   try {
-    await prisma.businessIdea.update({
-      where: { id: ambassador.businessIdea.id },
-      data: {
-        status: 'SUBMITTED',
-        submittedAt: new Date(),
-      },
-    })
-
-    // Update onboarding progress
-    const businessIdeaTask = await prisma.ambassadorOnboardingTask.findFirst({
-      where: { type: 'BUSINESS_IDEA', isActive: true },
-    })
-
-    if (businessIdeaTask) {
-      await prisma.ambassadorOnboardingProgress.upsert({
-        where: {
-          ambassadorId_taskId: { ambassadorId: ambassador.id, taskId: businessIdeaTask.id },
-        },
-        update: { status: 'SUBMITTED' },
-        create: {
-          ambassadorId: ambassador.id,
-          taskId: businessIdeaTask.id,
+    await prisma.$transaction(async (tx) => {
+      await tx.businessIdea.update({
+        where: { id: businessIdea.id },
+        data: {
           status: 'SUBMITTED',
+          submittedAt: new Date(),
         },
       })
-    }
 
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: 'SUBMIT_BUSINESS_IDEA',
-        entityType: 'BusinessIdea',
-        entityId: ambassador.businessIdea.id,
-      },
+      // Update onboarding progress
+      const businessIdeaTask = await tx.ambassadorOnboardingTask.findFirst({
+        where: { type: 'BUSINESS_IDEA', isActive: true },
+      })
+
+      if (businessIdeaTask) {
+        await tx.ambassadorOnboardingProgress.upsert({
+          where: {
+            ambassadorId_taskId: { ambassadorId: ambassador.id, taskId: businessIdeaTask.id },
+          },
+          update: { status: 'SUBMITTED' },
+          create: {
+            ambassadorId: ambassador.id,
+            taskId: businessIdeaTask.id,
+            status: 'SUBMITTED',
+          },
+        })
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: 'SUBMIT_BUSINESS_IDEA',
+          entityType: 'BusinessIdea',
+          entityId: ambassador.businessIdea!.id,
+        },
+      })
     })
 
     revalidatePath('/ambassador/business-idea')

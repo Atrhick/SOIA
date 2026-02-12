@@ -1,6 +1,6 @@
 'use client'
 
-import { LucideIcon, Check, PartyPopper, ExternalLink } from 'lucide-react'
+import { LucideIcon, Check, PartyPopper, ExternalLink, XCircle } from 'lucide-react'
 import Link from 'next/link'
 
 export interface OnboardingStep {
@@ -364,22 +364,23 @@ export interface ProspectStep {
   title: string
   shortTitle?: string
   icon: LucideIcon
-  status: 'completed' | 'current' | 'pending' | 'skipped'
+  status: 'completed' | 'current' | 'pending' | 'skipped' | 'rejected'
 }
 
 interface ProspectJourneyProps {
   preOnboardingSteps: ProspectStep[]
   onboardingSteps: ProspectStep[]
   coachProfileId?: string | null
+  isRejected?: boolean
   className?: string
 }
 
-export function ProspectJourney({ preOnboardingSteps, onboardingSteps, coachProfileId, className = '' }: ProspectJourneyProps) {
+export function ProspectJourney({ preOnboardingSteps, onboardingSteps, coachProfileId, isRejected = false, className = '' }: ProspectJourneyProps) {
   const allSteps = [...preOnboardingSteps, ...onboardingSteps]
   const completedCount = allSteps.filter(s => s.status === 'completed').length
   const totalCount = allSteps.filter(s => s.status !== 'skipped').length
   const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-  const isComplete = progressPercentage === 100
+  const isComplete = progressPercentage === 100 && !isRejected
 
   const preOnboardingCompleted = preOnboardingSteps.filter(s => s.status === 'completed').length
   const preOnboardingTotal = preOnboardingSteps.filter(s => s.status !== 'skipped').length
@@ -390,6 +391,7 @@ export function ProspectJourney({ preOnboardingSteps, onboardingSteps, coachProf
     const StepIcon = step.icon
     const isCompleted = step.status === 'completed'
     const isCurrent = step.status === 'current'
+    const isRejectedStep = step.status === 'rejected'
     const isPending = step.status === 'pending'
     const isSkipped = step.status === 'skipped'
 
@@ -401,14 +403,18 @@ export function ProspectJourney({ preOnboardingSteps, onboardingSteps, coachProf
           {/* Step Circle */}
           <div
             className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-              isCompleted
-                ? 'bg-green-500 text-white'
-                : isCurrent
-                  ? 'bg-amber-500 text-white ring-4 ring-amber-200'
-                  : 'bg-gray-200 text-gray-400'
+              isRejectedStep
+                ? 'bg-red-500 text-white ring-4 ring-red-200'
+                : isCompleted
+                  ? 'bg-green-500 text-white'
+                  : isCurrent
+                    ? 'bg-amber-500 text-white ring-4 ring-amber-200'
+                    : 'bg-gray-200 text-gray-400'
             }`}
           >
-            {isCompleted ? (
+            {isRejectedStep ? (
+              <XCircle className="w-5 h-5" />
+            ) : isCompleted ? (
               <Check className="w-5 h-5 stroke-[3]" />
             ) : (
               <StepIcon className="w-5 h-5" />
@@ -416,7 +422,7 @@ export function ProspectJourney({ preOnboardingSteps, onboardingSteps, coachProf
           </div>
           {/* Step Label */}
           <span className={`mt-2 text-[10px] sm:text-xs font-medium text-center max-w-[60px] sm:max-w-[80px] leading-tight ${
-            isCompleted ? 'text-green-700' : isCurrent ? 'text-amber-700' : 'text-gray-400'
+            isRejectedStep ? 'text-red-700' : isCompleted ? 'text-green-700' : isCurrent ? 'text-amber-700' : 'text-gray-400'
           }`}>
             {step.shortTitle || step.title}
           </span>
@@ -424,7 +430,7 @@ export function ProspectJourney({ preOnboardingSteps, onboardingSteps, coachProf
         {/* Connector Line (except for last in phase) */}
         {!isLastInPhase && (
           <div className={`w-6 sm:w-10 h-1 mx-1 rounded-full ${
-            isCompleted ? 'bg-green-400' : 'bg-gray-200'
+            isRejectedStep ? 'bg-red-400' : isCompleted ? 'bg-green-400' : 'bg-gray-200'
           }`} />
         )}
       </div>
@@ -432,7 +438,21 @@ export function ProspectJourney({ preOnboardingSteps, onboardingSteps, coachProf
   }
 
   return (
-    <div className={`bg-white rounded-xl border ${isComplete ? 'border-green-300' : 'border-gray-200'} shadow-sm overflow-hidden ${className}`}>
+    <div className={`bg-white rounded-xl border ${isComplete ? 'border-green-300' : isRejected ? 'border-red-300' : 'border-gray-200'} shadow-sm overflow-hidden ${className}`}>
+      {/* Rejection Banner */}
+      {isRejected && (
+        <div className="px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+              <XCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Prospect Rejected</h3>
+              <p className="text-sm text-red-100">This prospect was not approved to continue</p>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Completion Banner */}
       {isComplete && (
         <div className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white">

@@ -91,7 +91,7 @@ export async function createUser(formData: FormData) {
       return { error: 'A user with this email already exists' }
     }
 
-    const hashedPassword = await bcrypt.hash(validated.data.password, 10)
+    const hashedPassword = await bcrypt.hash(validated.data.password, 12)
 
     // Create user with appropriate profile
     // Note: Ambassador profiles require a coach connection, so they are created
@@ -215,12 +215,12 @@ export async function resetUserPassword(userId: string, newPassword: string) {
     return { error: 'Unauthorized' }
   }
 
-  if (newPassword.length < 6) {
-    return { error: 'Password must be at least 6 characters' }
+  if (newPassword.length < 8) {
+    return { error: 'Password must be at least 8 characters' }
   }
 
   try {
-    const hashedPassword = await bcrypt.hash(newPassword, 10)
+    const hashedPassword = await bcrypt.hash(newPassword, 12)
 
     await prisma.user.update({
       where: { id: userId },

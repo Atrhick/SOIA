@@ -36,7 +36,10 @@ const updateSurveySchema = z.object({
   isPublic: z.boolean().optional(),
   requiresProspectInfo: z.boolean().optional(),
   showProgressBar: z.boolean().optional(),
-  contactInfoConfig: z.any().optional(),
+  contactInfoConfig: z.object({
+    phone: z.object({ enabled: z.boolean(), required: z.boolean() }).optional(),
+    referrer: z.object({ enabled: z.boolean(), required: z.boolean() }).optional(),
+  }).optional(),
 })
 
 const questionSchema = z.object({

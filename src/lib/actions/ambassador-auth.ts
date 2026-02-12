@@ -4,13 +4,18 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { z } from 'zod'
 
 const createAmbassadorSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number'),
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
   phone: z.string().optional(),
   phoneCountryCode: z.string().optional(),
@@ -165,7 +170,7 @@ export async function createAmbassadorAccount(formData: FormData) {
       let parentUser = null
       if (requiresParentalConsent && data.parentEmail) {
         // Generate a temporary password for parent (they should reset it)
-        const tempParentPassword = Math.random().toString(36).slice(-10) + 'A1!'
+        const tempParentPassword = `Parent${crypto.randomBytes(6).toString('hex').toUpperCase()}!${crypto.randomInt(1000, 9999)}`
         const hashedParentPassword = await bcrypt.hash(tempParentPassword, 12)
 
         parentUser = await tx.user.create({
@@ -256,13 +261,11 @@ export async function createAmbassadorAccount(formData: FormData) {
         entityType: 'Ambassador',
         entityId: result.ambassador.id,
         details: JSON.stringify({
-          ambassadorEmail: data.email,
+          ambassadorId: result.ambassador.id,
           coachId: coachId,
           createdBy: session.user.role,
-          age: age,
           requiresParentalConsent: requiresParentalConsent,
           parentAccountCreated: !!result.parentUser,
-          parentEmail: result.parentUser ? data.parentEmail : null,
         }),
       },
     })
@@ -311,8 +314,8 @@ export async function resetAmbassadorPassword(ambassadorId: string, newPassword:
     return { error: 'Unauthorized' }
   }
 
-  if (newPassword.length < 6) {
-    return { error: 'Password must be at least 6 characters' }
+  if (newPassword.length < 8) {
+    return { error: 'Password must be at least 8 characters' }
   }
 
   try {

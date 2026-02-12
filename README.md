@@ -144,6 +144,9 @@ The StageOneInAction Back Office provides:
 | LMS Courses | ✅ | ✅ | ✅ | Complete |
 | LMS Analytics | - | - | ✅ | Complete |
 
+| Calendar Events as Availability | - | - | ✅ | Complete |
+| Migration API | - | - | ✅ | Complete |
+
 ### Future Enhancements
 
 - Audit Logs
@@ -186,6 +189,13 @@ DATABASE_URL="postgresql://stageoneinaction:stageoneinaction_dev_2024@localhost:
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your-secret-key-here-change-in-production"
+
+# Coach Program
+COACH_PROGRAM_FEE="1500"
+NEXT_PUBLIC_COACH_PROGRAM_FEE="1500"
+
+# Migration API (optional, for URL-based migrations)
+MIGRATION_SECRET="your-migration-secret-here"
 ```
 
 ### Database Setup
@@ -1053,6 +1063,12 @@ For older prospects without `assessmentSubmissionId`, the system attempts to fin
 - **"Other" service option** - Prospects can select "Other" and enter a custom service not in the predefined list
 - Predefined services: Life Coaching, Mentoring, Training & Workshops, Business Consulting, Public Speaking, Writing & Content
 
+**Link Modal with Email:**
+When admin generates or views prospect links (business form, orientation, acceptance), a modal appears with:
+- Copy Link button to copy the URL to clipboard
+- Send Email button that opens the user's email client with pre-filled subject and body
+- The modal displays the full link for reference
+
 **Routes:**
 | Route | Description |
 |-------|-------------|
@@ -1062,6 +1078,7 @@ For older prospects without `assessmentSubmissionId`, the system attempts to fin
 | `/business-form/[token]` | Public business development form (no auth) |
 | `/acceptance/[token]` | Public acceptance letter with payment (no auth) |
 | `/book/[slug]` | Public calendar booking page (no auth) |
+| `/book/orientation/[token]` | Token-based orientation booking for prospects (no auth) |
 
 ### LMS (Learning Management System)
 
@@ -1138,6 +1155,53 @@ LMSCourse (Course container)
 Run the migration script to convert old Course/QuizQuestion data to new LMS structure:
 ```bash
 npx tsx scripts/migrate-courses-to-lms.ts
+```
+
+### Calendar Events as Bookable Availability
+
+CalendarEvents can be used as bookable availability for prospects:
+
+**How It Works:**
+- When an admin creates a CalendarEvent on a calendar, it becomes available as a bookable slot
+- Events have a capacity of 1 by default (can be configured)
+- Prospects see available event dates on their booking page
+- When a prospect books an event slot, a CalendarBooking is created with `eventId` set
+- Events that are fully booked no longer appear as available
+
+**Integration:**
+- `getAvailableDatesForMonth()` includes dates with CalendarEvents
+- `getAvailableSlots()` returns events as slots with `id: event_${event.id}` prefix
+- `createPublicBooking()` handles event bookings when slotId starts with `event_`
+
+### Migration API Endpoint
+
+A secure endpoint for running database migrations on production without direct database access:
+
+**Endpoint:** `GET/POST /api/admin/migrate`
+
+**Authentication:**
+- Admin session (via NextAuth)
+- Or `MIGRATION_SECRET` environment variable in `x-migration-secret` header
+
+**Usage:**
+```bash
+# Check migration status
+curl -H "x-migration-secret: YOUR_SECRET" https://your-app.com/api/admin/migrate
+
+# Run pending migrations
+curl -X POST -H "x-migration-secret: YOUR_SECRET" https://your-app.com/api/admin/migrate
+```
+
+**Adding New Migrations:**
+Add SQL migrations to the `MIGRATIONS` array in `src/app/api/admin/migrate/route.ts`:
+```typescript
+const MIGRATIONS = [
+  {
+    id: 'unique_migration_id',
+    description: 'What this migration does',
+    sql: 'ALTER TABLE ... ADD COLUMN ...',
+  },
+]
 ```
 
 ### Sidebar Navigation

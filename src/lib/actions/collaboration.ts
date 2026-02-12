@@ -23,19 +23,11 @@ const createReplySchema = z.object({
   content: z.string().min(1, 'Content is required'),
 })
 
-// Helper to revalidate all collaboration paths
+// Helper to revalidate all collaboration paths (layout-level covers sub-routes)
 function revalidateCollaboration() {
-  revalidatePath('/admin/collaboration')
-  revalidatePath('/admin/collaboration/channels')
-  revalidatePath('/admin/collaboration/messages')
-  revalidatePath('/admin/collaboration/files')
-  revalidatePath('/coach/collaboration')
-  revalidatePath('/coach/collaboration/channels')
-  revalidatePath('/coach/collaboration/messages')
-  revalidatePath('/coach/collaboration/files')
-  revalidatePath('/ambassador/collaboration')
-  revalidatePath('/ambassador/collaboration/channels')
-  revalidatePath('/ambassador/collaboration/messages')
+  revalidatePath('/admin/collaboration', 'layout')
+  revalidatePath('/coach/collaboration', 'layout')
+  revalidatePath('/ambassador/collaboration', 'layout')
 }
 
 // ============ CHANNELS ============
@@ -197,9 +189,7 @@ export async function createChannel(formData: FormData) {
       },
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true, channel }
   } catch (error) {
     console.error('Error creating channel:', error)
@@ -231,9 +221,7 @@ export async function updateChannel(channelId: string, formData: FormData) {
       data: validated.data,
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true, channel }
   } catch (error) {
     console.error('Error updating channel:', error)
@@ -248,23 +236,23 @@ export async function deleteChannel(channelId: string) {
   }
 
   try {
-    // Delete all related data first
-    await prisma.channelPostReply.deleteMany({
-      where: { post: { channelId } }
-    })
-    await prisma.channelPost.deleteMany({
-      where: { channelId }
-    })
-    await prisma.channelMember.deleteMany({
-      where: { channelId }
-    })
-    await prisma.collaborationChannel.delete({
-      where: { id: channelId },
+    // Delete all related data in a transaction for atomicity
+    await prisma.$transaction(async (tx) => {
+      await tx.channelPostReply.deleteMany({
+        where: { post: { channelId } }
+      })
+      await tx.channelPost.deleteMany({
+        where: { channelId }
+      })
+      await tx.channelMember.deleteMany({
+        where: { channelId }
+      })
+      await tx.collaborationChannel.delete({
+        where: { id: channelId },
+      })
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true }
   } catch (error) {
     console.error('Error deleting channel:', error)
@@ -312,9 +300,7 @@ export async function createPost(formData: FormData) {
       },
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true, post }
   } catch (error) {
     console.error('Error creating post:', error)
@@ -347,9 +333,7 @@ export async function createReply(formData: FormData) {
       },
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true, reply }
   } catch (error) {
     console.error('Error creating reply:', error)
@@ -377,9 +361,7 @@ export async function togglePinPost(postId: string) {
       data: { isPinned: !post.isPinned },
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true, isPinned: updated.isPinned }
   } catch (error) {
     console.error('Error toggling pin:', error)
@@ -407,16 +389,16 @@ export async function deletePost(postId: string) {
       return { error: 'Unauthorized' }
     }
 
-    await prisma.channelPostReply.deleteMany({
-      where: { postId }
-    })
-    await prisma.channelPost.delete({
-      where: { id: postId },
+    await prisma.$transaction(async (tx) => {
+      await tx.channelPostReply.deleteMany({
+        where: { postId }
+      })
+      await tx.channelPost.delete({
+        where: { id: postId },
+      })
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true }
   } catch (error) {
     console.error('Error deleting post:', error)
@@ -494,9 +476,7 @@ export async function createSharedDocument(formData: FormData) {
       },
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true, document }
   } catch (error) {
     console.error('Error creating document:', error)
@@ -515,9 +495,7 @@ export async function deleteSharedDocument(documentId: string) {
       where: { id: documentId },
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true }
   } catch (error) {
     console.error('Error deleting document:', error)
@@ -560,9 +538,7 @@ export async function joinChannel(channelId: string) {
       },
     })
 
-    revalidatePath('/admin/collaboration')
-    revalidatePath('/coach/collaboration')
-    revalidatePath('/ambassador/collaboration')
+    revalidateCollaboration()
     return { success: true }
   } catch (error) {
     console.error('Error joining channel:', error)
@@ -892,7 +868,7 @@ export async function getUsersForDM() {
     // Coach can message admins and their ambassadors
     // Ambassador can message their coach and admins
 
-    let whereClause: any = {}
+    let whereClause: Record<string, unknown> = {}
 
     if (session.user.role === 'ADMIN') {
       // Admin can message coaches and ambassadors

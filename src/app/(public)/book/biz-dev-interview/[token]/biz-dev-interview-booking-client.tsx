@@ -11,6 +11,7 @@ import {
   User,
   Mail,
   Phone,
+  Briefcase,
 } from 'lucide-react'
 import { getAvailableSlots, createPublicBooking, getAvailableDatesForMonth } from '@/lib/actions/admin-calendars'
 
@@ -50,7 +51,7 @@ interface AvailableSlot {
   remainingCapacity: number
 }
 
-interface OrientationBookingClientProps {
+interface BizDevInterviewBookingClientProps {
   calendar: CalendarData
   prospect: ProspectData
   token: string
@@ -102,7 +103,6 @@ function convertTimeToTimezone(
   const [slotHours, slotMinutes] = time.split(':').map(Number)
 
   // Use a reference date at noon UTC to calculate timezone offsets
-  // This avoids DST edge cases at midnight
   const refDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0))
 
   // Create formatters for both timezones
@@ -127,8 +127,7 @@ function convertTimeToTimezone(
   const fromTime = getTimeFromParts(fromParts)
   const toTime = getTimeFromParts(toParts)
 
-  // Calculate offset: how many minutes ahead is toTimezone compared to fromTimezone?
-  // If fromTimezone shows 12:00 and toTimezone shows 15:00, offset is +180 (3 hours ahead)
+  // Calculate offset
   let offsetMinutes = (toTime.hours * 60 + toTime.minutes) - (fromTime.hours * 60 + fromTime.minutes)
 
   // Handle day boundary wraparound
@@ -148,7 +147,7 @@ function convertTimeToTimezone(
   }
 }
 
-export function OrientationBookingClient({ calendar, prospect, token }: OrientationBookingClientProps) {
+export function BizDevInterviewBookingClient({ calendar, prospect, token }: BizDevInterviewBookingClientProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([])
@@ -263,7 +262,6 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
 
   // Server-Sent Events for real-time availability updates
   useEffect(() => {
-    // Don't connect if booking is complete
     if (isComplete) return
 
     const eventSource = new EventSource(`/api/calendar/${calendar.id}/events`)
@@ -272,7 +270,6 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
       try {
         const data = JSON.parse(event.data)
 
-        // Refresh availability when a booking is created
         if (data.type === 'booking_created' || data.type === 'booking_updated') {
           fetchAvailableDates()
           if (selectedDate) {
@@ -336,6 +333,7 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
         bookerPhone: phone || undefined,
         prospectId: prospect.id,
         notes: notes || undefined,
+        bookingType: 'biz-dev-interview',
       })
 
       if (result.error) {
@@ -363,19 +361,16 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
 
     const userTzLabel = TIMEZONE_LABELS[userTimezone] || userTimezone
 
-    // If user is in the same timezone as the slot, just show the time
     if (slotTimezone === userTimezone) {
       return `${formatTime(time)} ${userTzLabel}`
     }
 
-    // Convert to user's timezone
     const converted = convertTimeToTimezone(time, selectedDate, slotTimezone, userTimezone)
     const convertedTimeStr = `${String(converted.hours).padStart(2, '0')}:${String(converted.minutes).padStart(2, '0')}`
 
     return `${formatTime(convertedTimeStr)} ${userTzLabel}`
   }
 
-  // Get the original slot time label for display
   const getOriginalTimeLabel = (time: string, slotTimezone: string) => {
     const slotTzLabel = TIMEZONE_LABELS[slotTimezone] || slotTimezone
     return `${formatTime(time)} ${slotTzLabel}`
@@ -390,10 +385,10 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Booking Confirmed!
+            Interview Scheduled!
           </h1>
           <p className="text-gray-600 mb-6">
-            Your orientation has been scheduled.
+            Your Biz Dev Interview has been scheduled.
           </p>
 
           <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
@@ -423,9 +418,9 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
             </div>
           </div>
 
-          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
-            <p className="text-primary-800 text-sm">
-              You will receive a confirmation email at <strong>{email}</strong> with the meeting details.
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p className="text-amber-800 text-sm">
+              You will receive a confirmation email at <strong>{email}</strong> with the meeting details and any preparation information.
             </p>
           </div>
         </div>
@@ -437,6 +432,10 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
     <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="text-center mb-8">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-800 rounded-full text-sm mb-4">
+          <Briefcase className="w-4 h-4" />
+          <span>Business Development Interview</span>
+        </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{calendar.name}</h1>
         {calendar.description && (
           <p className="text-gray-600 max-w-2xl mx-auto">{calendar.description}</p>
@@ -489,7 +488,7 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
           {/* Calendar grid */}
           {isLoadingDates ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
               <span className="ml-2 text-gray-500">Loading available dates...</span>
             </div>
           ) : (
@@ -512,14 +511,14 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
                     className={`
                       aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all
                       ${isSelected
-                        ? 'bg-primary-600 text-white'
+                        ? 'bg-amber-600 text-white'
                         : isSelectable
-                          ? 'hover:bg-primary-50 text-gray-900 bg-green-50'
+                          ? 'hover:bg-amber-50 text-gray-900 bg-amber-50/50'
                           : isPast
                             ? 'text-gray-300 cursor-not-allowed'
                             : 'text-gray-400 cursor-not-allowed'
                       }
-                      ${isToday && !isSelected ? 'ring-2 ring-primary-500 ring-offset-2' : ''}
+                      ${isToday && !isSelected ? 'ring-2 ring-amber-500 ring-offset-2' : ''}
                     `}
                   >
                     {date.getDate()}
@@ -532,11 +531,11 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
           {/* Legend */}
           <div className="mt-6 flex items-center gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-primary-600"></div>
+              <div className="w-3 h-3 rounded-full bg-amber-600"></div>
               <span>Selected</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-green-50 border border-green-200"></div>
+              <div className="w-3 h-3 rounded bg-amber-50 border border-amber-200"></div>
               <span>Available</span>
             </div>
             <div className="flex items-center gap-2">
@@ -574,7 +573,7 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
 
               {isLoadingSlots ? (
                 <div className="text-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary-600 mx-auto" />
+                  <Loader2 className="w-8 h-8 animate-spin text-amber-600 mx-auto" />
                   <p className="text-gray-500 mt-2">Loading available times...</p>
                 </div>
               ) : availableSlots.length === 0 ? (
@@ -603,8 +602,8 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
                             ${!slot.available
                               ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
                               : selectedSlot?.id === slot.id
-                                ? 'border-primary-600 bg-primary-50 text-primary-700'
-                                : 'border-gray-200 hover:border-primary-300 text-gray-900'
+                                ? 'border-amber-600 bg-amber-50 text-amber-700'
+                                : 'border-gray-200 hover:border-amber-300 text-gray-900'
                             }
                           `}
                         >
@@ -680,8 +679,8 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
                           rows={2}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="Any questions or additional information..."
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          placeholder="Any questions or topics you'd like to discuss..."
                         />
                       </div>
 
@@ -694,7 +693,7 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-3 px-4 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                       >
                         {isSubmitting ? (
                           <>
@@ -704,7 +703,7 @@ export function OrientationBookingClient({ calendar, prospect, token }: Orientat
                         ) : (
                           <>
                             <CheckCircle className="w-5 h-5" />
-                            Confirm Booking
+                            Confirm Interview
                           </>
                         )}
                       </button>

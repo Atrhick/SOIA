@@ -42,8 +42,17 @@ interface AvailableSlot {
   remainingCapacity: number
 }
 
+interface ProspectData {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string | null
+}
+
 interface BookingClientProps {
   calendar: CalendarData
+  prospect?: ProspectData | null
 }
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -52,7 +61,83 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ]
 
-export function BookingClient({ calendar }: BookingClientProps) {
+const TIMEZONE_LABELS: Record<string, string> = {
+  'America/Los_Angeles': 'PT',
+  'America/Denver': 'MT',
+  'America/Chicago': 'CT',
+  'America/New_York': 'ET',
+  'America/Anchorage': 'AKT',
+  'Pacific/Honolulu': 'HT',
+  'America/Phoenix': 'MST',
+  'UTC': 'UTC',
+}
+
+// Helper to get hour/minute from formatToParts
+function getTimeFromParts(parts: Intl.DateTimeFormatPart[]): { hours: number; minutes: number } {
+  const hourPart = parts.find(p => p.type === 'hour')
+  const minutePart = parts.find(p => p.type === 'minute')
+
+  let hours = parseInt(hourPart?.value || '0', 10)
+  const minutes = parseInt(minutePart?.value || '0', 10)
+
+  return { hours, minutes }
+}
+
+// Convert time from source timezone to target timezone
+function convertTimeToTimezone(
+  time: string,
+  date: Date,
+  fromTimezone: string,
+  toTimezone: string
+): { hours: number; minutes: number } {
+  const [slotHours, slotMinutes] = time.split(':').map(Number)
+
+  // Use a reference date at noon UTC to calculate timezone offsets
+  const refDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0))
+
+  // Create formatters for both timezones (24-hour format)
+  const fromFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: fromTimezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  const toFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: toTimezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  // Get the time in each timezone for the same instant
+  const fromParts = fromFormatter.formatToParts(refDate)
+  const toParts = toFormatter.formatToParts(refDate)
+
+  const fromTime = getTimeFromParts(fromParts)
+  const toTime = getTimeFromParts(toParts)
+
+  // Calculate offset: how many minutes ahead is toTimezone compared to fromTimezone?
+  let offsetMinutes = (toTime.hours * 60 + toTime.minutes) - (fromTime.hours * 60 + fromTime.minutes)
+
+  // Handle day boundary wraparound
+  if (offsetMinutes > 720) offsetMinutes -= 1440
+  if (offsetMinutes < -720) offsetMinutes += 1440
+
+  // Apply offset to slot time
+  let resultMinutes = slotHours * 60 + slotMinutes + offsetMinutes
+
+  // Handle day wraparound
+  while (resultMinutes < 0) resultMinutes += 1440
+  while (resultMinutes >= 1440) resultMinutes -= 1440
+
+  return {
+    hours: Math.floor(resultMinutes / 60),
+    minutes: resultMinutes % 60,
+  }
+}
+
+export function BookingClient({ calendar, prospect }: BookingClientProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([])
@@ -63,11 +148,24 @@ export function BookingClient({ calendar }: BookingClientProps) {
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState('')
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
+  const [maxBookingDays, setMaxBookingDays] = useState<number | null>(null)
+  const [maxBookingDate, setMaxBookingDate] = useState<Date | null>(null)
 
-  // Form fields
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  // Store confirmed booking details for the success screen
+  const [confirmedBooking, setConfirmedBooking] = useState<{
+    date: Date
+    startTime: string
+    endTime: string
+    timezone: string
+  } | null>(null)
+
+  // Detect user's browser timezone
+  const [userTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+
+  // Form fields - pre-fill from prospect if available
+  const [name, setName] = useState(prospect ? `${prospect.firstName} ${prospect.lastName}` : '')
+  const [email, setEmail] = useState(prospect?.email || '')
+  const [phone, setPhone] = useState(prospect?.phone || '')
   const [notes, setNotes] = useState('')
 
   // Fetch available dates for the current month
@@ -90,6 +188,13 @@ export function BookingClient({ calendar }: BookingClientProps) {
         setAvailableDates(new Set(result.availableDates))
       } else if (result.error) {
         console.error('[BookingClient] Error:', result.error)
+      }
+      // Store booking window info
+      if (result.maxBookingDays !== undefined) {
+        setMaxBookingDays(result.maxBookingDays)
+      }
+      if (result.maxBookingDate) {
+        setMaxBookingDate(new Date(result.maxBookingDate))
       }
     } catch (err) {
       console.error('[BookingClient] Failed to load available dates:', err)
@@ -166,6 +271,34 @@ export function BookingClient({ calendar }: BookingClientProps) {
     }
   }, [selectedDate, fetchAvailableSlots])
 
+  // Server-Sent Events for real-time availability updates
+  useEffect(() => {
+    // Don't connect if booking is complete
+    if (isComplete) return
+
+    const eventSource = new EventSource(`/api/calendar/${calendar.id}/events`)
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+
+        // Refresh availability when a booking is created
+        if (data.type === 'booking_created' || data.type === 'booking_updated') {
+          fetchAvailableDates()
+          if (selectedDate) {
+            fetchAvailableSlots(selectedDate)
+          }
+        }
+      } catch (error) {
+        console.error('[SSE] Error parsing message:', error)
+      }
+    }
+
+    return () => {
+      eventSource.close()
+    }
+  }, [calendar.id, fetchAvailableDates, fetchAvailableSlots, selectedDate, isComplete])
+
   const handleDateClick = (date: Date | null) => {
     if (!date || !isDateSelectable(date)) return
     setSelectedDate(date)
@@ -178,6 +311,21 @@ export function BookingClient({ calendar }: BookingClientProps) {
 
   const handleNextMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
+  }
+
+  // Check if we can navigate to next month (not beyond booking window)
+  const canGoNextMonth = () => {
+    if (!maxBookingDate) return true // No limit set
+    const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
+    return nextMonth <= maxBookingDate
+  }
+
+  // Check if we can navigate to previous month (not before current month)
+  const canGoPrevMonth = () => {
+    const today = new Date()
+    const currentMonthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+    return currentMonthStart > thisMonthStart
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -197,12 +345,20 @@ export function BookingClient({ calendar }: BookingClientProps) {
         bookerName: name,
         bookerEmail: email,
         bookerPhone: phone || undefined,
+        prospectId: prospect?.id,
         notes: notes || undefined,
       })
 
       if (result.error) {
         setError(result.error)
       } else {
+        // Save booking details for success screen
+        setConfirmedBooking({
+          date: selectedDate,
+          startTime: selectedSlot.startTime,
+          endTime: selectedSlot.endTime,
+          timezone: selectedSlot.timezone,
+        })
         setIsComplete(true)
       }
     } catch {
@@ -219,8 +375,50 @@ export function BookingClient({ calendar }: BookingClientProps) {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`
   }
 
+  // Format time converted to user's timezone
+  const formatTimeInUserTimezone = (time: string, slotTimezone: string) => {
+    if (!selectedDate) return formatTime(time)
+
+    const userTzLabel = TIMEZONE_LABELS[userTimezone] || userTimezone
+
+    // If user is in the same timezone as the slot, just show the time
+    if (slotTimezone === userTimezone) {
+      return `${formatTime(time)} ${userTzLabel}`
+    }
+
+    // Convert to user's timezone
+    const converted = convertTimeToTimezone(time, selectedDate, slotTimezone, userTimezone)
+    const convertedTimeStr = `${String(converted.hours).padStart(2, '0')}:${String(converted.minutes).padStart(2, '0')}`
+
+    return `${formatTime(convertedTimeStr)} ${userTzLabel}`
+  }
+
+  // Get the original slot time label
+  const getOriginalTimeLabel = (time: string, slotTimezone: string) => {
+    const slotTzLabel = TIMEZONE_LABELS[slotTimezone] || slotTimezone
+    return `${formatTime(time)} ${slotTzLabel}`
+  }
+
+  // Helper to format time for success screen using confirmed booking data
+  const formatConfirmedTime = (time: string, timezone: string) => {
+    if (!confirmedBooking) return formatTime(time)
+
+    const userTzLabel = TIMEZONE_LABELS[userTimezone] || userTimezone
+
+    if (timezone === userTimezone) {
+      return `${formatTime(time)} ${userTzLabel}`
+    }
+
+    // Convert to user's timezone
+    const converted = convertTimeToTimezone(time, confirmedBooking.date, timezone, userTimezone)
+    const convertedTimeStr = `${String(converted.hours).padStart(2, '0')}:${String(converted.minutes).padStart(2, '0')}`
+    return `${formatTime(convertedTimeStr)} ${userTzLabel}`
+  }
+
   // Success screen
-  if (isComplete) {
+  if (isComplete && confirmedBooking) {
+    const slotTzLabel = TIMEZONE_LABELS[confirmedBooking.timezone] || confirmedBooking.timezone
+
     return (
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-xl shadow-lg p-8 text-center">
@@ -238,7 +436,7 @@ export function BookingClient({ calendar }: BookingClientProps) {
             <div className="flex items-center gap-2 mb-2">
               <CalendarIcon className="w-5 h-5 text-gray-500" />
               <span className="font-medium">
-                {selectedDate?.toLocaleDateString('en-US', {
+                {confirmedBooking.date.toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',
@@ -248,9 +446,16 @@ export function BookingClient({ calendar }: BookingClientProps) {
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">
-                {selectedSlot && formatTime(selectedSlot.startTime)} - {selectedSlot && formatTime(selectedSlot.endTime)} {selectedSlot?.timezone}
-              </span>
+              <div>
+                <span className="font-medium">
+                  {formatConfirmedTime(confirmedBooking.startTime, confirmedBooking.timezone)} - {formatConfirmedTime(confirmedBooking.endTime, confirmedBooking.timezone)}
+                </span>
+                {userTimezone !== confirmedBooking.timezone && (
+                  <span className="block text-sm text-gray-500 mt-1">
+                    ({formatTime(confirmedBooking.startTime)} - {formatTime(confirmedBooking.endTime)} {slotTzLabel})
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -272,16 +477,23 @@ export function BookingClient({ calendar }: BookingClientProps) {
         {calendar.description && (
           <p className="text-gray-600 max-w-2xl mx-auto">{calendar.description}</p>
         )}
+        {prospect && (
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-full text-sm">
+            <User className="w-4 h-4" />
+            <span>Booking for: <strong>{prospect.firstName} {prospect.lastName}</strong></span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Calendar */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           {/* Month navigation */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <button
               onClick={handlePrevMonth}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              disabled={!canGoPrevMonth()}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
@@ -290,11 +502,18 @@ export function BookingClient({ calendar }: BookingClientProps) {
             </h2>
             <button
               onClick={handleNextMonth}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              disabled={!canGoNextMonth()}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-5 h-5 text-gray-600" />
             </button>
           </div>
+          {/* Booking window indicator */}
+          {maxBookingDays && maxBookingDays > 0 && (
+            <p className="text-xs text-gray-500 text-center mb-4">
+              Book within the next {maxBookingDays} days
+            </p>
+          )}
 
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-1 mb-2">
@@ -406,7 +625,10 @@ export function BookingClient({ calendar }: BookingClientProps) {
                   {/* Time slot selection */}
                   <div>
                     <p className="text-sm text-gray-600 mb-3">
-                      Select a time <span className="text-gray-500">({availableSlots[0]?.timezone === 'America/Los_Angeles' ? 'Pacific Time' : availableSlots[0]?.timezone || 'Pacific Time'})</span>:
+                      Select a time
+                      {userTimezone !== (availableSlots[0]?.timezone || 'America/Los_Angeles') && (
+                        <span className="text-gray-500"> (shown in your timezone: {TIMEZONE_LABELS[userTimezone] || userTimezone})</span>
+                      )}:
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {availableSlots.map(slot => (
@@ -424,7 +646,12 @@ export function BookingClient({ calendar }: BookingClientProps) {
                             }
                           `}
                         >
-                          {formatTime(slot.startTime)} {slot.timezone === 'America/Los_Angeles' ? 'PT' : ''}
+                          <span className="block">{formatTimeInUserTimezone(slot.startTime, slot.timezone)}</span>
+                          {userTimezone !== slot.timezone && (
+                            <span className="block text-xs text-gray-500 mt-0.5">
+                              ({getOriginalTimeLabel(slot.startTime, slot.timezone)})
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -435,18 +662,29 @@ export function BookingClient({ calendar }: BookingClientProps) {
                     <form onSubmit={handleSubmit} className="space-y-4 pt-4 border-t">
                       <h4 className="font-medium text-gray-900">Your Information</h4>
 
+                      {prospect && (
+                        <div className="p-3 bg-primary-50 text-primary-700 text-sm rounded-lg mb-2">
+                          Booking for: <strong>{name}</strong>
+                        </div>
+                      )}
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Full Name *
+                          Full Name {!prospect && '*'}
                         </label>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type="text"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => !prospect && setName(e.target.value)}
+                            readOnly={!!prospect}
                             required
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            className={`w-full pl-10 pr-4 py-2 border rounded-lg ${
+                              prospect
+                                ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed'
+                                : 'border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
+                            }`}
                             placeholder="John Doe"
                           />
                         </div>
@@ -454,36 +692,48 @@ export function BookingClient({ calendar }: BookingClientProps) {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Email Address *
+                          Email Address {!prospect && '*'}
                         </label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type="email"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            onChange={(e) => !prospect && setEmail(e.target.value)}
+                            readOnly={!!prospect}
                             required
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            className={`w-full pl-10 pr-4 py-2 border rounded-lg ${
+                              prospect
+                                ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed'
+                                : 'border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
+                            }`}
                             placeholder="name@example.com"
                           />
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Phone Number
-                        </label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="(555) 123-4567"
-                          />
+                      {(prospect?.phone || !prospect) && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Phone Number
+                          </label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <input
+                              type="tel"
+                              value={phone}
+                              onChange={(e) => !prospect && setPhone(e.target.value)}
+                              readOnly={!!prospect}
+                              className={`w-full pl-10 pr-4 py-2 border rounded-lg ${
+                                prospect
+                                  ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed'
+                                  : 'border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
+                              }`}
+                              placeholder="(555) 123-4567"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -532,7 +782,10 @@ export function BookingClient({ calendar }: BookingClientProps) {
 
       {/* Timezone note */}
       <p className="text-center text-sm text-gray-500 mt-6">
-        All times are shown in {calendar.slots[0]?.timezone === 'America/Los_Angeles' ? 'Pacific Time (PT)' : calendar.slots[0]?.timezone || 'Pacific Time (PT)'}
+        {userTimezone === (calendar.slots[0]?.timezone || 'America/Los_Angeles')
+          ? `All times are shown in ${TIMEZONE_LABELS[userTimezone] || userTimezone}`
+          : `Times are shown in your local timezone (${TIMEZONE_LABELS[userTimezone] || userTimezone})`
+        }
       </p>
     </div>
   )

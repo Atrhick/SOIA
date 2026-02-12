@@ -85,12 +85,13 @@ async function markMigrationApplied(id: string) {
 }
 
 export async function GET(request: NextRequest) {
-  // Check authentication - either admin session or secret key
+  // Check authentication - either admin session or secret key via Authorization header
   const session = await auth()
-  const secretKey = request.nextUrl.searchParams.get('secret')
+  const authHeader = request.headers.get('Authorization') || request.headers.get('x-migration-secret') || ''
+  const secretKey = authHeader.replace('Bearer ', '')
 
   const isAuthorized =
-    (session?.user?.role === 'ADMIN') ||
+    (session?.user?.role === 'ADMIN' && !session.user.isImpersonating) ||
     (MIGRATION_SECRET && secretKey === MIGRATION_SECRET)
 
   if (!isAuthorized) {
@@ -116,12 +117,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  // Check authentication - either admin session or secret key
+  // Check authentication - either admin session or secret key via Authorization header
   const session = await auth()
-  const secretKey = request.nextUrl.searchParams.get('secret')
+  const authHeader = request.headers.get('Authorization') || request.headers.get('x-migration-secret') || ''
+  const secretKey = authHeader.replace('Bearer ', '')
 
   const isAuthorized =
-    (session?.user?.role === 'ADMIN') ||
+    (session?.user?.role === 'ADMIN' && !session.user.isImpersonating) ||
     (MIGRATION_SECRET && secretKey === MIGRATION_SECRET)
 
   if (!isAuthorized) {

@@ -36,13 +36,13 @@ const createContentBlockSchema = z.object({
   lessonId: z.string().min(1, 'Lesson ID is required'),
   title: z.string().optional(),
   type: z.enum(['VIDEO', 'TEXT', 'QUIZ', 'DOCUMENT']),
-  content: z.any(), // Validated based on type
+  content: z.union([videoContentSchema, textContentSchema, quizContentSchema, documentContentSchema, z.record(z.string(), z.unknown())]),
   completionThreshold: z.number().int().min(0).max(100).optional(),
 })
 
 const updateContentBlockSchema = z.object({
   title: z.string().optional().nullable(),
-  content: z.any(),
+  content: z.union([videoContentSchema, textContentSchema, quizContentSchema, documentContentSchema, z.record(z.string(), z.unknown())]),
   completionThreshold: z.number().int().min(0).max(100).optional().nullable(),
 })
 
@@ -160,7 +160,7 @@ export async function createContentBlock(formData: FormData) {
         lessonId: validated.data.lessonId,
         title: validated.data.title,
         type: validated.data.type,
-        content: validated.data.content,
+        content: validated.data.content as Prisma.InputJsonValue,
         completionThreshold,
         sortOrder: (maxSortOrder._max.sortOrder || 0) + 1,
       },
@@ -224,7 +224,7 @@ export async function updateContentBlock(contentBlockId: string, formData: FormD
       where: { id: contentBlockId },
       data: {
         title: validated.data.title,
-        content: validated.data.content,
+        content: validated.data.content as Prisma.InputJsonValue,
         completionThreshold: validated.data.completionThreshold,
       },
     })
