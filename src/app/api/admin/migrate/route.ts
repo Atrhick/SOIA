@@ -10,10 +10,10 @@ const MIGRATIONS = [
   {
     id: '2026_01_21_add_orientation_token',
     description: 'Add orientationToken to prospects table',
-    sql: `
-      ALTER TABLE "prospects" ADD COLUMN IF NOT EXISTS "orientationToken" TEXT;
-      CREATE UNIQUE INDEX IF NOT EXISTS "prospects_orientationToken_key" ON "prospects"("orientationToken");
-    `,
+    sql: [
+      `ALTER TABLE "prospects" ADD COLUMN IF NOT EXISTS "orientationToken" TEXT`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "prospects_orientationToken_key" ON "prospects"("orientationToken")`,
+    ],
   },
   {
     id: '2026_01_21_add_event_booking',
@@ -141,7 +141,10 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        await prisma.$executeRawUnsafe(migration.sql)
+        const statements = Array.isArray(migration.sql) ? migration.sql : [migration.sql]
+        for (const stmt of statements) {
+          await prisma.$executeRawUnsafe(stmt)
+        }
         await markMigrationApplied(migration.id)
         results.push({ id: migration.id, status: 'success' })
       } catch (error) {
