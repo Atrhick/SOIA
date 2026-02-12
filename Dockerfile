@@ -60,4 +60,4 @@ EXPOSE 8080
 # prisma db push applies schema changes (indexes, constraints, new fields)
 # || true ensures server starts even if schema sync fails
 # exec replaces shell with node process for proper signal handling
-CMD ["sh", "-c", "echo '[startup] Syncing database schema...' && node ./node_modules/prisma/build/index.js db push --skip-generate 2>&1 && echo '[startup] Schema sync completed successfully' || echo '[startup] WARNING: Schema sync failed - visit /admin/migrate for details'; echo '[startup] Starting server...'; exec node server.js"]
+CMD ["sh", "-c", "echo '[startup] Syncing database schema...' && node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>&1 && echo '[startup] Schema sync completed successfully' || echo '[startup] WARNING: Schema sync failed - visit /admin/migrate for details'; echo '[startup] Starting server...'; exec node server.js"]

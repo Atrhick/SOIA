@@ -64,11 +64,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Check if --accept-data-loss flag is requested
+  let acceptDataLoss = false
+  try {
+    const body = await request.json()
+    acceptDataLoss = body?.acceptDataLoss === true
+  } catch {
+    // No body or invalid JSON — default to false
+  }
+
   const startTime = Date.now()
 
   try {
     const prismaPath = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js')
-    const output = await runCommand(`node "${prismaPath}" db push --skip-generate 2>&1`, 120000)
+    const flags = acceptDataLoss ? '--skip-generate --accept-data-loss' : '--skip-generate'
+    const output = await runCommand(`node "${prismaPath}" db push ${flags} 2>&1`, 120000)
 
     return NextResponse.json({
       status: 'completed',

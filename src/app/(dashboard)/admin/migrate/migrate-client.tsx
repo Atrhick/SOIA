@@ -40,6 +40,7 @@ export default function MigrateClient() {
   const [isCheckingSql, setIsCheckingSql] = useState(false)
   const [sqlStatus, setSqlStatus] = useState<SqlMigrationStatus>(null)
   const [sqlResult, setSqlResult] = useState<SqlMigrationResult>(null)
+  const [acceptDataLoss, setAcceptDataLoss] = useState(false)
   const [copiedSchema, setCopiedSchema] = useState(false)
   const [copiedSql, setCopiedSql] = useState(false)
   const schemaOutputRef = useRef<HTMLPreElement>(null)
@@ -57,14 +58,22 @@ export default function MigrateClient() {
 
   // ── Schema Sync ──────────────────────────────────────────
 
-  const runSchemaSync = async () => {
+  const runSchemaSync = async (forceAcceptDataLoss = false) => {
+    const useAcceptDataLoss = forceAcceptDataLoss || acceptDataLoss
     setIsRunningSchema(true)
     setSchemaLogs([])
     addSchemaLog('info', 'Starting Prisma schema synchronization (prisma db push)...')
+    if (useAcceptDataLoss) {
+      addSchemaLog('warning', 'Running with --accept-data-loss flag enabled')
+    }
     addSchemaLog('info', 'This will apply any pending schema changes (indexes, constraints, fields, tables)...')
 
     try {
-      const res = await fetch('/api/admin/migrate/schema', { method: 'POST' })
+      const res = await fetch('/api/admin/migrate/schema', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acceptDataLoss: useAcceptDataLoss }),
+      })
       const data = await res.json()
 
       if (data.output) {
@@ -247,23 +256,34 @@ export default function MigrateClient() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={runSchemaSync}
-              disabled={isRunningSchema}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-            >
-              {isRunningSchema ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Running...
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4" />
-                  Run Schema Sync
-                </>
-              )}
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={acceptDataLoss}
+                  onChange={(e) => setAcceptDataLoss(e.target.checked)}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Accept data loss
+              </label>
+              <button
+                onClick={() => runSchemaSync()}
+                disabled={isRunningSchema}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {isRunningSchema ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />
+                    Run Schema Sync
+                  </>
+                )}
             </button>
+            </div>
           </div>
         </div>
 
