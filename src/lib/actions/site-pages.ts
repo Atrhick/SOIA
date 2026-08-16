@@ -8,13 +8,13 @@ import { revalidatePath } from 'next/cache'
 const DEFAULT_PAGES: Record<string, { title: string; content: string }> = {
   terms: {
     title: 'Terms of Service',
-    content: `Terms of Service for StageOneInAction Coaching Program
+    content: `Terms of Service for NowTransformed Coaching Program
 
 1. Agreement to Terms
-By enrolling in the StageOneInAction Coaching Program, you agree to be bound by these Terms of Service.
+By enrolling in the NowTransformed Coaching Program, you agree to be bound by these Terms of Service.
 
 2. Program Description
-The StageOneInAction Coaching Program provides comprehensive training, resources, and support to build your coaching practice. The program includes:
+The NowTransformed Coaching Program provides comprehensive training, resources, and support to build your coaching practice. The program includes:
 - Complete coaching certification program
 - Personal development workbook
 - Access to our coaching platform
@@ -22,26 +22,26 @@ The StageOneInAction Coaching Program provides comprehensive training, resources
 - Marketing and business development resources
 
 3. Enrollment
-Enrollment is subject to approval by StageOneInAction administration. Acceptance into the program is at the sole discretion of StageOneInAction.
+Enrollment is subject to approval by NowTransformed administration. Acceptance into the program is at the sole discretion of NowTransformed.
 
 4. Conduct
 Participants are expected to maintain professional conduct at all times, treat fellow participants with respect, and comply with all program guidelines.
 
 5. Intellectual Property
-All program materials, including but not limited to training content, workbooks, and resources, are the intellectual property of StageOneInAction and may not be reproduced or distributed without written permission.
+All program materials, including but not limited to training content, workbooks, and resources, are the intellectual property of NowTransformed and may not be reproduced or distributed without written permission.
 
 6. Limitation of Liability
-StageOneInAction is not liable for any indirect, incidental, or consequential damages arising from participation in the program.
+NowTransformed is not liable for any indirect, incidental, or consequential damages arising from participation in the program.
 
 7. Modifications
-StageOneInAction reserves the right to modify these terms at any time. Participants will be notified of any material changes.
+NowTransformed reserves the right to modify these terms at any time. Participants will be notified of any material changes.
 
 8. Contact
 For questions about these terms, contact us at info@stageoneinaction.com.`,
   },
   privacy: {
     title: 'Privacy Policy',
-    content: `Privacy Policy for StageOneInAction
+    content: `Privacy Policy for NowTransformed
 
 Effective Date: January 1, 2026
 
@@ -88,7 +88,7 @@ For questions about this privacy policy, contact us at info@stageoneinaction.com
   },
   'acceptance-letter': {
     title: 'Acceptance Letter',
-    content: `We are pleased to welcome you to the StageOneInAction Coaching Program. As a member of our community, you will have access to comprehensive training, resources, and support to build your coaching practice.
+    content: `We are pleased to welcome you to the NowTransformed Coaching Program. As a member of our community, you will have access to comprehensive training, resources, and support to build your coaching practice.
 
 The program includes:
 - Complete coaching certification program

@@ -50,6 +50,49 @@ const MIGRATIONS = [
       );
     `,
   },
+  {
+    id: '2026_02_12_add_performance_indexes',
+    description: 'Add database indexes for query performance optimization',
+    sql: [
+      `CREATE INDEX IF NOT EXISTS "calendar_bookings_prospectId_idx" ON "calendar_bookings"("prospectId")`,
+      `CREATE INDEX IF NOT EXISTS "calendar_bookings_calendarId_idx" ON "calendar_bookings"("calendarId")`,
+      `CREATE INDEX IF NOT EXISTS "calendar_bookings_status_idx" ON "calendar_bookings"("status")`,
+      `CREATE INDEX IF NOT EXISTS "channel_posts_channelId_createdAt_idx" ON "channel_posts"("channelId", "createdAt")`,
+      `CREATE INDEX IF NOT EXISTS "lms_enrollments_status_idx" ON "lms_enrollments"("status")`,
+      `CREATE INDEX IF NOT EXISTS "lms_enrollments_lastAccessedAt_idx" ON "lms_enrollments"("lastAccessedAt")`,
+    ],
+  },
+  {
+    id: '2026_03_02_add_password_reset_tokens',
+    description: 'Add password_reset_tokens table for secure password reset flow',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "token" TEXT NOT NULL,
+        "expiresAt" TIMESTAMP(3) NOT NULL,
+        "usedAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "password_reset_tokens_pkey" PRIMARY KEY ("id")
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "password_reset_tokens_token_key" ON "password_reset_tokens"("token")`,
+      `CREATE INDEX IF NOT EXISTS "password_reset_tokens_token_idx" ON "password_reset_tokens"("token")`,
+      `CREATE INDEX IF NOT EXISTS "password_reset_tokens_userId_idx" ON "password_reset_tokens"("userId")`,
+      `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'password_reset_tokens_userId_fkey'
+        ) THEN
+          ALTER TABLE "password_reset_tokens"
+          ADD CONSTRAINT "password_reset_tokens_userId_fkey"
+          FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        END IF;
+      END $$`,
+      // Add prospect and calendar booking indexes from schema audit
+      `CREATE INDEX IF NOT EXISTS "prospects_assessmentSurveyId_idx" ON "prospects"("assessmentSurveyId")`,
+      `CREATE INDEX IF NOT EXISTS "calendar_bookings_userId_idx" ON "calendar_bookings"("userId")`,
+    ],
+  },
 ]
 
 // Create migrations tracking table if it doesn't exist

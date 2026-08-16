@@ -1,37 +1,25 @@
 # CLAUDE.md - AI Assistant Context
 
-This file provides context for AI assistants working on the StageOneInAction Back Office codebase.
+This file provides context for AI assistants working on the NowTransformed Back Office codebase.
 
 ## Project Overview
 
-This is a **Next.js 14** web application for managing coaches and ambassadors in the StageOneInAction organization. It's a comprehensive back-office platform with role-based access for Admins, Coaches, and Ambassadors.
+This is a **Next.js 14** web application for managing coaches and ambassadors in the NowTransformed organization. It's a comprehensive back-office platform with role-based access for Admins, Coaches, and Ambassadors.
 
 ### Key Features
 - **Coach Prospect Pipeline**: Public assessment surveys for prospective coaches with automatic prospect tracking through the onboarding pipeline
-- **Admin Impersonation**: Admins can view the app as any coach or ambassador via the profile dropdown menu (with visual banner indicator)
+- **Admin Impersonation**: Admins can view the app as any coach or ambassador via the profile dropdown menu (with visual banner indicator); auto-expires after 30 minutes
+- **Password Reset Flow**: Secure token-based password reset (`/forgot-password` → email link → `/reset-password/[token]`); dev mode logs link to console
+- **Login Rate Limiting**: 5 failed attempts per email → 15-minute lockout (in-memory, see `src/lib/auth.ts`)
 - **Ambassador Profile Editing**: Ambassadors can edit their profile with photo URL, bio, and social media links
 - **Ambassador Account Creation**: Admins/Coaches can create ambassador accounts (ages 10-24) with enhanced form inputs
 - **Parental Consent Flow**: Ambassadors under 18 require parent/guardian info; parent account auto-created with PARENT role
 - **Enhanced Form Components**: Phone input with country selector, password generator with strength meter, structured address fields, date of birth dropdowns
-- **Admin-Configurable Business Tools**: 6 feature modules (CRM, Project Management, Collaboration, Time Clock, Scheduling, Knowledge Base) with per-role and per-user access control
+- **Admin-Configurable Business Tools**: 7 feature modules (CRM, Project Management, Collaboration, Time Clock, Scheduling, Knowledge Base, Program Pages) with per-role and per-user access control
 - **User Management**: Admins can create user accounts and configure per-user feature permissions (grant/deny access)
+- **Coach Program Pages**: Public landing page per program at `/p/[slug]` with a two-step signup — interest form, then a Zoom link plus a coach-customizable qualification form. Leads flow into the coach's Business Excellence area for classification. Admin-approved before publishing
+- **Associate Roles**: SERVICE_PROVIDER, BUSINESS_AFFILIATE and VOLUNTEER logins sharing one `/associate` dashboard, managed at `/admin/associates`
 
-## Current Work: Feature Analysis
-
-**IMPORTANT:** We are conducting a feature-by-feature review to verify business logic and functionality.
-
-**Reference Document:** `docs/PROJECT_PLAN.md` - Contains the "Feature Analysis & Business Logic Review" section
-
-**Current Status:**
-- Feature 1: Authentication - ❓ Needs Clarification (business logic questions documented)
-- Features 2-24: ⏳ Pending Review
-
-**To Continue:**
-1. Open `docs/PROJECT_PLAN.md` and find the "Feature Analysis" section
-2. Review the pending questions for Authentication (or next feature in queue)
-3. User provides answers to business logic questions
-4. Verify implementation matches requirements
-5. Update feature status and move to next feature
 
 ## Tech Stack
 
@@ -74,7 +62,20 @@ if (!session || session.user.role !== 'COACH') {
 }
 ```
 
-Session includes: `id`, `email`, `role`, `coachId` (for coaches), `ambassadorId` (for ambassadors), `isImpersonating`, and `originalAdminId` (when admin is impersonating)
+Session includes: `id`, `email`, `role`, `coachId` (for coaches), `ambassadorId` (for ambassadors), `isImpersonating`, `originalAdminId`, and `impersonatingAt` (when admin is impersonating)
+
+**Rate limiting (in `src/lib/auth.ts`):**
+- 5 failed login attempts per email triggers a 15-minute lockout
+- Implemented as an in-memory `Map` — suitable for single-instance; switch to Redis for multi-instance
+- Constants: `MAX_ATTEMPTS=5`, `WINDOW_MS=15min`, `LOCKOUT_MS=15min`
+
+**Password reset (in `src/lib/actions/password-reset.ts`):**
+- `requestPasswordReset(email)` — generates a 64-char hex token, stores in `password_reset_tokens`, sends email
+- `validateResetToken(token)` — validates token exists, not used, not expired, user is ACTIVE
+- `confirmPasswordReset(token, password)` — validates token + password, updates password + marks token used in a single `$transaction`
+- Token expiry: 60 minutes; old unused tokens are invalidated on new request
+- Password rules: min 8 chars, at least one uppercase, one lowercase, one number
+- Email utility: `src/lib/email.ts` — logs to console in dev, needs provider connected for production
 
 ## Database Schema Notes
 
@@ -115,6 +116,10 @@ Session includes: `id`, `email`, `role`, `coachId` (for coaches), `ambassadorId`
 - `ProspectStatusHistory` - Audit trail of status changes
 - `ProspectPayment` - Payment tracking (Stripe, PayPal, Manual)
 - `AdminNotification` - In-app notifications for admins
+
+### Security Models
+
+- `PasswordResetToken` - One-time password reset tokens (`token` TEXT UNIQUE, `expiresAt`, `usedAt` nullable). Table: `password_reset_tokens`. Cascade-deleted when `User` is deleted.
 
 ### Important Field Names
 
@@ -226,9 +231,27 @@ export async function myAction(formData: FormData) {
 npm run dev          # Start development server
 npm run build        # Production build
 npx prisma studio    # Database GUI
-npx prisma db push   # Push schema changes
+npx prisma db push   # Push schema changes to DB
+npm run db:generate  # Regenerate Prisma client after schema changes
 npx prisma db seed   # Seed demo data
 ```
+
+**Prisma CLI and DATABASE_URL:** the Prisma CLI reads `.env` only — `.env.local` is a
+Next.js convention it does not know about. `DATABASE_URL` is therefore kept in **both**
+files (identical values) so the commands above work as written. Both files are
+gitignored. If you change the database, change it in both places.
+
+**ESLint versions are pinned to match Next 14.** `eslint@^8.57.1` +
+`eslint-config-next@^14.2.35`. Do not upgrade these independently: `next lint` in
+Next 14 uses the ESLint 8 legacy API, and `eslint-config-next` 16 ships flat-config
+only, so ESLint 9 + config 16 makes `next lint` — and therefore `next build` —
+fail with `Invalid Options: Unknown options: useEslintrc, extensions`.
+
+**`_custom_migrations`:** this table is created by raw SQL in
+`src/app/api/admin/migrate/route.ts` and is declared in `schema.prisma` as the
+`CustomMigration` model **only** so `prisma db push` does not treat it as drift and
+drop it. Do not remove that model — without it, a push wipes the migration history
+and every custom migration re-runs.
 
 ## Demo Credentials
 
@@ -299,6 +322,7 @@ Admins can view the app as any coach or ambassador:
 3. Session is updated via `useSession().update()` with impersonation data
 4. An amber banner appears in the header showing "Viewing as: [email] ([role])"
 5. To switch back, click "Switch Back" button in banner or profile dropdown → "Switch Back to Admin"
+6. **Auto-expiry**: impersonation sessions are automatically reverted after 30 minutes; `impersonatingAt` timestamp in JWT is checked on every JWT callback
 
 **Header Profile Name Display:**
 The header displays the user's profile name (firstName + lastName) for coaches and ambassadors, fetched from `CoachProfile` or `Ambassador` model respectively. Falls back to email if name is not available. The dashboard layout (`src/app/(dashboard)/layout.tsx`) fetches the profile name and passes it to the Header component.
@@ -306,11 +330,12 @@ The header displays the user's profile name (firstName + lastName) for coaches a
 **Key files:**
 - `src/lib/actions/impersonation.ts` - Server actions for impersonation
 - `src/components/dashboard/header.tsx` - Dropdown menu with impersonation UI, displays profile name
-- `src/lib/auth.ts` - JWT callback handles session updates for impersonation
+- `src/lib/auth.ts` - JWT callback handles session updates, rate limiting, and impersonation timeout
 
 **Session fields when impersonating:**
 - `isImpersonating: true`
 - `originalAdminId: string` - The admin's real user ID
+- `impersonatingAt: number` - Unix timestamp when impersonation started (used for 30-min timeout check)
 - `id`, `role`, `coachId`, `ambassadorId` - Set to the impersonated user's values
 
 ## Ambassador Profile Fields
@@ -386,13 +411,17 @@ Six feature modules with role-based and per-user access control:
 **Checking if a feature is enabled:**
 ```typescript
 import { isFeatureEnabled } from '@/lib/actions/feature-config'
+import { FeatureDisabled } from '@/components/ui/feature-disabled'
 
 // In a page.tsx server component:
 const featureEnabled = await isFeatureEnabled('COLLABORATION', 'COACH', session.user.id)
 if (!featureEnabled) {
-  return <FeatureDisabledMessage />
+  return <FeatureDisabled title="Collaboration" icon={MessageSquare} />
 }
 ```
+
+Note: the 14 older gated pages each inline their own copy of this denial markup.
+`FeatureDisabled` is the shared component; new gated pages should use it.
 
 The `isFeatureEnabled` function checks:
 1. Is the feature globally enabled?
@@ -653,10 +682,10 @@ const [modalLink, setModalLink] = useState<string | null>(null)
 
 const handleSendEmail = (link: string, type: 'business-form' | 'orientation' | 'acceptance') => {
   const subject = type === 'business-form'
-    ? 'Complete Your Business Development Form - Stage One In Action'
+    ? 'Complete Your Business Development Form - NowTransformed'
     : type === 'orientation'
-      ? 'Schedule Your Orientation - Stage One In Action'
-      : 'Acceptance Letter & Payment - Stage One In Action'
+      ? 'Schedule Your Orientation - NowTransformed'
+      : 'Acceptance Letter & Payment - NowTransformed'
   // Opens mailto: link with pre-filled content
 }
 ```
@@ -1163,8 +1192,10 @@ Key environment variables for the application:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | - |
-| `NEXTAUTH_SECRET` | Secret for NextAuth JWT | - |
+| `NEXTAUTH_SECRET` | Secret for NextAuth JWT — generate with `openssl rand -hex 32` | - |
 | `NEXTAUTH_URL` | Application URL | http://localhost:3000 |
 | `COACH_PROGRAM_FEE` | Program fee in USD (server-side) | 1500 |
 | `NEXT_PUBLIC_COACH_PROGRAM_FEE` | Program fee in USD (client-side) | 1500 |
-| `MIGRATION_SECRET` | Secret for migration API authentication | - |
+| `MIGRATION_SECRET` | Secret for migration API authentication — generate with `openssl rand -hex 32` | - |
+| `EMAIL_FROM` | Sender address for password reset emails (production only) | - |
+| `RESEND_API_KEY` | Resend API key (or use another provider; see `src/lib/email.ts`) | - |

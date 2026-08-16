@@ -1,5 +1,5 @@
 {
-  "name": "stageoneinaction-backoffice",
+  "name": "nowtransformed-backoffice",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -45,8 +45,8 @@
     "zod": "^4.3.2"
   },
   "devDependencies": {
-    "eslint": "^9.39.2",
-    "eslint-config-next": "^16.1.1",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
     "tsx": "^4.21.0"
   },
   "prisma": {

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
+import { isAssociateRole } from '@/lib/roles'
 
 export default async function Home() {
   const session = await auth()
@@ -8,13 +9,15 @@ export default async function Home() {
     redirect('/login')
   }
 
-  if (session.user.role === 'ADMIN') {
-    redirect('/admin')
-  }
+  const role = session.user.role
 
-  if (session.user.role === 'AMBASSADOR') {
-    redirect('/ambassador')
-  }
+  if (role === 'ADMIN') redirect('/admin')
+  if (role === 'COACH') redirect('/coach')
+  if (role === 'AMBASSADOR') redirect('/ambassador')
+  if (isAssociateRole(role)) redirect('/associate')
 
-  redirect('/coach')
+  // Every role must be listed above. Anything else - PARENT, SUB_ADMIN, or a
+  // role added later - lands on /login rather than falling through to /coach,
+  // which rejects non-coaches and sends them back here in an endless loop.
+  redirect('/login')
 }

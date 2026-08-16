@@ -75,6 +75,9 @@ const ROLE_COLORS: Record<string, string> = {
   COACH: 'bg-blue-100 text-blue-800',
   AMBASSADOR: 'bg-green-100 text-green-800',
   PARENT: 'bg-purple-100 text-purple-800',
+  SERVICE_PROVIDER: 'bg-teal-100 text-teal-800',
+  BUSINESS_AFFILIATE: 'bg-amber-100 text-amber-800',
+  VOLUNTEER: 'bg-sky-100 text-sky-800',
 }
 
 const FEATURE_INFO: Record<string, { label: string; description: string }> = {
@@ -430,6 +433,9 @@ export function UsersAdminClient({
                 <SelectItem value="COACH">Coach</SelectItem>
                 <SelectItem value="AMBASSADOR">Ambassador</SelectItem>
                 <SelectItem value="PARENT">Parent</SelectItem>
+                <SelectItem value="SERVICE_PROVIDER">Service Provider</SelectItem>
+                <SelectItem value="BUSINESS_AFFILIATE">Business Affiliate</SelectItem>
+                <SelectItem value="VOLUNTEER">Volunteer</SelectItem>
               </SelectContent>
             </Select>
           </div>

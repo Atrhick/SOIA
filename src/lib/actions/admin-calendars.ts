@@ -1200,12 +1200,17 @@ export async function getCalendarsForUser() {
   try {
     const role = session.user.role
 
-    // Build visibility filter based on role
-    const visibilityFilter: CalendarVisibility[] = ['GLOBAL']
-    if (role === 'COACH') {
-      visibilityFilter.push('COACHES_ONLY')
+    // Build visibility filter based on role.
+    // Start EMPTY, not with GLOBAL: a permissive base granted before the role
+    // is examined hands every GLOBAL calendar to roles that should see none
+    // (associates, PARENT, SUB_ADMIN). Only roles listed below get anything.
+    const visibilityFilter: CalendarVisibility[] = []
+    if (role === 'ADMIN') {
+      visibilityFilter.push('GLOBAL', 'COACHES_ONLY', 'AMBASSADORS_ONLY')
+    } else if (role === 'COACH') {
+      visibilityFilter.push('GLOBAL', 'COACHES_ONLY')
     } else if (role === 'AMBASSADOR') {
-      visibilityFilter.push('AMBASSADORS_ONLY')
+      visibilityFilter.push('GLOBAL', 'AMBASSADORS_ONLY')
     }
 
     const calendars = await prisma.adminCalendar.findMany({
@@ -1274,10 +1279,22 @@ export async function getCalendarEventsForUser(calendarId: string, dateRange: { 
         id: calendarId,
         isActive: true,
         OR: [
-          { visibility: 'GLOBAL' },
-          { visibility: session.user.role === 'COACH' ? 'COACHES_ONLY' : 'AMBASSADORS_ONLY' },
+          // A ternary here silently treats every non-COACH role as an
+          // ambassador. List the roles explicitly instead so unknown roles
+          // match nothing but their own CUSTOM grants.
+          ...(session.user.role === 'ADMIN' ||
+          session.user.role === 'COACH' ||
+          session.user.role === 'AMBASSADOR'
+            ? [{ visibility: 'GLOBAL' as CalendarVisibility }]
+            : []),
+          ...(session.user.role === 'ADMIN' || session.user.role === 'COACH'
+            ? [{ visibility: 'COACHES_ONLY' as CalendarVisibility }]
+            : []),
+          ...(session.user.role === 'ADMIN' || session.user.role === 'AMBASSADOR'
+            ? [{ visibility: 'AMBASSADORS_ONLY' as CalendarVisibility }]
+            : []),
           {
-            visibility: 'CUSTOM',
+            visibility: 'CUSTOM' as CalendarVisibility,
             access: {
               some: {
                 userId: session.user.id,
@@ -1346,7 +1363,7 @@ export async function getOrCreateOrientationCalendar() {
       calendar = await prisma.adminCalendar.create({
         data: {
           name: 'Coach Orientation',
-          description: 'Schedule your orientation call to learn more about becoming a SOIA Coach.',
+          description: 'Schedule your orientation call to learn more about becoming a NowTransformed Coach.',
           type: 'BOOKING',
           visibility: 'PUBLIC',
           color: '#10B981', // Green
@@ -1954,7 +1971,7 @@ export async function getOrCreateBizDevInterviewCalendar() {
       calendar = await prisma.adminCalendar.create({
         data: {
           name: 'Biz Dev Interview',
-          description: 'Schedule your business development interview with SOIA.',
+          description: 'Schedule your business development interview with NowTransformed.',
           type: 'BOOKING',
           visibility: 'PUBLIC',
           color: '#F59E0B', // Amber/Orange
@@ -2242,7 +2259,7 @@ export async function scheduleInterviewDirect(
       calendar = await prisma.adminCalendar.create({
         data: {
           name: 'Biz Dev Interview',
-          description: 'Schedule your business development interview with SOIA.',
+          description: 'Schedule your business development interview with NowTransformed.',
           type: 'BOOKING',
           visibility: 'PUBLIC',
           color: '#F59E0B',

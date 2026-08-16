@@ -428,20 +428,20 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
 
     switch (type) {
       case 'business-form':
-        subject = 'Complete Your Business Development Form - Stage One In Action'
-        body = `Hi ${prospect.firstName},\n\nPlease complete your Business Development Form using the link below:\n\n${link}\n\nThis form helps us understand your business goals and how we can best support you.\n\nBest regards,\nStage One In Action Team`
+        subject = 'Complete Your Business Development Form - NowTransformed'
+        body = `Hi ${prospect.firstName},\n\nPlease complete your Business Development Form using the link below:\n\n${link}\n\nThis form helps us understand your business goals and how we can best support you.\n\nBest regards,\nNowTransformed Team`
         break
       case 'orientation':
-        subject = 'Schedule Your Orientation - Stage One In Action'
-        body = `Hi ${prospect.firstName},\n\nPlease schedule your orientation using the link below:\n\n${link}\n\nWe look forward to meeting with you!\n\nBest regards,\nStage One In Action Team`
+        subject = 'Schedule Your Orientation - NowTransformed'
+        body = `Hi ${prospect.firstName},\n\nPlease schedule your orientation using the link below:\n\n${link}\n\nWe look forward to meeting with you!\n\nBest regards,\nNowTransformed Team`
         break
       case 'biz-dev-interview':
-        subject = 'Schedule Your Business Development Interview - Stage One In Action'
-        body = `Hi ${prospect.firstName},\n\nPlease schedule your Business Development Interview using the link below:\n\n${link}\n\nThis interview is an important step in your onboarding journey. We're looking forward to discussing your business goals!\n\nBest regards,\nStage One In Action Team`
+        subject = 'Schedule Your Business Development Interview - NowTransformed'
+        body = `Hi ${prospect.firstName},\n\nPlease schedule your Business Development Interview using the link below:\n\n${link}\n\nThis interview is an important step in your onboarding journey. We're looking forward to discussing your business goals!\n\nBest regards,\nNowTransformed Team`
         break
       case 'acceptance':
-        subject = 'Acceptance Letter & Payment - Stage One In Action'
-        body = `Hi ${prospect.firstName},\n\nCongratulations! Please review your acceptance letter and complete your payment using the link below:\n\n${link}\n\nWe're excited to have you join us!\n\nBest regards,\nStage One In Action Team`
+        subject = 'Acceptance Letter & Payment - NowTransformed'
+        body = `Hi ${prospect.firstName},\n\nCongratulations! Please review your acceptance letter and complete your payment using the link below:\n\n${link}\n\nWe're excited to have you join us!\n\nBest regards,\nNowTransformed Team`
         break
     }
 

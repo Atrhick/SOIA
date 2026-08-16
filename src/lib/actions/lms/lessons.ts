@@ -48,12 +48,12 @@ export async function createLesson(formData: FormData) {
 
   try {
     // Verify module exists and get course ID
-    const module = await prisma.lMSModule.findUnique({
+    const lmsModule = await prisma.lMSModule.findUnique({
       where: { id: validated.data.moduleId },
       select: { id: true, courseId: true },
     })
 
-    if (!module) {
+    if (!lmsModule) {
       return { error: 'Module not found' }
     }
 
@@ -73,7 +73,7 @@ export async function createLesson(formData: FormData) {
       },
     })
 
-    revalidatePath(`/admin/lms/${module.courseId}`)
+    revalidatePath(`/admin/lms/${lmsModule.courseId}`)
     return { success: true, lessonId: lesson.id }
   } catch (error) {
     console.error('Error creating lesson:', error)
@@ -173,12 +173,12 @@ export async function reorderLessons(moduleId: string, lessonIds: string[]) {
 
   try {
     // Get the course ID for revalidation
-    const module = await prisma.lMSModule.findUnique({
+    const lmsModule = await prisma.lMSModule.findUnique({
       where: { id: moduleId },
       select: { courseId: true },
     })
 
-    if (!module) {
+    if (!lmsModule) {
       return { error: 'Module not found' }
     }
 
@@ -192,7 +192,7 @@ export async function reorderLessons(moduleId: string, lessonIds: string[]) {
       )
     )
 
-    revalidatePath(`/admin/lms/${module.courseId}`)
+    revalidatePath(`/admin/lms/${lmsModule.courseId}`)
     return { success: true }
   } catch (error) {
     console.error('Error reordering lessons:', error)

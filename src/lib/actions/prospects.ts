@@ -250,6 +250,7 @@ export async function getProspect(id: string) {
         payment: true,
         statusHistory: {
           orderBy: { createdAt: 'desc' },
+          take: 50,
         },
         coachProfile: {
           include: {
@@ -261,6 +262,7 @@ export async function getProspect(id: string) {
             calendar: { select: { id: true, name: true, meetingLink: true } },
           },
           orderBy: { createdAt: 'desc' },
+          take: 20,
         },
       },
     })
@@ -419,9 +421,12 @@ export async function getAllProspects(filters?: {
     const prospects = await prisma.prospect.findMany({
       where,
       include: {
-        payment: true,
+        payment: {
+          select: { status: true, amount: true, method: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
+      take: 200,
     })
 
     return {
@@ -973,17 +978,16 @@ export async function completeInterview(
       },
     })
 
-    for (const booking of activeBookings) {
+    if (activeBookings.length > 0) {
+      const bookingIds = activeBookings.map(b => b.id)
       if (result === 'APPROVED') {
-        await prisma.calendarBooking.update({
-          where: { id: booking.id },
-          data: {
-            status: 'COMPLETED',
-          },
+        await prisma.calendarBooking.updateMany({
+          where: { id: { in: bookingIds } },
+          data: { status: 'COMPLETED' },
         })
       } else {
-        await prisma.calendarBooking.update({
-          where: { id: booking.id },
+        await prisma.calendarBooking.updateMany({
+          where: { id: { in: bookingIds } },
           data: {
             status: 'CANCELLED',
             cancelledBy: session.user.id,
@@ -1217,10 +1221,10 @@ export async function cancelInterviewBooking(prospectId: string, reason?: string
       return { error: 'Prospect is not in interview scheduled status' }
     }
 
-    // Cancel all active interview bookings
-    for (const booking of prospect.calendarBookings) {
-      await prisma.calendarBooking.update({
-        where: { id: booking.id },
+    // Cancel all active interview bookings in batch
+    if (prospect.calendarBookings.length > 0) {
+      await prisma.calendarBooking.updateMany({
+        where: { id: { in: prospect.calendarBookings.map(b => b.id) } },
         data: {
           status: 'CANCELLED',
           cancelledBy: session.user.id,
@@ -1558,56 +1562,34 @@ export async function getProspectAssessmentResults(prospectId: string) {
 
     let submissionId = prospect.assessmentSubmissionId
 
-    // If no direct submission ID, try to find submission by email from coach assessment survey
-    if (!submissionId && prospect.assessmentSurveyId) {
+    // If no direct submission ID, find by email across known survey IDs in a single query
+    if (!submissionId) {
+      const surveyFilters: Record<string, unknown>[] = []
+      if (prospect.assessmentSurveyId) {
+        surveyFilters.push({ surveyId: prospect.assessmentSurveyId })
+      }
+      // Also check by survey title as fallback
+      surveyFilters.push({ survey: { title: 'Coach Assessment' } })
+
       const matchingSubmission = await prisma.surveySubmission.findFirst({
         where: {
-          surveyId: prospect.assessmentSurveyId,
           contactEmail: prospect.email,
+          OR: surveyFilters,
         },
         orderBy: { submittedAt: 'desc' },
-        select: { id: true },
+        select: { id: true, surveyId: true },
       })
 
       if (matchingSubmission) {
         submissionId = matchingSubmission.id
-        // Update the prospect with the found submission ID for future use
+        // Cache the found submission ID on the prospect for future lookups
         await prisma.prospect.update({
           where: { id: prospectId },
-          data: { assessmentSubmissionId: submissionId },
-        })
-      }
-    }
-
-    // If still no submission, try to find by email in the coach assessment survey
-    if (!submissionId) {
-      // Find the coach assessment survey by title
-      const coachAssessment = await prisma.survey.findFirst({
-        where: { title: 'Coach Assessment' },
-        select: { id: true },
-      })
-
-      if (coachAssessment) {
-        const matchingSubmission = await prisma.surveySubmission.findFirst({
-          where: {
-            surveyId: coachAssessment.id,
-            contactEmail: prospect.email,
+          data: {
+            assessmentSubmissionId: submissionId,
+            ...(!prospect.assessmentSurveyId ? { assessmentSurveyId: matchingSubmission.surveyId } : {}),
           },
-          orderBy: { submittedAt: 'desc' },
-          select: { id: true },
         })
-
-        if (matchingSubmission) {
-          submissionId = matchingSubmission.id
-          // Update the prospect with the found submission ID for future use
-          await prisma.prospect.update({
-            where: { id: prospectId },
-            data: {
-              assessmentSubmissionId: submissionId,
-              assessmentSurveyId: coachAssessment.id,
-            },
-          })
-        }
       }
     }
 

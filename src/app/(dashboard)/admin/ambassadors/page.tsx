@@ -11,7 +11,7 @@ async function getAmbassadors() {
     include: {
       coach: {
         include: {
-          user: true,
+          user: { select: { id: true, email: true, status: true } },
         },
       },
     },

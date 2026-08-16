@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,13 +27,20 @@ import { AddressInput, type AddressData } from '@/components/ui/address-input'
 import { updateAmbassadorStatus } from '@/lib/actions/ambassadors'
 import { createAmbassadorAccount } from '@/lib/actions/ambassador-auth'
 import { Check, X, Users, Plus, AlertTriangle } from 'lucide-react'
-import type { Ambassador, CoachProfile, User } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
-type AmbassadorWithCoach = Ambassador & {
-  coach: CoachProfile & {
-    user: User
+// Mirrors the query in ./page.tsx exactly: only a safe subset of `coach.user`
+// is selected (never the password hash), so derive the type from the query
+// shape instead of the full User model.
+type AmbassadorWithCoach = Prisma.AmbassadorGetPayload<{
+  include: {
+    coach: {
+      include: {
+        user: { select: { id: true; email: true; status: true } }
+      }
+    }
   }
-}
+}>
 
 interface Coach {
   id: string
@@ -124,7 +131,7 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAm
     parentRelationship: '',
   })
 
-  const age = calculateAgeFromDate(formData.dateOfBirth)
+  const age = useMemo(() => calculateAgeFromDate(formData.dateOfBirth), [formData.dateOfBirth])
   const requiresParentalConsent = age !== null && age < 18
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -386,7 +393,7 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAm
                   required={requiresParentalConsent}
                 />
                 <p className="text-xs text-amber-600">
-                  A login will be created for the parent to monitor their child's account.
+                  A login will be created for the parent to monitor their child&apos;s account.
                 </p>
               </div>
 
@@ -479,7 +486,7 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAm
             <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || !formData.coachId || !formData.dateOfBirth}>
+            <Button type="submit" disabled={isSubmitting || !formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.coachId || !formData.dateOfBirth}>
               {isSubmitting ? 'Creating...' : 'Create Ambassador'}
             </Button>
           </div>
@@ -520,7 +527,7 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAm
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
                       <span className="text-sm font-medium text-primary-700">
-                        {ambassador.firstName[0]}{ambassador.lastName[0]}
+                        {(ambassador.firstName?.[0] || '?').toUpperCase()}{(ambassador.lastName?.[0] || '?').toUpperCase()}
                       </span>
                     </div>
                     <div>

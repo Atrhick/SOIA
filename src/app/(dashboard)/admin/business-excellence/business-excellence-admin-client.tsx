@@ -120,7 +120,7 @@ export function BusinessExcellenceAdminClient({ coaches }: BusinessExcellenceAdm
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Business Excellence Overview</h1>
         <p className="text-gray-600 mt-1">
-          Monitor coaches' CRM activation, website readiness, and outreach activities
+          Monitor coaches&apos; CRM activation, website readiness, and outreach activities
         </p>
       </div>
 
@@ -234,8 +234,8 @@ export function BusinessExcellenceAdminClient({ coaches }: BusinessExcellenceAdm
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                         <span className="text-sm font-semibold text-gray-600">
-                          {coach.firstName[0]}
-                          {coach.lastName[0]}
+                          {(coach.firstName?.[0] || '?').toUpperCase()}
+                          {(coach.lastName?.[0] || '?').toUpperCase()}
                         </span>
                       </div>
                       <div>

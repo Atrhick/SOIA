@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -112,9 +113,11 @@ export function ProfileForm({ ambassador }: ProfileFormProps) {
           <div className="flex items-center gap-4">
             <div className="relative">
               {formData.photoUrl ? (
-                <img
+                <Image
                   src={formData.photoUrl}
                   alt={`${formData.firstName} ${formData.lastName}`}
+                  width={80}
+                  height={80}
                   className="w-20 h-20 rounded-full object-cover border-4 border-white/30"
                 />
               ) : (

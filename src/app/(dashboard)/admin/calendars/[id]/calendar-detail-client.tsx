@@ -336,26 +336,22 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
 
     eventSource.onopen = () => {
       setIsConnected(true)
-      console.log('[SSE] Connected to calendar updates')
     }
 
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
-        console.log('[SSE] Received:', data.type)
-
         // Refresh data when any change occurs
         if (['booking_created', 'booking_updated', 'event_added', 'event_updated', 'event_deleted', 'slot_added', 'slot_deleted'].includes(data.type)) {
           fetchLatestData()
         }
-      } catch (error) {
-        console.error('[SSE] Error parsing message:', error)
+      } catch {
+        // Ignore malformed SSE messages
       }
     }
 
     eventSource.onerror = () => {
       setIsConnected(false)
-      console.log('[SSE] Connection error, will retry...')
     }
 
     // Cleanup on unmount
@@ -847,8 +843,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
       setShowAddEventModal(false)
       resetEventForm()
       setIsSubmitting(false)
-    } catch (error) {
-      console.error('Error creating events:', error)
+    } catch {
       alert('Failed to create events')
       setIsSubmitting(false)
     }
@@ -3002,7 +2997,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                   <CalendarDays className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-blue-900 mb-1">
-                      "{selectedEvent.title}"
+                      &quot;{selectedEvent.title}&quot;
                     </p>
                     <p className="text-xs text-blue-700">
                       This event is part of a series with {eventSeriesInfo.totalEvents} total occurrences.
@@ -3249,7 +3244,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
                   <CalendarDays className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-amber-900 mb-1">
-                      "{selectedEvent.title}"
+                      &quot;{selectedEvent.title}&quot;
                     </p>
                     <p className="text-xs text-amber-700">
                       This event is part of a series with {eventSeriesInfo.totalEvents} total occurrences.

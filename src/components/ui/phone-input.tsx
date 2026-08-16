@@ -95,7 +95,7 @@ export function PhoneInput({
 }: PhoneInputProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [selectedCountry, setSelectedCountry] = React.useState(
-    countries.find((c) => c.code === countryCode) || countries.find((c) => c.code === 'US')!
+    countries.find((c) => c.code === countryCode) || countries.find((c) => c.code === 'US') || countries[0]
   )
   const [inputValue, setInputValue] = React.useState(value)
   const [search, setSearch] = React.useState('')

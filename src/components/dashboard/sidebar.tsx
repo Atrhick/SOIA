@@ -36,11 +36,13 @@ import {
   Hash,
   Mail,
   UserPlus,
+  Handshake,
   type LucideIcon,
 } from 'lucide-react'
+import { ASSOCIATE_LABELS, isAssociateRole, type AssociateRole } from '@/lib/roles'
 
 interface SidebarProps {
-  role: 'ADMIN' | 'COACH' | 'AMBASSADOR'
+  role: 'ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
 }
 
 interface NavItem {
@@ -122,6 +124,7 @@ const coachNavSections: NavSection[] = [
       { href: '/coach/crm', label: 'CRM', icon: UserCheck },
       { href: '/coach/projects', label: 'Projects', icon: FolderKanban },
       { href: '/coach/business-excellence', label: 'Business Excellence', icon: Briefcase },
+      { href: '/coach/programs', label: 'Program Pages', icon: Megaphone },
       { href: '/coach/income-goals', label: 'Income & Goals', icon: DollarSign },
     ],
   },
@@ -156,6 +159,17 @@ const coachNavSections: NavSection[] = [
 ]
 
 // Admin navigation - organized into sections
+// Shared by all three associate roles - they differ only by label.
+const associateNavSections: NavSection[] = [
+  {
+    title: 'Account',
+    icon: UserCog,
+    items: [
+      { href: '/associate/profile', label: 'My Profile', icon: UserCog },
+    ],
+  },
+]
+
 const adminNavSections: NavSection[] = [
   {
     title: 'People',
@@ -165,6 +179,7 @@ const adminNavSections: NavSection[] = [
       { href: '/admin/users', label: 'User Management', icon: UserCog },
       { href: '/admin/coaches', label: 'Coaches', icon: Users },
       { href: '/admin/ambassadors', label: 'Ambassadors', icon: Users },
+      { href: '/admin/associates', label: 'Associates', icon: Handshake },
     ],
   },
   {
@@ -189,6 +204,7 @@ const adminNavSections: NavSection[] = [
     icon: BookOpen,
     items: [
       { href: '/admin/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
+      { href: '/admin/programs', label: 'Program Pages', icon: Megaphone },
       { href: '/admin/resource-centers', label: 'Resource Centers', icon: Building2 },
     ],
   },
@@ -322,6 +338,9 @@ export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
 
   const getHomeLink = () => {
+    // Associate roles must be handled before the default, or they inherit
+    // the coach dashboard and bounce back to /login.
+    if (isAssociateRole(role)) return '/associate'
     switch (role) {
       case 'ADMIN': return '/admin'
       case 'AMBASSADOR': return '/ambassador'
@@ -330,6 +349,7 @@ export function Sidebar({ role }: SidebarProps) {
   }
 
   const getPortalLabel = () => {
+    if (isAssociateRole(role)) return `${ASSOCIATE_LABELS[role]} Portal`
     switch (role) {
       case 'ADMIN': return 'Admin Portal'
       case 'AMBASSADOR': return 'Ambassador Portal'
@@ -342,6 +362,11 @@ export function Sidebar({ role }: SidebarProps) {
 
   // Get the sections for the current role
   const getSections = () => {
+    // Must come before the switch, exactly like getHomeLink/getPortalLabel.
+    // The accordion's active-section state is derived from this list, so
+    // falling through to coachNavSections leaves an associate's only menu
+    // section permanently collapsed.
+    if (isAssociateRole(role)) return associateNavSections
     switch (role) {
       case 'ADMIN': return adminNavSections
       case 'AMBASSADOR': return ambassadorNavSections
@@ -488,10 +513,10 @@ export function Sidebar({ role }: SidebarProps) {
                 ? 'bg-gradient-to-br from-amber-500 to-amber-600'
                 : 'bg-gradient-to-br from-primary-500 to-primary-600'
             )}>
-              <span className="text-lg font-bold text-white">S1</span>
+              <span className="text-lg font-bold text-white">NT</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold text-gray-900">StageOneInAction</span>
+              <span className="text-sm font-semibold text-gray-900">NowTransformed</span>
               <span className="text-xs text-gray-500">{getPortalLabel()}</span>
             </div>
           </Link>
@@ -503,13 +528,15 @@ export function Sidebar({ role }: SidebarProps) {
             ? renderSectionedNav(adminNavSections)
             : role === 'COACH'
               ? renderSectionedNav(coachNavSections)
-              : renderAmbassadorNav()}
+              : isAssociateRole(role)
+                ? renderSectionedNav(associateNavSections)
+                : renderAmbassadorNav()}
         </nav>
 
         {/* Footer */}
         <div className="border-t border-gray-100 p-4">
           <p className="text-xs text-gray-400 text-center">
-            StageOneInAction Back Office
+            NowTransformed Back Office
           </p>
         </div>
       </div>

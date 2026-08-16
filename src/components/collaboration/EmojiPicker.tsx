@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { SmilePlus } from 'lucide-react'
 
@@ -49,10 +49,10 @@ export function EmojiPicker({ onSelect, disabled = false, size = 'default' }: Em
     }
   }, [isOpen])
 
-  const handleSelect = (emoji: string) => {
+  const handleSelect = useCallback((emoji: string) => {
     onSelect(emoji)
     setIsOpen(false)
-  }
+  }, [onSelect])
 
   return (
     <div className="relative" ref={containerRef}>

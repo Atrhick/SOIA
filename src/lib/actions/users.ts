@@ -142,6 +142,18 @@ export async function updateUserRole(userId: string, newRole: string) {
     return { error: 'Invalid role' }
   }
 
+  // Associates are managed at /admin/associates, where User.role and
+  // AssociateProfile.type are written together. Changing the role here would
+  // leave the two out of step: the account would route to a dashboard it has
+  // no profile for, and no screen could set it back.
+  const associateProfile = await prisma.associateProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  })
+  if (associateProfile) {
+    return { error: 'Change this person’s association from the Associates page instead' }
+  }
+
   try {
     const user = await prisma.user.update({
       where: { id: userId },

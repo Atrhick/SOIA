@@ -1,6 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  compress: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+    formats: ['image/avif', 'image/webp'],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',

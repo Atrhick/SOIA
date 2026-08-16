@@ -108,7 +108,6 @@ interface AdminReportsClientProps {
 export function AdminReportsClient({ stats, reports }: AdminReportsClientProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'coaches' | 'ambassadors' | 'sponsorships' | 'events'>('overview')
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const downloadCSV = (data: any[], filename: string) => {
     if (data.length === 0) return
 

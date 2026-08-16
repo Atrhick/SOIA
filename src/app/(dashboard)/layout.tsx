@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { Header } from '@/components/dashboard/header'
 import { prisma } from '@/lib/prisma'
+import { isAssociateRole, type AssociateRole } from '@/lib/roles'
 
 export default async function DashboardLayout({
   children,
@@ -16,12 +17,20 @@ export default async function DashboardLayout({
   }
 
   // Cast to the supported role types
-  const role = session.user.role as 'ADMIN' | 'COACH' | 'AMBASSADOR'
+  const role = session.user.role as 'ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
   const isImpersonating = session.user.isImpersonating || false
 
   // Fetch the profile name based on role
   let profileName: string | null = null
-  if (role === 'COACH' && session.user.coachId) {
+  if (isAssociateRole(role)) {
+    const associate = await prisma.associateProfile.findUnique({
+      where: { userId: session.user.id },
+      select: { firstName: true, lastName: true }
+    })
+    if (associate) {
+      profileName = `${associate.firstName} ${associate.lastName}`
+    }
+  } else if (role === 'COACH' && session.user.coachId) {
     const coachProfile = await prisma.coachProfile.findUnique({
       where: { id: session.user.coachId },
       select: { firstName: true, lastName: true }

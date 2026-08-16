@@ -102,8 +102,8 @@ export function ChannelsAdminClient({
       if (result.channel) {
         setSelectedChannel(result.channel as ChannelDetail)
       }
-    } catch (error) {
-      console.error('Error loading channel:', error)
+    } catch {
+      // Channel load failed — UI stays on channel list
     } finally {
       setIsLoading(false)
     }
@@ -149,8 +149,8 @@ export function ChannelsAdminClient({
         setNewChannelPrivate(false)
         setNewChannelRoles(['ADMIN', 'COACH', 'AMBASSADOR'])
       }
-    } catch (error) {
-      console.error('Error creating channel:', error)
+    } catch {
+      // Channel creation failed silently
     } finally {
       setIsSubmitting(false)
     }
@@ -173,8 +173,8 @@ export function ChannelsAdminClient({
         }
         setNewPostContent('')
       }
-    } catch (error) {
-      console.error('Error creating post:', error)
+    } catch {
+      // Post creation failed silently
     } finally {
       setIsSubmitting(false)
     }
@@ -199,8 +199,8 @@ export function ChannelsAdminClient({
         setReplyContent({ ...replyContent, [postId]: '' })
         setShowReplyFor(null)
       }
-    } catch (error) {
-      console.error('Error creating reply:', error)
+    } catch {
+      // Reply creation failed silently
     } finally {
       setIsSubmitting(false)
     }
@@ -215,8 +215,8 @@ export function ChannelsAdminClient({
           setSelectedChannel(refreshed.channel as ChannelDetail)
         }
       }
-    } catch (error) {
-      console.error('Error toggling pin:', error)
+    } catch {
+      // Pin toggle failed silently
     }
   }
 

@@ -41,3 +41,8 @@ next-env.d.ts
 prisma/*.db
 prisma/*.db-journal
 tmpclaude-*
+
+# Stray Windows device-name artifact from a `> nul` redirect.
+# Git cannot index a file named `nul` on Windows ("invalid path"), which makes
+# `git add -A` fail outright unless it is ignored.
+nul

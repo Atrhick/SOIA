@@ -154,7 +154,7 @@ export function AcceptanceClient({ prospect, token, acceptanceLetter, refundPoli
               Dear {prospect.firstName},
             </p>
             <div className="text-gray-700 whitespace-pre-wrap">
-              {acceptanceLetter || `We are pleased to welcome you to the StageOneInAction Coaching Program. As a member of our community, you will have access to comprehensive training, resources, and support to build your coaching practice.
+              {acceptanceLetter || `We are pleased to welcome you to the NowTransformed Coaching Program. As a member of our community, you will have access to comprehensive training, resources, and support to build your coaching practice.
 
 The program fee is $${programFee} USD and includes:
 - Complete coaching certification program

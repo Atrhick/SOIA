@@ -277,7 +277,7 @@ export function LMSAnalyticsClient({
                         {activity.type === 'COURSE_COMPLETED' ? (
                           <>completed course</>
                         ) : (
-                          <>completed lesson "{activity.lessonTitle}"</>
+                          <>completed lesson &quot;{activity.lessonTitle}&quot;</>
                         )}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">{activity.courseTitle}</p>

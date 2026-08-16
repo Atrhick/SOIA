@@ -121,14 +121,21 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
     contactInfoFields: defaultContactFields,
   })
 
+  // Helper for stable option keys
+  const makeOption = (optionText = '', isCorrect = false) => ({
+    _key: crypto.randomUUID(),
+    optionText,
+    isCorrect,
+  })
+
   // Question form
   const [questionForm, setQuestionForm] = useState({
     questionText: '',
     questionType: 'MULTIPLE_CHOICE' as SurveyQuestion['questionType'],
     isRequired: true,
     options: [
-      { optionText: '', isCorrect: false },
-      { optionText: '', isCorrect: false },
+      makeOption(),
+      makeOption(),
     ],
     likertConfig: {
       minLabel: 'Strongly Disagree',
@@ -146,8 +153,8 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
       questionType: 'MULTIPLE_CHOICE',
       isRequired: true,
       options: [
-        { optionText: '', isCorrect: false },
-        { optionText: '', isCorrect: false },
+        makeOption(),
+        makeOption(),
       ],
       likertConfig: {
         minLabel: 'Strongly Disagree',
@@ -169,8 +176,8 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
       questionType: question.questionType,
       isRequired: question.isRequired,
       options: question.options.length > 0
-        ? question.options.map(o => ({ optionText: o.optionText, isCorrect: o.isCorrect || false }))
-        : [{ optionText: '', isCorrect: false }, { optionText: '', isCorrect: false }],
+        ? question.options.map(o => makeOption(o.optionText, o.isCorrect || false))
+        : [makeOption(), makeOption()],
       likertConfig: question.likertConfig || {
         minLabel: 'Strongly Disagree',
         maxLabel: 'Strongly Agree',
@@ -553,7 +560,7 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
     if (questionForm.options.length < 8) {
       setQuestionForm({
         ...questionForm,
-        options: [...questionForm.options, { optionText: '', isCorrect: false }],
+        options: [...questionForm.options, makeOption()],
       })
     }
   }
@@ -1136,7 +1143,7 @@ export function SurveyBuilderClient({ initialType = 'QUIZ' }: SurveyBuilderClien
                     </div>
                     <div className="space-y-2">
                       {questionForm.options.map((option, index) => (
-                        <div key={index} className="flex items-center gap-2">
+                        <div key={option._key} className="flex items-center gap-2">
                           {surveyForm.type === 'QUIZ' && (
                             <input
                               type="checkbox"

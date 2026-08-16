@@ -80,22 +80,16 @@ export async function getLMSOverviewStats(): Promise<{ stats?: OverviewStats; er
           lastAccessedAt: { gte: oneWeekAgo },
         },
       }),
-      prisma.lMSEnrollment.findMany({
+      prisma.lMSEnrollment.aggregate({
         where: {
           status: 'COMPLETED',
           totalTimeSpent: { gt: 0 },
         },
-        select: { totalTimeSpent: true },
+        _avg: { totalTimeSpent: true },
       }),
     ])
 
-    const avgCompletionTime =
-      completedWithTime.length > 0
-        ? Math.round(
-            completedWithTime.reduce((acc, e) => acc + e.totalTimeSpent, 0) /
-              completedWithTime.length
-          )
-        : 0
+    const avgCompletionTime = Math.round(completedWithTime._avg.totalTimeSpent ?? 0)
 
     const overallCompletionRate =
       totalEnrollments > 0 ? Math.round((completedEnrollments / totalEnrollments) * 100) : 0
