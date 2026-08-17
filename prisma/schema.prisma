@@ -1223,6 +1223,22 @@ model CRMPipelineStage {
   @@map("crm_pipeline_stages")
 }
 
+enum ContactSource {
+  MANUAL
+  PROGRAM_PAGE
+  REFERRAL
+  IMPORT
+}
+
+enum ContactStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  DORMANT
+  LOST
+}
+
 model CRMContact {
   id         String        @id @default(cuid())
   ownerId    String        // CoachProfile ID
@@ -1237,12 +1253,27 @@ model CRMContact {
   notes      String?       @db.Text
   tags       String[]
 
+  // Where this person came from, and where the coach has got to with them.
+  source          ContactSource @default(MANUAL)
+  status          ContactStatus @default(NEW)
+  lastContactedAt DateTime?
+  nextFollowUpAt  DateTime?
+
+  // Set when the contact originated from a program page signup. The
+  // ProgramLead row stays as the immutable record of what they submitted;
+  // this contact is the working record. SetNull so removing a program never
+  // destroys the coach's contact.
+  programLeadId String?      @unique
+  programLead   ProgramLead? @relation(fields: [programLeadId], references: [id], onDelete: SetNull)
+
   deals      CRMDeal[]
   activities CRMActivity[]
 
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
+  @@index([ownerId, status])
+  @@index([ownerId, nextFollowUpAt])
   @@map("crm_contacts")
 }
 
@@ -2476,9 +2507,46 @@ model ProgramLead {
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 
+  crmContact   CRMContact?
+
   @@unique([programId, email])
   @@index([programId, association])
   @@map("program_leads")
+}
+
+// ============================================
+// PROGRAM CORE QUESTIONS
+// The standard qualification questions every program asks, ahead of each
+// coach's own additions. Database-backed so admins can edit them without a
+// deploy. Coach-authored extras still live in CoachProgram.extraQuestions.
+// ============================================
+
+enum ProgramQuestionKind {
+  LIKERT
+  TEXT_LONG
+  DROPDOWN
+  RADIO
+}
+
+model ProgramCoreQuestion {
+  id        String              @id @default(cuid())
+  // Stable identifier stored on every answer snapshot. NEVER reuse a key for
+  // a different question - it would silently merge two things in reporting.
+  key       String              @unique
+  type      ProgramQuestionKind
+  label     String
+  required  Boolean             @default(true)
+  options   Json?               // DROPDOWN | RADIO: string[]
+  likert    Json?               // LIKERT: { min, max, minLabel, maxLabel }
+  sortOrder Int                 @default(0)
+  // Retire with isActive rather than deleting, so stored answers keep resolving.
+  isActive  Boolean             @default(true)
+
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("program_core_questions")
 }
 
 // ============================================

@@ -23,6 +23,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { AlertBanner } from '@/components/ui/alert-banner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { CoreQuestionsClient, type CoreQuestionRow } from './core-questions-client'
 import {
   Check,
   Copy,
@@ -79,9 +81,11 @@ const UNASSIGNED = '__unassigned__'
 export function ProgramsAdminClient({
   programs,
   coaches,
+  coreQuestions,
 }: {
   programs: ProgramRow[]
   coaches: CoachOption[]
+  coreQuestions: CoreQuestionRow[]
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -124,16 +128,28 @@ export function ProgramsAdminClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-            <Megaphone className="h-6 w-6 text-teal-600" />
-            Program Pages
-          </h1>
-          <p className="text-gray-500 mt-1">
-            Assign each program to its owning coach, then review and publish their public page.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+          <Megaphone className="h-6 w-6 text-teal-600" />
+          Program Pages
+        </h1>
+        <p className="text-gray-500 mt-1">
+          Assign each program to its owning coach, then review and publish their public page.
+        </p>
+      </div>
+
+      <Tabs defaultValue="programs">
+        <TabsList>
+          <TabsTrigger value="programs">Programs</TabsTrigger>
+          <TabsTrigger value="questions">Standard questions</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="questions">
+          <CoreQuestionsClient questions={coreQuestions} />
+        </TabsContent>
+
+        <TabsContent value="programs" className="space-y-6">
+      <div className="flex justify-end">
         <Button onClick={() => setShowCreate(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Program
@@ -303,6 +319,8 @@ export function ProgramsAdminClient({
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Create program */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>

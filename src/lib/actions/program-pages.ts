@@ -8,7 +8,6 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { isFeatureEnabled } from '@/lib/actions/feature-config'
 import {
-  CORE_QUESTIONS,
   MAX_EXTRA_QUESTIONS,
   MAX_TEXT_LONG_LENGTH,
   PROGRAM_QUESTION_TYPES,
@@ -585,6 +584,140 @@ export async function adminUnpublishProgram(programId: string, reason: string) {
   return { success: true }
 }
 
+// ── Core questions (admin-managed, shared by every program) ──────────────────
+
+const coreQuestionSchema = z
+  .object({
+    type: z.enum(PROGRAM_QUESTION_TYPES),
+    label: z.string().min(1, 'Question text is required').max(300),
+    required: z.boolean(),
+    options: z.array(z.string().min(1).max(200)).optional(),
+    likert: likertSchema.optional(),
+    sortOrder: z.number().int().min(0).max(10000).optional(),
+  })
+  .superRefine((q, ctx) => {
+    if ((q.type === 'DROPDOWN' || q.type === 'RADIO') && (!q.options || q.options.length < 2)) {
+      ctx.addIssue({ code: 'custom', message: 'This question needs at least 2 options' })
+    }
+    if (q.type === 'LIKERT') {
+      if (!q.likert) ctx.addIssue({ code: 'custom', message: 'This question needs a rating scale' })
+      else if (q.likert.min >= q.likert.max) {
+        ctx.addIssue({ code: 'custom', message: 'Scale minimum must be below the maximum' })
+      }
+    }
+  })
+
+export async function getCoreQuestions() {
+  const ctx = await requireAdmin()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const rows = await prisma.programCoreQuestion.findMany({ orderBy: { sortOrder: 'asc' } })
+  return {
+    questions: rows.map((r) => ({
+      id: r.id,
+      key: r.key,
+      type: r.type,
+      label: r.label,
+      required: r.required,
+      options: (r.options as unknown as string[]) ?? undefined,
+      likert: (r.likert as unknown as ProgramQuestion['likert']) ?? undefined,
+      sortOrder: r.sortOrder,
+      isActive: r.isActive,
+    })),
+  }
+}
+
+export async function createCoreQuestion(data: unknown) {
+  const ctx = await requireAdmin()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const parsed = coreQuestionSchema.safeParse(data)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid question' }
+
+  const count = await prisma.programCoreQuestion.count()
+  // Keys are generated, never user-supplied, so they can never collide with an
+  // existing question's stored answers.
+  const key = `core_${crypto.randomBytes(6).toString('hex')}`
+
+  const created = await prisma.programCoreQuestion.create({
+    data: {
+      key,
+      type: parsed.data.type,
+      label: parsed.data.label,
+      required: parsed.data.required,
+      options: (parsed.data.options as unknown as object) ?? undefined,
+      likert: (parsed.data.likert as unknown as object) ?? undefined,
+      sortOrder: parsed.data.sortOrder ?? (count + 1) * 10,
+    },
+  })
+
+  await audit(ctx.session.user.id, 'CREATE_CORE_QUESTION', created.id, { key, label: parsed.data.label })
+  revalidatePath('/admin/programs')
+  return { success: true }
+}
+
+export async function updateCoreQuestion(id: string, data: unknown) {
+  const ctx = await requireAdmin()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const parsed = coreQuestionSchema.safeParse(data)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid question' }
+
+  const existing = await prisma.programCoreQuestion.findUnique({ where: { id }, select: { id: true } })
+  if (!existing) return { error: 'Question not found' }
+
+  // `key` is deliberately never updated. Answers are stored against it, and
+  // reusing a key for a different question would merge two distinct things in
+  // reporting. Rewording the label is safe - answers snapshot their own label.
+  await prisma.programCoreQuestion.update({
+    where: { id },
+    data: {
+      type: parsed.data.type,
+      label: parsed.data.label,
+      required: parsed.data.required,
+      options: (parsed.data.options as unknown as object) ?? Prisma.DbNull,
+      likert: (parsed.data.likert as unknown as object) ?? Prisma.DbNull,
+      ...(parsed.data.sortOrder !== undefined ? { sortOrder: parsed.data.sortOrder } : {}),
+    },
+  })
+
+  await audit(ctx.session.user.id, 'UPDATE_CORE_QUESTION', id, { label: parsed.data.label })
+  revalidatePath('/admin/programs')
+  return { success: true }
+}
+
+export async function setCoreQuestionActive(id: string, isActive: boolean) {
+  const ctx = await requireAdmin()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const existing = await prisma.programCoreQuestion.findUnique({ where: { id }, select: { id: true } })
+  if (!existing) return { error: 'Question not found' }
+
+  // Retiring rather than deleting keeps answers already stored resolvable.
+  await prisma.programCoreQuestion.update({ where: { id }, data: { isActive } })
+
+  await audit(ctx.session.user.id, isActive ? 'ENABLE_CORE_QUESTION' : 'RETIRE_CORE_QUESTION', id, {})
+  revalidatePath('/admin/programs')
+  return { success: true }
+}
+
+export async function reorderCoreQuestions(orderedIds: string[]) {
+  const ctx = await requireAdmin()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const ids = z.array(z.string().min(1)).max(50).safeParse(orderedIds)
+  if (!ids.success) return { error: 'Invalid order' }
+
+  await prisma.$transaction(
+    ids.data.map((id, index) =>
+      prisma.programCoreQuestion.update({ where: { id }, data: { sortOrder: (index + 1) * 10 } })
+    )
+  )
+
+  revalidatePath('/admin/programs')
+  return { success: true }
+}
+
 export async function deleteProgram(programId: string) {
   const ctx = await requireAdmin()
   if (!ctx.ok) return { error: ctx.error }
@@ -611,6 +744,30 @@ export async function deleteProgram(programId: string) {
 // Authorization is possession of a published slug or an unguessable token,
 // matching getProspectByToken / submitBusinessForm / createPublicBooking.
 // ============================================
+
+/**
+ * The standard questions every program asks, ahead of the coach's own.
+ *
+ * Read from the database rather than the CORE_QUESTIONS constant so admins can
+ * edit them without a deploy. CORE_QUESTIONS remains the seed source only.
+ * Retired questions (isActive false) are excluded, which stops collection
+ * without orphaning answers already stored against their key.
+ */
+async function loadCoreQuestions(): Promise<ProgramQuestion[]> {
+  const rows = await prisma.programCoreQuestion.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+  })
+
+  return rows.map((r) => ({
+    id: r.key,
+    type: r.type as ProgramQuestion['type'],
+    label: r.label,
+    required: r.required,
+    ...(r.options ? { options: r.options as unknown as string[] } : {}),
+    ...(r.likert ? { likert: r.likert as unknown as ProgramQuestion['likert'] } : {}),
+  }))
+}
 
 type PublicSnapshot = Record<string, unknown>
 
@@ -789,7 +946,7 @@ export async function getLeadQualificationData(slug: string, token: string) {
       zoomInstructions: (snap.zoomInstructions as string) ?? null,
       eventDatesText: (snap.eventDatesText as string) ?? null,
       qualificationIntro: (snap.qualificationIntro as string) ?? null,
-      questions: [...CORE_QUESTIONS, ...extras],
+      questions: [...(await loadCoreQuestions()), ...extras],
       leadName: lead.fullName,
       alreadySubmitted: lead.qualifiedAt !== null,
     },
@@ -811,7 +968,7 @@ export async function submitQualification(token: string, answers: unknown) {
 
   const snap = lead.program.publishedSnapshot as PublicSnapshot
   const extras = (snap.extraQuestions as unknown as ProgramQuestion[]) ?? []
-  const questions = [...CORE_QUESTIONS, ...extras]
+  const questions = [...(await loadCoreQuestions()), ...extras]
 
   const rawAnswers = z
     .array(z.object({ questionId: z.string(), value: z.union([z.string(), z.number()]) }))

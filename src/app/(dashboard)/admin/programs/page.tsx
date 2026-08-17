@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getAllPrograms } from '@/lib/actions/program-pages'
+import { getAllPrograms, getCoreQuestions } from '@/lib/actions/program-pages'
 import { ProgramsAdminClient } from './programs-admin-client'
 
 export default async function AdminProgramsPage() {
@@ -9,7 +9,7 @@ export default async function AdminProgramsPage() {
     redirect('/login')
   }
 
-  const result = await getAllPrograms()
+  const [result, questionsResult] = await Promise.all([getAllPrograms(), getCoreQuestions()])
 
   if ('error' in result) {
     return (
@@ -19,5 +19,11 @@ export default async function AdminProgramsPage() {
     )
   }
 
-  return <ProgramsAdminClient programs={result.programs} coaches={result.coaches} />
+  return (
+    <ProgramsAdminClient
+      programs={result.programs}
+      coaches={result.coaches}
+      coreQuestions={'error' in questionsResult ? [] : questionsResult.questions}
+    />
+  )
 }

@@ -1,5 +1,6 @@
 import { PrismaClient, UserRole, OnboardingTaskType, AmbassadorOnboardingTaskType } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { CORE_QUESTIONS } from '../src/lib/program-question-types'
 
 const prisma = new PrismaClient()
 
@@ -697,6 +698,34 @@ Contact your coach or administrator for assistance.`,
     })
   }
   console.log(`Created ${coachPrograms.length} starter coach programs`)
+
+  // ============================================
+  // PROGRAM CORE QUESTIONS
+  // The standard qualification questions, seeded from CORE_QUESTIONS so the
+  // keys match any answers already stored. Admins edit them at
+  // /admin/programs afterwards; `update: {}` so re-seeding never reverts
+  // their edits.
+  // ============================================
+  for (let index = 0; index < CORE_QUESTIONS.length; index++) {
+    const q = CORE_QUESTIONS[index]
+    await prisma.programCoreQuestion.upsert({
+      where: { key: q.id },
+      update: {},
+      create: {
+        key: q.id,
+        type: q.type,
+        label: q.label,
+        required: q.required,
+        // Cast through unknown: the typed shapes are structurally fine as JSON
+        // but Prisma's InputJsonValue requires an index signature.
+        options: (q.options as unknown as object) ?? undefined,
+        likert: (q.likert as unknown as object) ?? undefined,
+        sortOrder: (index + 1) * 10,
+        isActive: true,
+      },
+    })
+  }
+  console.log(`Created ${CORE_QUESTIONS.length} program core questions`)
 
   console.log('Seeding completed!')
 }
