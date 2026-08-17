@@ -93,6 +93,153 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS "calendar_bookings_userId_idx" ON "calendar_bookings"("userId")`,
     ],
   },
+  {
+    id: '2026_08_17_add_program_pages_and_associates',
+    description:
+      'Add coach program pages (public landing + qualification leads) and the associate roles',
+    sql: [
+      // --- Enums. CREATE TYPE has no IF NOT EXISTS, so swallow duplicates. ---
+      `DO $$ BEGIN
+        CREATE TYPE "ProgramStatus" AS ENUM ('DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED');
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+      `DO $$ BEGIN
+        CREATE TYPE "ProgramLeadAssociation" AS ENUM ('UNCLASSIFIED', 'AMBASSADOR', 'COACH', 'SERVICE_PROVIDER', 'BUSINESS_AFFILIATE', 'VOLUNTEER');
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+      `DO $$ BEGIN
+        CREATE TYPE "AssociateType" AS ENUM ('SERVICE_PROVIDER', 'BUSINESS_AFFILIATE', 'VOLUNTEER');
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+      `DO $$ BEGIN
+        CREATE TYPE "AssociateStatus" AS ENUM ('ACTIVE', 'INACTIVE');
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+
+      // --- New UserRole values. Each is its own statement: Postgres will not
+      // let a newly added enum value be used in the same transaction. ---
+      `ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'SUB_ADMIN'`,
+      `ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'SERVICE_PROVIDER'`,
+      `ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'BUSINESS_AFFILIATE'`,
+      `ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'VOLUNTEER'`,
+
+      // --- coach_programs ---
+      `CREATE TABLE IF NOT EXISTS "coach_programs" (
+        "id" TEXT NOT NULL,
+        "slug" TEXT NOT NULL,
+        "coachId" TEXT,
+        "assignedAt" TIMESTAMP(3),
+        "assignedBy" TEXT,
+        "name" TEXT NOT NULL,
+        "organization" TEXT NOT NULL,
+        "targetMarket" TEXT NOT NULL,
+        "internshipOffering" TEXT NOT NULL,
+        "servicesDescription" TEXT NOT NULL,
+        "weeklyEngagement1" TEXT NOT NULL,
+        "weeklyEngagement2" TEXT NOT NULL,
+        "monthlyGrowthGoal" TEXT NOT NULL,
+        "monthlyImpactGoal" TEXT NOT NULL,
+        "headline" TEXT,
+        "coachBio" TEXT,
+        "programDescription" TEXT,
+        "eventDatesText" TEXT,
+        "zoomUrl" TEXT,
+        "zoomInstructions" TEXT,
+        "extraQuestions" JSONB NOT NULL DEFAULT '[]',
+        "qualificationIntro" TEXT,
+        "status" "ProgramStatus" NOT NULL DEFAULT 'DRAFT',
+        "publishedSnapshot" JSONB,
+        "submittedAt" TIMESTAMP(3),
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedBy" TEXT,
+        "reviewNotes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "coach_programs_pkey" PRIMARY KEY ("id")
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "coach_programs_slug_key" ON "coach_programs"("slug")`,
+      `CREATE INDEX IF NOT EXISTS "coach_programs_coachId_idx" ON "coach_programs"("coachId")`,
+      `CREATE INDEX IF NOT EXISTS "coach_programs_status_idx" ON "coach_programs"("status")`,
+      `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'coach_programs_coachId_fkey'
+        ) THEN
+          ALTER TABLE "coach_programs"
+          ADD CONSTRAINT "coach_programs_coachId_fkey"
+          FOREIGN KEY ("coachId") REFERENCES "coach_profiles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+        END IF;
+      END $$`,
+
+      // --- program_leads ---
+      `CREATE TABLE IF NOT EXISTS "program_leads" (
+        "id" TEXT NOT NULL,
+        "programId" TEXT NOT NULL,
+        "fullName" TEXT NOT NULL,
+        "email" TEXT NOT NULL,
+        "profession" TEXT NOT NULL,
+        "registeredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "token" TEXT NOT NULL,
+        "answers" JSONB,
+        "qualifiedAt" TIMESTAMP(3),
+        "association" "ProgramLeadAssociation" NOT NULL DEFAULT 'UNCLASSIFIED',
+        "classifiedAt" TIMESTAMP(3),
+        "coachNotes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "program_leads_pkey" PRIMARY KEY ("id")
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "program_leads_token_key" ON "program_leads"("token")`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "program_leads_programId_email_key" ON "program_leads"("programId", "email")`,
+      `CREATE INDEX IF NOT EXISTS "program_leads_programId_association_idx" ON "program_leads"("programId", "association")`,
+      `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'program_leads_programId_fkey'
+        ) THEN
+          ALTER TABLE "program_leads"
+          ADD CONSTRAINT "program_leads_programId_fkey"
+          FOREIGN KEY ("programId") REFERENCES "coach_programs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        END IF;
+      END $$`,
+
+      // --- associate_profiles ---
+      `CREATE TABLE IF NOT EXISTS "associate_profiles" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "type" "AssociateType" NOT NULL,
+        "status" "AssociateStatus" NOT NULL DEFAULT 'ACTIVE',
+        "firstName" TEXT NOT NULL,
+        "lastName" TEXT NOT NULL,
+        "phone" TEXT,
+        "organization" TEXT,
+        "serviceOffered" TEXT,
+        "notes" TEXT,
+        "coachId" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "associate_profiles_pkey" PRIMARY KEY ("id")
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "associate_profiles_userId_key" ON "associate_profiles"("userId")`,
+      `CREATE INDEX IF NOT EXISTS "associate_profiles_type_status_idx" ON "associate_profiles"("type", "status")`,
+      `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'associate_profiles_userId_fkey'
+        ) THEN
+          ALTER TABLE "associate_profiles"
+          ADD CONSTRAINT "associate_profiles_userId_fkey"
+          FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        END IF;
+      END $$`,
+      `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'associate_profiles_coachId_fkey'
+        ) THEN
+          ALTER TABLE "associate_profiles"
+          ADD CONSTRAINT "associate_profiles_coachId_fkey"
+          FOREIGN KEY ("coachId") REFERENCES "coach_profiles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+        END IF;
+      END $$`,
+    ],
+  },
 ]
 
 // Create migrations tracking table if it doesn't exist
