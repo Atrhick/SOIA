@@ -163,7 +163,6 @@ export function CalendarsClient({ calendars: initialCalendars }: Props) {
         window.location.reload()
       }
     } catch (err) {
-      console.error('Error setting up orientation calendar:', err)
       setError('Failed to create orientation calendar. Please try again.')
       setIsSettingUpOrientation(false)
     }
@@ -405,7 +404,7 @@ export function CalendarsClient({ calendars: initialCalendars }: Props) {
                   value={newCalendar.name}
                   onChange={(e) => setNewCalendar({ ...newCalendar, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="e.g., SOIA Events"
+                  placeholder="e.g., NowTransformed Events"
                   required
                 />
               </div>

@@ -372,7 +372,7 @@ export function ProspectsClient({ prospects, stats }: ProspectsClientProps) {
                           <div className="flex items-center">
                             <div className="h-10 w-10 flex-shrink-0 bg-primary-100 rounded-full flex items-center justify-center">
                               <span className="text-primary-700 font-medium">
-                                {prospect.firstName[0]}{prospect.lastName[0]}
+                                {(prospect.firstName?.[0] || '?').toUpperCase()}{(prospect.lastName?.[0] || '?').toUpperCase()}
                               </span>
                             </div>
                             <div className="ml-4">
@@ -475,7 +475,7 @@ export function ProspectsClient({ prospects, stats }: ProspectsClientProps) {
                         >
                           <div className="flex items-center mb-2">
                             <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 text-xs font-medium">
-                              {prospect.firstName[0]}{prospect.lastName[0]}
+                              {(prospect.firstName?.[0] || '?').toUpperCase()}{(prospect.lastName?.[0] || '?').toUpperCase()}
                             </div>
                             <div className="ml-2">
                               <div className="text-sm font-medium text-gray-900">

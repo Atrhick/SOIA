@@ -2,20 +2,28 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Mail, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react'
+import { Mail, ArrowLeft, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react'
+import { requestPasswordReset } from '@/lib/actions/password-reset'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [focusedField, setFocusedField] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
-    // TODO: Implement password reset logic
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const result = await requestPasswordReset(email)
+
+    if ('error' in result) {
+      setError(result.error)
+      setIsLoading(false)
+      return
+    }
 
     setIsSubmitted(true)
     setIsLoading(false)
@@ -26,7 +34,6 @@ export default function ForgotPasswordPage() {
       <div className="animate-scale-in">
         <div className="glass rounded-3xl shadow-2xl shadow-black/20 overflow-hidden">
           <div className="px-8 py-12 text-center">
-            {/* Success icon */}
             <div className="animate-slide-up">
               <div className="mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30">
                 <CheckCircle className="w-10 h-10 text-white" />
@@ -37,7 +44,7 @@ export default function ForgotPasswordPage() {
               Check Your Email
             </h1>
             <p className="mt-3 text-gray-600 animate-slide-up animation-delay-200 max-w-sm mx-auto">
-              If an account exists with <span className="font-medium text-gray-900">{email}</span>, you will receive a password reset link.
+              If an account exists with <span className="font-medium text-gray-900">{email}</span>, you will receive a password reset link shortly.
             </p>
 
             <div className="mt-8 animate-slide-up animation-delay-300">
@@ -61,11 +68,9 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="animate-scale-in">
-      {/* Card with glassmorphism */}
       <div className="glass rounded-3xl shadow-2xl shadow-black/20 overflow-hidden">
         {/* Header section */}
         <div className="relative px-8 pt-10 pb-8 text-center">
-          {/* Icon */}
           <div className="animate-slide-up">
             <div className="mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/30 transform hover:scale-105 transition-transform duration-300">
               <Mail className="w-9 h-9 text-white" />
@@ -83,6 +88,14 @@ export default function ForgotPasswordPage() {
         {/* Form section */}
         <div className="px-8 pb-8">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Error message */}
+            {error && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {error}
+              </div>
+            )}
+
             {/* Email field */}
             <div className="animate-slide-up animation-delay-200 opacity-0" style={{ animationFillMode: 'forwards' }}>
               <label
@@ -120,34 +133,16 @@ export default function ForgotPasswordPage() {
             <div className="animate-slide-up animation-delay-300 opacity-0 pt-2" style={{ animationFillMode: 'forwards' }}>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !email}
                 className="relative w-full h-12 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/30 overflow-hidden group transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/40 hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                {/* Button shimmer effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-
                 <span className="relative flex items-center justify-center gap-2">
                   {isLoading ? (
                     <>
-                      <svg
-                        className="animate-spin h-5 w-5"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
                       <span>Sending...</span>
                     </>
@@ -177,7 +172,6 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
 
-      {/* Bottom text */}
       <p className="mt-8 text-center text-sm text-white/60 animate-fade-in animation-delay-500">
         Remember your password? Sign in instead.
       </p>

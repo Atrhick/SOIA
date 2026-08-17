@@ -1,6 +1,6 @@
-# StageOneInAction Back Office
+# NowTransformed Back Office
 
-A comprehensive web-based platform for managing coaches, ambassadors, and organizational operations for StageOneInAction's four pillars: Personal Development, Professional Development, Talent Development, and Community Involvement.
+A comprehensive web-based platform for managing coaches, ambassadors, and organizational operations for NowTransformed's four pillars: Personal Development, Professional Development, Talent Development, and Community Involvement.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ A comprehensive web-based platform for managing coaches, ambassadors, and organi
 
 ## Overview
 
-The StageOneInAction Back Office provides:
+The NowTransformed Back Office provides:
 
 **For Ambassadors (Ages 10-24):**
 - Personal login portal with onboarding journey
@@ -146,12 +146,15 @@ The StageOneInAction Back Office provides:
 
 | Calendar Events as Availability | - | - | ✅ | Complete |
 | Migration API | - | - | ✅ | Complete |
+| Password Reset Flow | ✅ | ✅ | ✅ | Complete |
+| Login Rate Limiting (5 attempts / 15-min lockout) | ✅ | ✅ | ✅ | Complete |
+| Impersonation Auto-Expiry (30 min) | - | - | ✅ | Complete |
 
 ### Future Enhancements
 
 - Audit Logs
 - Admin Settings
-- Email Notifications
+- Production Email Provider (connect Resend/SendGrid to `src/lib/email.ts`)
 - Payment Integration for Paid Classes
 
 ---
@@ -194,9 +197,19 @@ NEXTAUTH_SECRET="your-secret-key-here-change-in-production"
 COACH_PROGRAM_FEE="1500"
 NEXT_PUBLIC_COACH_PROGRAM_FEE="1500"
 
-# Migration API (optional, for URL-based migrations)
+# Migration API (required for running DB migrations without direct DB access)
 MIGRATION_SECRET="your-migration-secret-here"
+
+# Email (for production password reset emails)
+# In development, reset links are logged to the console — no provider needed
+EMAIL_FROM="noreply@stageoneinaction.com"
+RESEND_API_KEY="your-resend-api-key"    # or SENDGRID_API_KEY, etc.
 ```
+
+> **Security note:** Generate strong random values for `NEXTAUTH_SECRET` and `MIGRATION_SECRET`:
+> ```bash
+> openssl rand -hex 32
+> ```
 
 ### Database Setup
 
@@ -296,7 +309,8 @@ test_app/
 │   │   ├── (auth)/              # Authentication pages
 │   │   │   ├── login/           # Admin/Coach login
 │   │   │   ├── ambassador-login/ # Ambassador login portal
-│   │   │   ├── forgot-password/ # Password reset
+│   │   │   ├── forgot-password/ # Request password reset link
+│   │   │   ├── reset-password/[token]/ # Set new password via token
 │   │   │   └── layout.tsx       # Auth layout with animations
 │   │   ├── (public)/            # Public routes (no auth required)
 │   │   │   ├── layout.tsx       # Minimal public layout
@@ -412,6 +426,7 @@ test_app/
 │       │   ├── ambassador-onboarding.ts # Ambassador onboarding progress
 │       │   ├── impersonation.ts # Admin user impersonation
 │       │   ├── ambassadors.ts   # Ambassador CRUD
+│       │   ├── password-reset.ts # Password reset flow (request, validate, confirm)
 │       │   ├── business-excellence.ts # CRM, website, outreach
 │       │   ├── business-idea.ts # Business idea submission/review
 │       │   ├── classes.ts       # Class management & enrollment
@@ -439,7 +454,8 @@ test_app/
 │       │       ├── content-blocks.ts # Content block management
 │       │       ├── enrollment.ts # Enrollment & progress
 │       │       └── analytics.ts # LMS analytics
-│       ├── auth.ts              # NextAuth configuration
+│       ├── auth.ts              # NextAuth configuration (rate limiting, impersonation timeout)
+│       ├── email.ts             # Email utility (dev console logging, production provider stub)
 │       ├── feature-names.ts     # Feature key constants
 │       ├── prisma.ts            # Prisma client singleton
 │       └── utils.ts             # Utility functions (cn)
@@ -545,6 +561,12 @@ test_app/
 | **ProspectPayment** | Payment tracking (Stripe, PayPal, Manual methods) |
 | **AdminNotification** | In-app notifications for admin users |
 
+### Security Entities
+
+| Entity | Description |
+|--------|-------------|
+| **PasswordResetToken** | One-time cryptographic tokens for secure password reset (64-char hex, 60-min expiry, single-use) |
+
 ### Key Relationships
 
 ```
@@ -578,8 +600,20 @@ MessageThread (1) ─── (N) Message
 The application uses NextAuth.js v5 (beta) with a credentials provider:
 
 - **Session Strategy:** JWT
-- **Password Hashing:** bcryptjs
+- **Password Hashing:** bcryptjs (saltRounds: 12)
 - **Role-Based Access:** Enforced via middleware and server-side checks
+- **Rate Limiting:** 5 failed login attempts per email triggers a 15-minute lockout (in-memory; use Redis for multi-instance deployments)
+- **Impersonation Timeout:** Admin impersonation sessions auto-expire after 30 minutes
+
+### Password Reset Flow
+
+1. User visits `/forgot-password` and submits their email
+2. A 64-character cryptographic token is generated and stored in `password_reset_tokens` (expires in 60 minutes)
+3. In development, the reset link is logged to the console. In production, connect an email provider in `src/lib/email.ts`
+4. User visits `/reset-password/[token]` — token is validated server-side before the form renders
+5. User sets a new password (min 8 chars, must include uppercase, lowercase, and number)
+6. Password is updated and token is marked as used atomically in a DB transaction
+7. User is redirected to `/login` after 2 seconds
 
 ### Protected Routes
 
@@ -681,6 +715,7 @@ The application primarily uses Next.js Server Actions for data mutations:
 
 | Module | Actions |
 |--------|---------|
+| `password-reset.ts` | requestPasswordReset, validateResetToken, confirmPasswordReset |
 | `ambassador-auth.ts` | createAmbassadorAccount, resetAmbassadorPassword, getAmbassadorProfile, updateAmbassadorProfile, getCoachesForAssignment |
 | `impersonation.ts` | getUsersForImpersonation, getImpersonationData |
 | `ambassador-onboarding.ts` | getAmbassadorOnboardingTasks, updateOnboardingProgress, approveInterview, markWhatsAppTeamCreated, inviteToPowerTeam |
@@ -1412,14 +1447,16 @@ docker run -p 8080:8080 -e DATABASE_URL="..." -e AUTH_SECRET="..." stageoneinact
 - [ ] Cloud SQL Admin API enabled
 - [ ] Database user and database created
 - [ ] `DATABASE_URL` set in Cloud Run
-- [ ] `AUTH_SECRET` generated and set
+- [ ] `AUTH_SECRET` / `NEXTAUTH_SECRET` generated with `openssl rand -hex 32` and set
+- [ ] `MIGRATION_SECRET` generated with `openssl rand -hex 32` and set
 - [ ] `AUTH_TRUST_HOST=true` set
 - [ ] `NEXTAUTH_URL` set to Cloud Run URL
 - [ ] Cloud SQL connection added in Cloud Run
 - [ ] Memory set to 1 GiB+
 - [ ] Cross-project IAM configured (if applicable)
-- [ ] Database migrations run (`prisma db push`)
+- [ ] Database migrations run via `POST /api/admin/migrate` with `MIGRATION_SECRET` header
 - [ ] Database seeded (`prisma db seed`)
+- [ ] Email provider connected in `src/lib/email.ts` (`EMAIL_FROM` + provider API key set)
 
 ---
 
@@ -1434,11 +1471,11 @@ For questions or issues:
 
 ## License
 
-Proprietary - StageOneInAction
+Proprietary - NowTransformed
 
 ---
 
-*Last updated: January 2026*
+*Last updated: March 2026*
 
 ---
 

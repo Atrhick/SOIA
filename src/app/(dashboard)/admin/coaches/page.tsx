@@ -22,10 +22,8 @@ async function getCoaches() {
   const [coaches, requiredTasksCount] = await Promise.all([
     prisma.coachProfile.findMany({
       include: {
-        user: true,
-        ambassadors: true,
-        recruiter: true,
-        recruitedCoaches: true,
+        user: { select: { id: true, email: true, status: true } },
+        _count: { select: { ambassadors: true, recruitedCoaches: true } },
         onboardingProgress: {
           where: { status: 'APPROVED' },
           include: { task: { select: { isRequired: true } } },
@@ -203,7 +201,7 @@ export default async function CoachesPage({ searchParams }: PageProps) {
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center">
                       <span className="text-lg font-medium text-primary-700">
-                        {coach.firstName[0]}{coach.lastName[0]}
+                        {(coach.firstName?.[0] || '?').toUpperCase()}{(coach.lastName?.[0] || '?').toUpperCase()}
                       </span>
                     </div>
                     <div>
@@ -216,12 +214,12 @@ export default async function CoachesPage({ searchParams }: PageProps) {
 
                   <div className="flex items-center gap-6">
                     <div className="hidden md:block text-center">
-                      <p className="text-lg font-semibold">{coach.ambassadors.length}</p>
+                      <p className="text-lg font-semibold">{coach._count.ambassadors}</p>
                       <p className="text-xs text-gray-500">Ambassadors</p>
                     </div>
 
                     <div className="hidden lg:block text-center">
-                      <p className="text-lg font-semibold">{coach.recruitedCoaches.length}</p>
+                      <p className="text-lg font-semibold">{coach._count.recruitedCoaches}</p>
                       <p className="text-xs text-gray-500">Recruited</p>
                     </div>
 

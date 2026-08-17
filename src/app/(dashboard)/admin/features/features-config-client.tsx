@@ -11,6 +11,7 @@ import {
   Clock,
   Calendar,
   BookOpen,
+  Megaphone,
   Settings2,
   Loader2
 } from 'lucide-react'
@@ -65,6 +66,12 @@ const FEATURE_META: Record<string, {
     description: 'Articles and documentation',
     icon: BookOpen,
     color: 'bg-indigo-500',
+  },
+  PROGRAM_PAGES: {
+    label: 'Program Pages',
+    description: 'Public program landing pages and lead qualification',
+    icon: Megaphone,
+    color: 'bg-teal-500',
   },
 }
 

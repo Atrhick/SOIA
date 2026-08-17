@@ -20,7 +20,7 @@ export function PaymentSuccessClient() {
         </h1>
 
         <p className="text-lg text-gray-600 mb-8">
-          Thank you for joining the StageOneInAction Coach Program. Your payment has been processed successfully.
+          Thank you for joining the NowTransformed Coach Program. Your payment has been processed successfully.
         </p>
 
         <div className="bg-gray-50 rounded-lg p-6 mb-8">

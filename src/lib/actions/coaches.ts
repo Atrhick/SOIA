@@ -110,18 +110,23 @@ export async function createCoach(formData: FormData) {
     const featurePermissionsJson = formData.get('featurePermissions') as string
     if (featurePermissionsJson) {
       try {
-        const permissions = JSON.parse(featurePermissionsJson) as { feature: string; granted: boolean }[]
-        if (permissions.length > 0) {
+        const parsed = JSON.parse(featurePermissionsJson)
+        const permissionSchema = z.array(z.object({
+          feature: z.string().min(1),
+          granted: z.boolean(),
+        }))
+        const permissions = permissionSchema.safeParse(parsed)
+        if (permissions.success && permissions.data.length > 0) {
           await prisma.userFeaturePermission.createMany({
-            data: permissions.map(p => ({
+            data: permissions.data.map(p => ({
               userId: result.user.id,
               feature: p.feature,
               granted: p.granted,
             }))
           })
         }
-      } catch (e) {
-        console.error('Error parsing feature permissions:', e)
+      } catch {
+        // Invalid JSON or schema — skip permissions silently
       }
     }
 

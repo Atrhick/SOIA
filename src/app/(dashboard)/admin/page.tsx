@@ -303,7 +303,7 @@ export default async function AdminDashboard() {
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-sm">
                         <span className="text-sm font-semibold text-white">
-                          {coach.firstName[0]}{coach.lastName[0]}
+                          {(coach.firstName?.[0] || '?').toUpperCase()}{(coach.lastName?.[0] || '?').toUpperCase()}
                         </span>
                       </div>
                       <div>

@@ -59,7 +59,7 @@ export async function createModule(formData: FormData) {
       _max: { sortOrder: true },
     })
 
-    const module = await prisma.lMSModule.create({
+    const lmsModule = await prisma.lMSModule.create({
       data: {
         courseId: validated.data.courseId,
         title: validated.data.title,
@@ -69,7 +69,7 @@ export async function createModule(formData: FormData) {
     })
 
     revalidatePath(`/admin/lms/${validated.data.courseId}`)
-    return { success: true, moduleId: module.id }
+    return { success: true, moduleId: lmsModule.id }
   } catch (error) {
     console.error('Error creating module:', error)
     return { error: 'Failed to create module' }
@@ -94,12 +94,12 @@ export async function updateModule(moduleId: string, formData: FormData) {
   }
 
   try {
-    const module = await prisma.lMSModule.findUnique({
+    const lmsModule = await prisma.lMSModule.findUnique({
       where: { id: moduleId },
       select: { courseId: true },
     })
 
-    if (!module) {
+    if (!lmsModule) {
       return { error: 'Module not found' }
     }
 
@@ -112,7 +112,7 @@ export async function updateModule(moduleId: string, formData: FormData) {
       },
     })
 
-    revalidatePath(`/admin/lms/${module.courseId}`)
+    revalidatePath(`/admin/lms/${lmsModule.courseId}`)
     return { success: true }
   } catch (error) {
     console.error('Error updating module:', error)
@@ -127,12 +127,12 @@ export async function deleteModule(moduleId: string) {
   }
 
   try {
-    const module = await prisma.lMSModule.findUnique({
+    const lmsModule = await prisma.lMSModule.findUnique({
       where: { id: moduleId },
       select: { courseId: true, title: true },
     })
 
-    if (!module) {
+    if (!lmsModule) {
       return { error: 'Module not found' }
     }
 
@@ -146,11 +146,11 @@ export async function deleteModule(moduleId: string) {
         action: 'DELETE_LMS_MODULE',
         entityType: 'LMSModule',
         entityId: moduleId,
-        details: `Deleted module: ${module.title}`,
+        details: `Deleted module: ${lmsModule.title}`,
       },
     })
 
-    revalidatePath(`/admin/lms/${module.courseId}`)
+    revalidatePath(`/admin/lms/${lmsModule.courseId}`)
     return { success: true }
   } catch (error) {
     console.error('Error deleting module:', error)

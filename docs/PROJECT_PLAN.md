@@ -1,4 +1,4 @@
-# StageOneInAction Back Office - Project Plan
+# NowTransformed Back Office - Project Plan
 
 **Document Version:** 1.1
 **Created:** January 26, 2026
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The StageOneInAction Back Office is a comprehensive Next.js 14 enterprise application managing coaches, ambassadors, and prospects through a complete onboarding and business management platform. This project plan outlines the roadmap from current state to production-ready deployment and beyond.
+The NowTransformed Back Office is a comprehensive Next.js 14 enterprise application managing coaches, ambassadors, and prospects through a complete onboarding and business management platform. This project plan outlines the roadmap from current state to production-ready deployment and beyond.
 
 ### Current State Metrics
 

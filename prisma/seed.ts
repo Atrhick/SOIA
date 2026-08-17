@@ -428,6 +428,13 @@ async function main() {
       enabledForCoaches: true,
       enabledForAmbassadors: true,
     },
+    {
+      // Opt-in per coach - granted individually from /admin/users
+      feature: 'PROGRAM_PAGES',
+      isEnabled: true,
+      enabledForCoaches: false,
+      enabledForAmbassadors: false,
+    },
   ]
 
   for (const config of featureConfigs) {
@@ -526,6 +533,170 @@ Contact your coach or administrator for assistance.`,
     },
   })
   console.log('Created sample knowledge base article')
+
+  // ============================================
+  // COACH PROGRAMS
+  // Starter data from the grant deliverables spreadsheet. Admins can add
+  // unlimited further programs from /admin/programs - this is not a fixed set.
+  // Each row is created unassigned; an admin assigns the owning coach.
+  // `update: {}` means re-seeding never overwrites a coach's edits.
+  // ============================================
+  const coachPrograms = [
+    {
+      slug: 'business-management',
+      name: 'Business Management',
+      organization: 'LPL MServices',
+      targetMarket: 'Entrepreneurs, Business Community',
+      internshipOffering: 'Mini Projects',
+      servicesDescription: 'Resident Agent Service, Grant Writing, Foundation & Business formation, etc',
+      weeklyEngagement1: 'Business Empowerment',
+      weeklyEngagement2: 'Projects to showcase biz',
+      monthlyGrowthGoal: '10 sign ups',
+      monthlyImpactGoal: '5 projects',
+    },
+    {
+      slug: 'communication-goals',
+      name: 'Communication & Goals',
+      organization: 'ACHIEVE Mentorship',
+      targetMarket: 'Youth in Library',
+      internshipOffering: 'Library Talks',
+      servicesDescription: 'Goal-Setting, Public Speaking, Foster Parenting, Youth Engagement, etc',
+      weeklyEngagement1: 'Introduction to P.A.T.H',
+      weeklyEngagement2: 'Library Talks',
+      monthlyGrowthGoal: '10 students',
+      monthlyImpactGoal: '10 signups',
+    },
+    {
+      slug: 'financial-empowerment',
+      name: 'Financial Empowerment',
+      organization: 'Life Changing Solutions',
+      targetMarket: 'Families',
+      internshipOffering: 'Drafting Estate Plans',
+      servicesDescription: 'Legal, Financial Security, Stability and Empowerment, Bookkeeping, Taxes etc',
+      weeklyEngagement1: 'Financial Empowerment',
+      weeklyEngagement2: 'Financial Security',
+      monthlyGrowthGoal: '10 PPLSI affiliates',
+      monthlyImpactGoal: '5 FS kits',
+    },
+    {
+      slug: 'fundraising-events',
+      name: 'Fundraising & Events',
+      organization: 'Mondarra International',
+      targetMarket: 'Volunteerism',
+      internshipOffering: 'Event Planning',
+      servicesDescription: 'Event Planning & Management, Talent Representation, Fundraising plans, etc',
+      weeklyEngagement1: 'Fundraising & Events',
+      weeklyEngagement2: 'Contracts',
+      monthlyGrowthGoal: '5 clients',
+      monthlyImpactGoal: '5 contracts',
+    },
+    {
+      slug: 'health-stress-management',
+      name: 'Health & Stress Mgmnt',
+      organization: 'USAWA',
+      targetMarket: 'Youth in School, Career Women',
+      internshipOffering: 'Health Initiatives',
+      servicesDescription: 'Health Coaching, Stress Management, Healthy Lifestyle, Natural remedies, etc',
+      weeklyEngagement1: 'Intro to EXPLORER Club',
+      weeklyEngagement2: 'Intro to Stress Mgmt',
+      monthlyGrowthGoal: '40 Explorers',
+      monthlyImpactGoal: '20 students',
+    },
+    {
+      slug: 'leadership-development',
+      name: 'Leadership Development',
+      organization: 'Leading The Way',
+      targetMarket: 'Young Leaders',
+      internshipOffering: 'YUPP Club Initiatives',
+      servicesDescription: "Decision-Making, Young Upcoming Professional's Leadership Training, etc",
+      weeklyEngagement1: 'Leadership Classes',
+      weeklyEngagement2: 'YUPP Club membership',
+      monthlyGrowthGoal: '10 students',
+      monthlyImpactGoal: '10 YUPP mbrs',
+    },
+    {
+      slug: 'onboarding-integration',
+      name: 'Onboarding & Integration',
+      organization: 'K.A.P.I.T Global',
+      targetMarket: 'Vision Advocates',
+      internshipOffering: 'Orientation/Training',
+      servicesDescription: 'Candidate Pre-qualification/Screening, Paperwork, SetUp, Internship, etc',
+      weeklyEngagement1: 'Intro to Onboarding',
+      weeklyEngagement2: 'Intro to Internship',
+      monthlyGrowthGoal: '20 New Affiliates',
+      monthlyImpactGoal: "5 A'-led Intrnsps",
+    },
+    {
+      slug: 'mindset-mastery',
+      name: 'Mindset Mastery',
+      organization: 'Total Athlete',
+      targetMarket: 'Sports people, Discipline',
+      internshipOffering: 'Book Reading Club',
+      servicesDescription: 'Character Development & Discipline, Sports Agility, NFL Qualification, etc',
+      weeklyEngagement1: 'Meet & Greets',
+      weeklyEngagement2: 'Leadership Calls',
+      monthlyGrowthGoal: '20 New Sign ups',
+      monthlyImpactGoal: '4 ResCtr Signup',
+    },
+    {
+      slug: 'program-development',
+      name: 'Program Development',
+      organization: 'Verily Academy',
+      targetMarket: 'Educators',
+      internshipOffering: 'Implementation',
+      servicesDescription: 'Legacy Building, Lifelong Learning, Program Development, Core Values etc',
+      weeklyEngagement1: "Educators' membership",
+      weeklyEngagement2: 'Intro to Programs w/ VA',
+      monthlyGrowthGoal: '10 new members',
+      monthlyImpactGoal: '10 Programs',
+    },
+    {
+      slug: 'talent-acquisition',
+      name: 'Talent Acquisition',
+      organization: 'ExploreNation',
+      targetMarket: 'Youth / Businesses',
+      internshipOffering: 'Internship Training',
+      servicesDescription: 'Skills Development, Create Awareness & Appreciation for Own Community, etc',
+      weeklyEngagement1: 'Intro to Explore Nation',
+      weeklyEngagement2: 'Business Sponsorships',
+      monthlyGrowthGoal: '10 Ambassadors',
+      monthlyImpactGoal: '50 Businesses',
+    },
+    {
+      slug: 'total-transformation',
+      name: 'Total Transformation',
+      organization: 'Sheila Sherman Llc',
+      targetMarket: 'Individuals, Workshop',
+      internshipOffering: 'FB admin/marketing',
+      servicesDescription: 'Maximize Potential thru healthy living, Mindset Change, Motivational Speaking',
+      weeklyEngagement1: 'Intro recorded webinar 4 TT',
+      weeklyEngagement2: 'Workshop Motivational Spk',
+      monthlyGrowthGoal: '5 Students',
+      monthlyImpactGoal: '1 Workshop',
+    },
+    {
+      slug: 'vision-development',
+      name: 'Vision Development',
+      organization: 'DreamIt LiveIt / PALA',
+      targetMarket: 'Youth in Foster Care, Family Caregivers',
+      internshipOffering: 'Community Outreach',
+      servicesDescription:
+        'Self-Awareness, Vision and Values, Caregiving Impact, Identity, Purpose etc, focus on Foster Children',
+      weeklyEngagement1: 'Youth Vision Development',
+      weeklyEngagement2: 'Family Caregiver Program',
+      monthlyGrowthGoal: '10 students',
+      monthlyImpactGoal: '10 FCaregivers',
+    },
+  ]
+
+  for (const program of coachPrograms) {
+    await prisma.coachProgram.upsert({
+      where: { slug: program.slug },
+      update: {},
+      create: program,
+    })
+  }
+  console.log(`Created ${coachPrograms.length} starter coach programs`)
 
   console.log('Seeding completed!')
 }

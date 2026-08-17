@@ -1,10 +1,10 @@
-StageOneInAction Back Office – Web Platform Requirements
+NowTransformed Back Office – Web Platform Requirements
 
 User Roles: Administrators & Coaches
 
 1. Platform Overview
 
-The StageOneInAction Back Office is a web-based platform that:
+The NowTransformed Back Office is a web-based platform that:
 
 Gives Coaches a structured way to:
 
@@ -30,7 +30,7 @@ Review sponsorship and Resource Center applications.
 
 Track program performance and generate reports.
 
-This platform supports StageOneInAction’s four pillars:
+This platform supports NowTransformed’s four pillars:
 
 Personal Development
 
@@ -313,7 +313,7 @@ Admin may mark completion as required for certain teaching roles or events.
 
 4.7 Income Tracking (Coach)
 
-Purpose: Help coaches see how SOIA-related activities contribute to income.
+Purpose: Help coaches see how NowTransformed-related activities contribute to income.
 
 Income Entry Form:
 

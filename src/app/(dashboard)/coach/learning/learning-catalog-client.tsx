@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   GraduationCap,
   BookOpen,
@@ -227,7 +228,7 @@ export function LearningCatalogClient({ courses, enrollments, basePath = '/coach
             <div className="text-center py-12 bg-white rounded-lg border">
               <CheckCircle className="h-12 w-12 mx-auto text-green-300 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">All caught up!</h3>
-              <p className="text-gray-500">You're enrolled in all available courses</p>
+              <p className="text-gray-500">You&apos;re enrolled in all available courses</p>
             </div>
           )}
         </div>
@@ -251,12 +252,14 @@ function EnrollmentCard({ enrollment, basePath }: { enrollment: Enrollment; base
       className="block bg-white rounded-lg border hover:border-blue-300 hover:shadow-md transition-all"
     >
       {/* Thumbnail */}
-      <div className="h-36 bg-gray-100 rounded-t-lg overflow-hidden">
+      <div className="h-36 bg-gray-100 rounded-t-lg overflow-hidden relative">
         {enrollment.courseThumbnail ? (
-          <img
+          <Image
             src={enrollment.courseThumbnail}
-            alt=""
-            className="w-full h-full object-cover"
+            alt={enrollment.courseTitle || 'Course thumbnail'}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 33vw"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -339,9 +342,9 @@ function CourseCard({ course, basePath }: { course: Course; basePath: string }) 
       className="block bg-white rounded-lg border hover:border-blue-300 hover:shadow-md transition-all"
     >
       {/* Thumbnail */}
-      <div className="h-36 bg-gray-100 rounded-t-lg overflow-hidden">
+      <div className="h-36 bg-gray-100 rounded-t-lg overflow-hidden relative">
         {course.thumbnail ? (
-          <img src={course.thumbnail} alt="" className="w-full h-full object-cover" />
+          <Image src={course.thumbnail} alt={course.title || 'Course thumbnail'} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <GraduationCap className="h-12 w-12 text-gray-300" />

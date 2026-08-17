@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -136,8 +137,8 @@ export function CourseViewClient({ course, basePath = '/coach/learning' }: Cours
 
   // Find the first incomplete lesson for "Continue" button
   const findNextLesson = (): Lesson | null => {
-    for (const module of course.modules) {
-      for (const lesson of module.lessons) {
+    for (const lmsModule of course.modules) {
+      for (const lesson of lmsModule.lessons) {
         if (lesson.progress.status !== 'COMPLETED') {
           return lesson
         }
@@ -165,12 +166,14 @@ export function CourseViewClient({ course, basePath = '/coach/learning' }: Cours
       <div className="bg-white rounded-lg border overflow-hidden">
         <div className="md:flex">
           {/* Thumbnail */}
-          <div className="md:w-1/3 h-48 md:h-auto bg-gray-100">
+          <div className="md:w-1/3 h-48 md:h-auto bg-gray-100 relative">
             {course.thumbnail ? (
-              <img
+              <Image
                 src={course.thumbnail}
-                alt=""
-                className="w-full h-full object-cover"
+                alt={course.title || 'Course thumbnail'}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 33vw"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

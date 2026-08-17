@@ -7,6 +7,7 @@ export const FEATURES = {
   TIME_CLOCK: 'TIME_CLOCK',
   SCHEDULING: 'SCHEDULING',
   KNOWLEDGE_BASE: 'KNOWLEDGE_BASE',
+  PROGRAM_PAGES: 'PROGRAM_PAGES',
 } as const
 
 export type FeatureName = (typeof FEATURES)[keyof typeof FEATURES]

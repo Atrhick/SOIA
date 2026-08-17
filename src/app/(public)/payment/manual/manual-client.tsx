@@ -18,8 +18,8 @@ export function ManualPaymentClient() {
   const programFee = process.env.NEXT_PUBLIC_COACH_PROGRAM_FEE || '1500'
 
   const bankDetails = {
-    bankName: 'StageOneInAction Bank',
-    accountName: 'StageOneInAction LLC',
+    bankName: 'NowTransformed Bank',
+    accountName: 'NowTransformed LLC',
     accountNumber: '1234567890',
     routingNumber: '987654321',
     reference: token?.slice(0, 12).toUpperCase() || 'COACH-PAYMENT',

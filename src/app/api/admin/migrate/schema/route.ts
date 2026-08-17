@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import path from 'path'
 
 const MIGRATION_SECRET = process.env.MIGRATION_SECRET
@@ -13,7 +13,6 @@ function extractSecret(request: NextRequest): string {
   return authHeader.replace('Bearer ', '')
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isAuthorized(session: any, secretKey: string) {
   return (
     (session?.user?.role === 'ADMIN' && !session.user.isImpersonating) ||
@@ -33,11 +32,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const prismaPath = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js')
-    const output = await runCommand(`node "${prismaPath}" db push --skip-generate 2>&1`, 120000)
+    const output = await runCommand('node', [prismaPath, 'db', 'push', '--skip-generate'], 120000)
 
     return NextResponse.json({
       status: 'checked',
-      output: output.trim(),
+      output: sanitizeOutput(output.trim()),
       durationMs: Date.now() - startTime,
       timestamp: new Date().toISOString(),
     })
@@ -46,8 +45,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         status: 'error',
-        output: (err.stdout || '') + '\n' + (err.stderr || ''),
-        error: err.message || 'Unknown error',
+        output: sanitizeOutput(((err.stdout || '') + '\n' + (err.stderr || '')).trim()),
+        error: 'Schema check failed',
         durationMs: Date.now() - startTime,
         timestamp: new Date().toISOString(),
       },
@@ -77,12 +76,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const prismaPath = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js')
-    const flags = acceptDataLoss ? '--skip-generate --accept-data-loss' : '--skip-generate'
-    const output = await runCommand(`node "${prismaPath}" db push ${flags} 2>&1`, 120000)
+    const args = acceptDataLoss
+      ? [prismaPath, 'db', 'push', '--skip-generate', '--accept-data-loss']
+      : [prismaPath, 'db', 'push', '--skip-generate']
+    const output = await runCommand('node', args, 120000)
 
     return NextResponse.json({
       status: 'completed',
-      output: output.trim(),
+      output: sanitizeOutput(output.trim()),
       durationMs: Date.now() - startTime,
       timestamp: new Date().toISOString(),
     })
@@ -91,8 +92,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         status: 'failed',
-        output: ((err.stdout || '') + '\n' + (err.stderr || '')).trim(),
-        error: err.message || 'Unknown error',
+        output: sanitizeOutput(((err.stdout || '') + '\n' + (err.stderr || '')).trim()),
+        error: 'Schema push failed',
         durationMs: Date.now() - startTime,
         timestamp: new Date().toISOString(),
       },
@@ -101,15 +102,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function runCommand(command: string, timeout: number): Promise<string> {
+function runCommand(executable: string, args: string[], timeout: number): Promise<string> {
   return new Promise((resolve, reject) => {
-    exec(
-      command,
+    execFile(
+      executable,
+      args,
       {
         timeout,
         cwd: process.cwd(),
         env: { ...process.env },
-        maxBuffer: 1024 * 1024 * 5, // 5MB buffer
+        maxBuffer: 1024 * 1024 * 5,
       },
       (error, stdout, stderr) => {
         if (error) {
@@ -121,4 +123,13 @@ function runCommand(command: string, timeout: number): Promise<string> {
       }
     )
   })
+}
+
+// Strip database credentials and internal paths from command output
+function sanitizeOutput(output: string): string {
+  return output
+    .replace(/postgresql:\/\/[^\s@]*@[^\s]*/gi, 'postgresql://[redacted]')
+    .replace(/mysql:\/\/[^\s@]*@[^\s]*/gi, 'mysql://[redacted]')
+    .replace(/DATABASE_URL=\S+/gi, 'DATABASE_URL=[redacted]')
+    .replace(/password[=:]\s*\S+/gi, 'password=[redacted]')
 }

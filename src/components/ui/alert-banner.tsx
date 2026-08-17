@@ -166,6 +166,7 @@ export function AlertBanner({
           {dismissible && (
             <button
               onClick={handleDismiss}
+              aria-label="Dismiss notification"
               className={cn(
                 'p-1 rounded-md transition-colors',
                 styles.icon,

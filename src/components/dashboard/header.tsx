@@ -60,11 +60,15 @@ export function Header({ user }: HeaderProps) {
       await update({
         impersonate: result.impersonateData
       })
-      // Redirect to the appropriate dashboard
+      // Redirect to the appropriate dashboard. Always navigate somewhere the
+      // impersonated role can actually load: staying put on an admin-only page
+      // bounces to /login, which renders no header and therefore no way back.
       if (result.impersonateData.role === 'COACH') {
         router.push('/coach')
       } else if (result.impersonateData.role === 'AMBASSADOR') {
         router.push('/ambassador')
+      } else {
+        router.push('/')
       }
       router.refresh()
     }

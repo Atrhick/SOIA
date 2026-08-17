@@ -14,7 +14,7 @@ export default function PublicLayout({
             <div className="relative h-10 w-40">
               <Image
                 src="/logo.png"
-                alt="StageOneInAction"
+                alt="NowTransformed"
                 fill
                 className="object-contain"
                 priority
@@ -33,7 +33,7 @@ export default function PublicLayout({
       <footer className="bg-white border-t border-gray-200 mt-auto">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} StageOneInAction. All rights reserved.
+            &copy; {new Date().getFullYear()} NowTransformed. All rights reserved.
           </p>
         </div>
       </footer>

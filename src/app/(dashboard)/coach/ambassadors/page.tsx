@@ -166,7 +166,7 @@ export default async function AmbassadorsPage({
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
                       <span className="text-sm font-medium text-primary-700">
-                        {ambassador.firstName[0]}{ambassador.lastName[0]}
+                        {(ambassador.firstName?.[0] || '?').toUpperCase()}{(ambassador.lastName?.[0] || '?').toUpperCase()}
                       </span>
                     </div>
                     <div>

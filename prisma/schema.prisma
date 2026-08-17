@@ -13,9 +13,15 @@ datasource db {
 
 enum UserRole {
   ADMIN
+  SUB_ADMIN
   COACH
   AMBASSADOR
   PARENT
+  // Associate roles - see AssociateProfile. These three values intentionally
+  // match AssociateType so no mapping table is needed.
+  SERVICE_PROVIDER
+  BUSINESS_AFFILIATE
+  VOLUNTEER
 }
 
 enum UserStatus {
@@ -39,6 +45,8 @@ model User {
   parentOfAmbassador Ambassador?   @relation("ParentUser")
   sentMessages       Message[]     @relation("SentMessages")
   messageThreads     MessageThread[] @relation("ThreadParticipants")
+  passwordResetTokens PasswordResetToken[]
+  associateProfile   AssociateProfile?
 
   @@index([role, status])
   @@map("users")
@@ -106,6 +114,10 @@ model CoachProfile {
   // Prospect & Ambassador Intro Relations
   prospect              Prospect?
   ambassadorIntros      AmbassadorIntroduction[]
+
+  // Program pages & associates
+  programs              CoachProgram[]
+  associates            AssociateProfile[]
 
   @@map("coach_profiles")
 }
@@ -503,6 +515,8 @@ model LMSEnrollment {
   @@unique([courseId, userId])
   @@index([userId])
   @@index([courseId])
+  @@index([status])
+  @@index([lastAccessedAt])
   @@map("lms_enrollments")
 }
 
@@ -912,7 +926,7 @@ model SponsorshipRequest {
   // Beneficiary - either coach themselves or an ambassador
   beneficiaryType String                 // "SELF" or "AMBASSADOR" or "PROJECT"
   ambassadorId    String?
-  ambassador      Ambassador?            @relation(fields: [ambassadorId], references: [id])
+  ambassador      Ambassador?            @relation(fields: [ambassadorId], references: [id], onDelete: SetNull)
   projectName     String?
 
   amountRequested Decimal                @db.Decimal(10, 2)
@@ -1439,6 +1453,7 @@ model ChannelPost {
   updatedAt DateTime             @updatedAt
 
   @@index([channelId])
+  @@index([channelId, createdAt])
   @@index([authorId])
   @@map("channel_posts")
 }
@@ -2071,6 +2086,7 @@ model Prospect {
 
   @@index([email])
   @@index([status])
+  @@index([assessmentSurveyId])
   @@map("prospects")
 }
 
@@ -2189,7 +2205,7 @@ model AmbassadorIntroduction {
 
 enum CalendarType {
   BOOKING     // Allows slot booking (e.g., orientation)
-  EVENTS      // Display-only events (e.g., SOIA events)
+  EVENTS      // Display-only events (e.g., NowTransformed events)
 }
 
 enum CalendarVisibility {
@@ -2313,6 +2329,10 @@ model CalendarBooking {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
+  @@index([prospectId])
+  @@index([calendarId])
+  @@index([status])
+  @@index([userId])
   @@map("calendar_bookings")
 }
 
@@ -2342,4 +2362,179 @@ model SitePage {
   updatedAt   DateTime @updatedAt
 
   @@map("site_pages")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ============================================
+// COACH PROGRAM PAGES
+// Public invite landing page + qualification form per program.
+// ============================================
+
+enum ProgramStatus {
+  DRAFT          // never submitted, or sent back by an admin
+  PENDING_REVIEW // awaiting admin approval
+  PUBLISHED      // publishedSnapshot is live at /p/[slug]
+  REJECTED       // admin sent it back with reviewNotes
+}
+
+enum ProgramLeadAssociation {
+  UNCLASSIFIED
+  AMBASSADOR
+  COACH
+  SERVICE_PROVIDER
+  BUSINESS_AFFILIATE
+  VOLUNTEER
+}
+
+model CoachProgram {
+  id                  String        @id @default(cuid())
+  slug                String        @unique
+
+  // Owner. Null only until an admin assigns it.
+  coachId             String?
+  coach               CoachProfile? @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  assignedAt          DateTime?
+  assignedBy          String?
+
+  // Grant deliverable facts. Coach-editable, admin-approved.
+  name                String
+  organization        String
+  targetMarket        String
+  internshipOffering  String
+  servicesDescription String        @db.Text
+  weeklyEngagement1   String
+  weeklyEngagement2   String
+  monthlyGrowthGoal   String
+  monthlyImpactGoal   String
+
+  // Coach-authored public content
+  headline            String?
+  coachBio            String?       @db.Text
+  programDescription  String?       @db.Text
+  eventDatesText      String?       @db.Text
+  zoomUrl             String?
+  zoomInstructions    String?       @db.Text
+
+  // Page 2 - coach's ADDITIONAL questions. Core questions are code-defined.
+  extraQuestions      Json          @default("[]")
+  qualificationIntro  String?       @db.Text
+
+  // Approval. The public page renders publishedSnapshot only, never the
+  // live columns above, so a coach can edit freely without affecting the
+  // live page until an admin approves.
+  status              ProgramStatus @default(DRAFT)
+  publishedSnapshot   Json?
+  submittedAt         DateTime?
+  reviewedAt          DateTime?
+  reviewedBy          String?
+  reviewNotes         String?       @db.Text
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  leads               ProgramLead[]
+
+  @@index([coachId])
+  @@index([status])
+  @@map("coach_programs")
+}
+
+model ProgramLead {
+  id           String                 @id @default(cuid())
+  programId    String
+  program      CoachProgram           @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  // Page 1
+  fullName     String
+  email        String
+  profession   String
+  registeredAt DateTime               @default(now())
+
+  // Page 2
+  token        String                 @unique
+  answers      Json?
+  qualifiedAt  DateTime?
+
+  // Coach classification
+  association  ProgramLeadAssociation @default(UNCLASSIFIED)
+  classifiedAt DateTime?
+  coachNotes   String?                @db.Text
+
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@unique([programId, email])
+  @@index([programId, association])
+  @@map("program_leads")
+}
+
+// ============================================
+// ASSOCIATES
+// Service providers, business affiliates and volunteers.
+// One model, one dashboard; the three roles differ only by label.
+// ============================================
+
+enum AssociateType {
+  SERVICE_PROVIDER
+  BUSINESS_AFFILIATE
+  VOLUNTEER
+}
+
+enum AssociateStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model AssociateProfile {
+  id             String          @id @default(cuid())
+  userId         String          @unique
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type           AssociateType
+  status         AssociateStatus @default(ACTIVE)
+
+  firstName      String
+  lastName       String
+  phone          String?
+  organization   String?
+  serviceOffered String?         @db.Text
+  notes          String?         @db.Text
+
+  // Coach who registered / sponsors them.
+  coachId        String?
+  coach          CoachProfile?   @relation(fields: [coachId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([type, status])
+  @@map("associate_profiles")
+}
+
+// ============================================
+// CUSTOM MIGRATION TRACKING
+// Created by raw SQL in src/app/api/admin/migrate/route.ts.
+// Declared here ONLY so `prisma db push` does not drop it - without this
+// model Prisma treats the table as drift and deletes it, which would make
+// every custom migration re-run.
+// ============================================
+
+model CustomMigration {
+  id        String    @id
+  appliedAt DateTime? @default(now()) @map("applied_at") @db.Timestamp(6)
+
+  @@map("_custom_migrations")
 }

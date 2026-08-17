@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { STAFF_ROLES } from '@/lib/roles'
 
 // Channel schemas
 const createChannelSchema = z.object({
@@ -52,6 +53,7 @@ export async function getChannels() {
         }
       },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     })
 
     return {
@@ -412,6 +414,13 @@ export async function getSharedDocuments() {
   const session = await auth()
   if (!session) {
     return { error: 'Unauthorized' }
+  }
+
+  // `isPublic` on a document means "public to staff", not "public to anyone
+  // with a login". Roles outside the staff set (associates, PARENT, SUB_ADMIN)
+  // get nothing.
+  if (!STAFF_ROLES.includes(session.user.role)) {
+    return { documents: [] }
   }
 
   try {
@@ -905,6 +914,10 @@ export async function getUsersForDM() {
         ],
         id: { not: session.user.id }
       }
+    } else {
+      // Any other role (PARENT, SUB_ADMIN, associate roles) has no DM directory.
+      // Without this branch whereClause stays {} and findMany returns every user.
+      return { users: [] }
     }
 
     const users = await prisma.user.findMany({
@@ -1120,6 +1133,17 @@ export async function getMentionableUsers(channelId: string) {
     })
 
     if (!channel) {
+      return { error: 'Channel not found' }
+    }
+
+    // Only someone who can actually see the channel may enumerate its members.
+    // Without this, possession of a channel id returned every member's email
+    // and role to any logged-in account.
+    const isMember = channel.members.some(m => m.userId === session.user.id)
+    const roleAllowed =
+      channel.allowedRoles.length === 0 ||
+      channel.allowedRoles.includes(session.user.role)
+    if (session.user.role !== 'ADMIN' && !isMember && !roleAllowed) {
       return { error: 'Channel not found' }
     }
 

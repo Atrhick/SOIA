@@ -7,15 +7,18 @@ async function getCoach(coachId: string) {
   return prisma.coachProfile.findUnique({
     where: { id: coachId },
     include: {
-      user: true,
-      recruiter: true,
-      recruitedCoaches: true,
-      ambassadors: true,
+      // Never select the whole User row here: CoachDetail is a client
+      // component, so every field fetched is serialized into the page HTML.
+      // Only email and status are actually used.
+      user: { select: { id: true, email: true, status: true } },
+      recruiter: { select: { id: true, firstName: true, lastName: true } },
+      recruitedCoaches: { select: { id: true, firstName: true, lastName: true } },
+      ambassadors: { select: { id: true, firstName: true, lastName: true, status: true, email: true } },
       onboardingProgress: {
         include: { task: true },
       },
       quizResults: {
-        include: { course: true },
+        include: { course: { select: { id: true, name: true } } },
       },
     },
   })

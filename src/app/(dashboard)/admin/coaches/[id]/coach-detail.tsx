@@ -29,16 +29,23 @@ import {
   Key,
   Shield,
 } from 'lucide-react'
-import type { CoachProfile, User as UserType, Ambassador, OnboardingTask, CoachOnboardingProgress, QuizResult, Course } from '@prisma/client'
+import type { OnboardingTask, Prisma } from '@prisma/client'
 
-type CoachWithRelations = CoachProfile & {
-  user: UserType
-  recruiter: CoachProfile | null
-  recruitedCoaches: CoachProfile[]
-  ambassadors: Ambassador[]
-  onboardingProgress: (CoachOnboardingProgress & { task: OnboardingTask })[]
-  quizResults: (QuizResult & { course: Course })[]
-}
+// Mirrors the query in ./page.tsx exactly: the related coaches, ambassadors and
+// courses are selected as narrow subsets, not full models, so derive the type
+// from the query shape rather than restating the models.
+type CoachWithRelations = Prisma.CoachProfileGetPayload<{
+  include: {
+    user: { select: { id: true; email: true; status: true } }
+    recruiter: { select: { id: true; firstName: true; lastName: true } }
+    recruitedCoaches: { select: { id: true; firstName: true; lastName: true } }
+    ambassadors: {
+      select: { id: true; firstName: true; lastName: true; status: true; email: true }
+    }
+    onboardingProgress: { include: { task: true } }
+    quizResults: { include: { course: { select: { id: true; name: true } } } }
+  }
+}>
 
 const userStatusVariants = {
   ACTIVE: 'success',

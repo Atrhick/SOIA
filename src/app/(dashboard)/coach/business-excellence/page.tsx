@@ -18,6 +18,14 @@ async function getBusinessExcellenceData(userId: string) {
         },
         orderBy: { date: 'desc' },
       },
+      programs: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          leads: { orderBy: { registeredAt: 'desc' } },
+        },
+      },
     },
   })
   return coachProfile
@@ -78,12 +86,32 @@ export default async function BusinessExcellencePage() {
     notes: l.notes,
   }))
 
+  // Serialize program leads (flattened across all of this coach's programs)
+  const programLeads = data.programs.flatMap((program) =>
+    program.leads.map((lead) => ({
+      id: lead.id,
+      programName: program.name,
+      fullName: lead.fullName,
+      email: lead.email,
+      profession: lead.profession,
+      registeredAt: lead.registeredAt.toISOString(),
+      qualifiedAt: lead.qualifiedAt?.toISOString() || null,
+      association: lead.association,
+      // The coach is the only route back to a lost joining link: the public
+      // form deliberately will not re-issue it, and the app sends no email.
+      joiningPath: `/p/${program.slug}/r/${lead.token}`,
+      answers: (lead.answers as { label: string; value: string | number }[] | null) ?? [],
+    }))
+  )
+  programLeads.sort((a, b) => b.registeredAt.localeCompare(a.registeredAt))
+
   return (
     <BusinessExcellenceClient
       crm={crm}
       website={website}
       outreachTargets={outreachTargets}
       outreachLogs={outreachLogs}
+      programLeads={programLeads}
     />
   )
 }

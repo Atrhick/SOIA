@@ -72,6 +72,14 @@ export async function getImpersonationData(userId: string) {
     return { error: 'User not found' }
   }
 
+  // The caller being an admin is not sufficient - the TARGET must also be an
+  // impersonable role. Without this an admin could impersonate another ADMIN,
+  // or a role with no dashboard, by passing its id directly. This mirrors the
+  // filter in getUsersForImpersonation, which is what populates the UI.
+  if (user.role !== 'COACH' && user.role !== 'AMBASSADOR') {
+    return { error: 'This user cannot be impersonated' }
+  }
+
   // Log the impersonation
   await prisma.auditLog.create({
     data: {

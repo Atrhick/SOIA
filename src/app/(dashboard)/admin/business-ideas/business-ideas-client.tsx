@@ -70,6 +70,7 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
   const [reviewStatus, setReviewStatus] = useState<'UNDER_REVIEW' | 'APPROVED' | 'NEEDS_REVISION' | 'REJECTED'>('UNDER_REVIEW')
   const [feedback, setFeedback] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
 
   const filteredIdeas = businessIdeas.filter(idea => {
     const matchesSearch = search === '' ||
@@ -85,10 +86,11 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
   const handleReview = async () => {
     if (!selectedIdea) return
     setIsSubmitting(true)
+    setReviewError(null)
 
     const result = await reviewBusinessIdea(selectedIdea.id, reviewStatus, feedback || undefined)
     if (result.error) {
-      alert(result.error)
+      setReviewError(result.error)
     } else {
       setReviewDialogOpen(false)
       setSelectedIdea(null)
@@ -343,7 +345,7 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
       </Dialog>
 
       {/* Review Dialog */}
-      <Dialog open={reviewDialogOpen} onOpenChange={(open) => { if (!open) { setReviewDialogOpen(false); setFeedback('') } }}>
+      <Dialog open={reviewDialogOpen} onOpenChange={(open) => { if (!open) { setReviewDialogOpen(false); setFeedback(''); setReviewError(null) } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Review Business Idea</DialogTitle>
@@ -353,6 +355,12 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {reviewError && (
+              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <XCircle className="w-4 h-4 shrink-0" />
+                {reviewError}
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Decision</label>
               <Select value={reviewStatus} onValueChange={(v) => setReviewStatus(v as typeof reviewStatus)}>
@@ -408,7 +416,7 @@ export function BusinessIdeasClient({ businessIdeas }: BusinessIdeasClientProps)
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setReviewDialogOpen(false); setFeedback('') }}>
+            <Button variant="outline" onClick={() => { setReviewDialogOpen(false); setFeedback(''); setReviewError(null) }}>
               Cancel
             </Button>
             <Button

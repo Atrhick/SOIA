@@ -1652,7 +1652,7 @@ const COACH_ASSESSMENT_QUESTIONS = [
     sortOrder: 1,
   },
   {
-    questionText: 'Are you willing to go through continued transformation in becoming a better version of yourself? Note: SOIA levels the playing field - no one is above another. It\'s not about who you are, what you\'ve achieved...it\'s what you can achieve in this program.',
+    questionText: 'Are you willing to go through continued transformation in becoming a better version of yourself? Note: NowTransformed levels the playing field - no one is above another. It\'s not about who you are, what you\'ve achieved...it\'s what you can achieve in this program.',
     questionType: 'TEXT_LONG' as const,
     isRequired: true,
     sortOrder: 2,
@@ -1684,7 +1684,7 @@ export async function getOrCreateCoachAssessment() {
       survey = await prisma.survey.create({
         data: {
           title: COACH_ASSESSMENT_TITLE,
-          description: 'Complete this assessment to begin your journey as a SOIA Coach.',
+          description: 'Complete this assessment to begin your journey as a NowTransformed Coach.',
           type: 'SURVEY',
           status: 'PUBLISHED',
           publishedAt: new Date(),
