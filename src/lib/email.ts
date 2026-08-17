@@ -1,10 +1,19 @@
 /**
- * Email sending utility.
+ * Email sending utility, backed by Resend.
  *
- * Currently logs reset links to the console in development.
- * To enable real email delivery, set EMAIL_FROM in .env and connect
- * a provider (Resend, SendGrid, Nodemailer, etc.) in the sendEmail function below.
+ * Configuration (see .env):
+ *   RESEND_API_KEY  - required to send. Without it nothing is sent.
+ *   EMAIL_FROM      - sender, e.g. "NowTransformed <noreply@yourdomain.com>".
+ *                     Must be on a domain verified at resend.com/domains.
+ *                     Falls back to Resend's shared testing sender, which can
+ *                     only deliver to the Resend account owner's own address.
+ *
+ * Uses the REST API directly rather than the `resend` package - one less
+ * dependency, and the call is a single POST.
  */
+
+const RESEND_ENDPOINT = 'https://api.resend.com/emails'
+const FALLBACK_FROM = 'NowTransformed <onboarding@resend.dev>'
 
 interface EmailPayload {
   to: string
@@ -12,24 +21,58 @@ interface EmailPayload {
   html: string
 }
 
-export async function sendEmail({ to, subject, html }: EmailPayload): Promise<void> {
+export interface SendResult {
+  sent: boolean
+  id?: string
+  error?: string
+}
+
+/**
+ * Sends an email. Never throws - callers (password reset, notifications) must
+ * not fail because a provider is down or misconfigured. Check the return value
+ * if the caller needs to know.
+ */
+export async function sendEmail({ to, subject, html }: EmailPayload): Promise<SendResult> {
+  const apiKey = process.env.RESEND_API_KEY
+  const from = process.env.EMAIL_FROM?.trim() || FALLBACK_FROM
+
+  // Keep the console trace in development so links are readable without
+  // needing a mailbox.
   if (process.env.NODE_ENV !== 'production') {
-    console.info(`[EMAIL] To: ${to} | Subject: ${subject}`)
-    // Strip HTML tags for readable console output
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    console.info(`[EMAIL] To: ${to} | Subject: ${subject}`)
     console.info(`[EMAIL] Body: ${text}`)
-    return
   }
 
-  // TODO: Connect a production email provider here.
-  // Example with Resend (npm install resend):
-  //
-  // import { Resend } from 'resend'
-  // const resend = new Resend(process.env.RESEND_API_KEY)
-  // await resend.emails.send({ from: process.env.EMAIL_FROM!, to, subject, html })
-  //
-  // Until a provider is configured, log and continue so the app doesn't crash.
-  console.warn(`[EMAIL] No provider configured. Email to ${to} was not sent.`)
+  if (!apiKey) {
+    console.warn(`[EMAIL] RESEND_API_KEY is not set. Email to ${to} was not sent.`)
+    return { sent: false, error: 'RESEND_API_KEY not configured' }
+  }
+
+  try {
+    const response = await fetch(RESEND_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to: [to], subject, html }),
+    })
+
+    if (!response.ok) {
+      // Resend returns a JSON body describing the problem. Log it, but never
+      // let it surface the API key.
+      const detail = await response.text()
+      console.error(`[EMAIL] Resend rejected the message (${response.status}): ${detail.slice(0, 300)}`)
+      return { sent: false, error: `Resend responded ${response.status}` }
+    }
+
+    const data = (await response.json()) as { id?: string }
+    return { sent: true, id: data.id }
+  } catch (error) {
+    console.error('[EMAIL] Failed to reach Resend:', error)
+    return { sent: false, error: 'Could not reach the email provider' }
+  }
 }
 
 export function buildPasswordResetEmail(resetUrl: string, expiresInMinutes: number): string {
