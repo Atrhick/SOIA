@@ -38,6 +38,7 @@ export default function NewCoachPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [inviteFailed, setInviteFailed] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [coaches, setCoaches] = useState<{ id: string; name: string }[]>([])
   const [features, setFeatures] = useState<FeatureConfig[]>([])
@@ -79,8 +80,14 @@ export default function NewCoachPage() {
     if (result.error) {
       setError(result.error)
       setIsLoading(false)
+    } else if (result.inviteSent) {
+      router.push('/admin/coaches?invited=1')
     } else {
-      router.push('/admin/coaches')
+      // The account exists but the welcome email did not go out, so the admin
+      // has to pass on the password they set. Stay on the page and say so
+      // rather than navigating away silently.
+      setInviteFailed(result.inviteError ?? 'The welcome email could not be sent')
+      setIsLoading(false)
     }
   }
 
@@ -115,6 +122,24 @@ export default function NewCoachPage() {
 
       {error && (
         <div className="p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>
+      )}
+
+      {inviteFailed && (
+        <div className="p-4 bg-amber-50 border border-amber-300 text-amber-900 rounded-lg">
+          <p className="font-medium">Coach created, but the welcome email was not sent</p>
+          <p className="text-sm mt-1">
+            {inviteFailed}. Give them the password you entered above, and ask them to
+            change it once they sign in. You can also resend the invite later by using
+            Reset Password on their row in User Management.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push('/admin/coaches')}
+            className="mt-3 text-sm font-medium underline"
+          >
+            Continue to coaches
+          </button>
+        </div>
       )}
 
       <Card>

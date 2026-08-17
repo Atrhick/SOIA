@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { sendWelcomeInvite } from '@/lib/actions/password-reset'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { ProspectStatus } from '@prisma/client'
@@ -1461,11 +1462,18 @@ export async function createCoachFromProspect(
     revalidatePath('/admin/prospects')
     revalidatePath('/admin/coaches')
 
+    // Email the new coach a one-time link to set their own password. After the
+    // transaction, so a mail failure cannot roll back the account - the admin
+    // still has the temporary password on screen as a fallback.
+    const invite = await sendWelcomeInvite(result.user.id, prospect.firstName, 'coach')
+
     return {
       success: true,
       userId: result.user.id,
       coachProfileId: result.coachProfile.id,
       tempPassword: password ? undefined : tempPassword, // Only return if generated
+      inviteSent: invite.sent,
+      inviteError: invite.error,
     }
   } catch (error) {
     console.error('Error creating coach from prospect:', error)

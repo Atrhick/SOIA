@@ -75,6 +75,44 @@ export async function sendEmail({ to, subject, html }: EmailPayload): Promise<Se
   }
 }
 
+/**
+ * Welcome email for a newly created account.
+ *
+ * Deliberately carries a one-time set-your-password link rather than a
+ * generated password - the plaintext never leaves the server, the link
+ * expires, and it cannot be reused.
+ */
+export function buildWelcomeEmail(
+  firstName: string,
+  roleLabel: string,
+  setupUrl: string,
+  expiresInDays: number
+): string {
+  const greeting = firstName?.trim() ? `Hi ${firstName.trim()},` : 'Hi,'
+  return `
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1a1a1a;">Welcome to NowTransformed</h2>
+      <p style="color: #555;">${greeting}</p>
+      <p style="color: #555;">
+        Your ${roleLabel} account has been created. Choose a password to get started.
+      </p>
+      <a href="${setupUrl}"
+         style="display: inline-block; margin: 24px 0; padding: 12px 24px;
+                background: #4f46e5; color: #fff; text-decoration: none;
+                border-radius: 8px; font-weight: 600;">
+        Set Your Password
+      </a>
+      <p style="color: #999; font-size: 13px;">
+        This link works once and expires in ${expiresInDays} days. If it expires,
+        use "Forgot password" on the sign-in page to get a new one.
+      </p>
+      <p style="color: #bbb; font-size: 12px;">
+        Or copy this link: ${setupUrl}
+      </p>
+    </div>
+  `
+}
+
 export function buildPasswordResetEmail(resetUrl: string, expiresInMinutes: number): string {
   return `
     <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">

@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { sendWelcomeInvite } from '@/lib/actions/password-reset'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
@@ -141,8 +142,23 @@ export async function createCoach(formData: FormData) {
       },
     })
 
+    // Email the new coach a one-time link to set their own password. Runs
+    // after the transaction so a mail failure can never roll back the account,
+    // and the admin still has the password they typed as a fallback.
+    const invite = await sendWelcomeInvite(
+      result.user.id,
+      validated.data.firstName,
+      'coach'
+    )
+
     revalidatePath('/admin/coaches')
-    return { success: true, coachId: result.coachProfile.id, userId: result.user.id }
+    return {
+      success: true,
+      coachId: result.coachProfile.id,
+      userId: result.user.id,
+      inviteSent: invite.sent,
+      inviteError: invite.error,
+    }
   } catch (error) {
     console.error('Error creating coach:', error)
     return { error: 'Failed to create coach' }
