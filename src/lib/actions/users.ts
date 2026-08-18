@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { sendWelcomeInvite } from '@/lib/actions/password-reset'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 
@@ -123,8 +124,22 @@ export async function createUser(formData: FormData) {
       },
     })
 
+    // Email them a one-time link to set their own password. After the user is
+    // created, so a mail failure can never roll back the account - the admin
+    // still has the password they typed as a fallback.
+    const invite = await sendWelcomeInvite(
+      user.id,
+      validated.data.firstName || '',
+      validated.data.role.toLowerCase()
+    )
+
     revalidatePath('/admin/users')
-    return { success: true, user: { id: user.id, email: user.email, role: user.role } }
+    return {
+      success: true,
+      user: { id: user.id, email: user.email, role: user.role },
+      inviteSent: invite.sent,
+      inviteError: invite.error,
+    }
   } catch (error) {
     console.error('Error creating user:', error)
     return { error: 'Failed to create user' }

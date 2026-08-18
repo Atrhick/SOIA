@@ -165,6 +165,93 @@ export async function createCoach(formData: FormData) {
   }
 }
 
+/**
+ * Deletes a coach: their login, profile and everything cascading from it.
+ *
+ * Programs are NOT destroyed - CoachProgram.coachId is SetNull, so a program
+ * survives and returns to unassigned for reassignment to someone else.
+ */
+export async function deleteCoach(coachId: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN' || session.user.isImpersonating) {
+    return { error: 'Unauthorized - Admin only' }
+  }
+
+  try {
+    const coach = await prisma.coachProfile.findUnique({
+      where: { id: coachId },
+      select: {
+        id: true,
+        userId: true,
+        firstName: true,
+        lastName: true,
+        user: { select: { email: true } },
+        _count: { select: { ambassadors: true, programs: true, crmContacts: true } },
+      },
+    })
+    if (!coach) return { error: 'Coach not found' }
+
+    if (coach.userId === session.user.id) {
+      return { error: 'You cannot delete your own account' }
+    }
+
+    // Deleting the User cascades to the CoachProfile and everything hanging
+    // off it, so this is one statement rather than a manual teardown.
+    await prisma.user.delete({ where: { id: coach.userId } })
+
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: 'DELETE_COACH',
+        entityType: 'Coach',
+        entityId: coachId,
+        details: `Deleted coach: ${coach.firstName} ${coach.lastName} (${coach.user.email}) - ${coach._count.ambassadors} ambassadors, ${coach._count.crmContacts} contacts removed; ${coach._count.programs} programs unassigned`,
+      },
+    })
+
+    revalidatePath('/admin/coaches')
+    revalidatePath('/admin/users')
+    revalidatePath('/admin/programs')
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting coach:', error)
+    return { error: 'Failed to delete coach' }
+  }
+}
+
+/**
+ * What deleting this coach would remove, so the confirmation can be specific
+ * rather than a generic "are you sure?".
+ */
+export async function getCoachDeletionImpact(coachId: string) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized - Admin only' }
+  }
+
+  const coach = await prisma.coachProfile.findUnique({
+    where: { id: coachId },
+    select: {
+      firstName: true,
+      lastName: true,
+      user: { select: { email: true } },
+      _count: { select: { ambassadors: true, programs: true, crmContacts: true } },
+      programs: { select: { name: true } },
+    },
+  })
+  if (!coach) return { error: 'Coach not found' }
+
+  return {
+    impact: {
+      name: `${coach.firstName} ${coach.lastName}`,
+      email: coach.user.email,
+      ambassadors: coach._count.ambassadors,
+      contacts: coach._count.crmContacts,
+      programs: coach.programs.map((p) => p.name),
+    },
+  }
+}
+
 export async function updateCoach(coachId: string, formData: FormData) {
   const session = await auth()
   if (!session || session.user.role !== 'ADMIN') {

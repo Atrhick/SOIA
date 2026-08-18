@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Users, UserPlus, ChevronRight, Clock } from 'lucide-react'
+import { DeleteCoachButton } from './delete-coach-button'
 
 const userStatusVariants = {
   ACTIVE: 'success',
@@ -193,10 +194,10 @@ export default async function CoachesPage({ searchParams }: PageProps) {
           {coaches.length > 0 ? (
             <div className="divide-y">
               {coaches.map((coach) => (
+                <div key={coach.id} className="flex items-center -mx-6 px-6 hover:bg-gray-50 transition-colors">
                 <Link
-                  key={coach.id}
                   href={`/admin/coaches/${coach.id}`}
-                  className="flex items-center justify-between py-4 hover:bg-gray-50 -mx-6 px-6 transition-colors"
+                  className="flex flex-1 items-center justify-between py-4 min-w-0"
                 >
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center">
@@ -259,6 +260,11 @@ export default async function CoachesPage({ searchParams }: PageProps) {
                     <ChevronRight className="h-5 w-5 text-gray-400" />
                   </div>
                 </Link>
+                <DeleteCoachButton
+                  coachId={coach.id}
+                  name={`${coach.firstName} ${coach.lastName}`}
+                />
+                </div>
               ))}
             </div>
           ) : (
