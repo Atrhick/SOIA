@@ -657,13 +657,18 @@ function ProgramLeadsCard({ leads }: { leads: ProgramLead[] }) {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
-      <div className="flex items-center gap-2 mb-1">
-        <Megaphone className="h-5 w-5 text-teal-600" />
-        <h2 className="text-lg font-semibold text-gray-900">Program Leads</h2>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+        <div className="flex items-center gap-2">
+          <Megaphone className="h-5 w-5 text-teal-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Program Leads</h2>
+        </div>
+        <a href="/coach/crm" className="text-sm text-primary-600 hover:underline">
+          Work these in Contacts &rarr;
+        </a>
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        People who signed up through your program pages. Classify each one so they can be followed
-        up correctly.
+        A summary of who has signed up. To see their answers, log a call or set a follow-up, open
+        them in Contacts.
       </p>
 
       {error && (
