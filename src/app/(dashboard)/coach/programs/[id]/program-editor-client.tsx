@@ -56,7 +56,11 @@ interface EditableProgram {
   weeklyEngagement2: string
   monthlyGrowthGoal: string
   monthlyImpactGoal: string
+  pageTitle: string | null
   headline: string | null
+  zoomLabel: string | null
+  secondMeetingUrl: string | null
+  secondMeetingLabel: string | null
   coachBio: string | null
   programDescription: string | null
   eventDatesText: string | null
@@ -99,7 +103,11 @@ export function ProgramEditorClient({ program }: { program: EditableProgram }) {
     weeklyEngagement2: program.weeklyEngagement2,
     monthlyGrowthGoal: program.monthlyGrowthGoal,
     monthlyImpactGoal: program.monthlyImpactGoal,
+    pageTitle: program.pageTitle ?? '',
     headline: program.headline ?? '',
+    zoomLabel: program.zoomLabel ?? '',
+    secondMeetingUrl: program.secondMeetingUrl ?? '',
+    secondMeetingLabel: program.secondMeetingLabel ?? '',
     coachBio: program.coachBio ?? '',
     programDescription: program.programDescription ?? '',
     eventDatesText: program.eventDatesText ?? '',
@@ -259,6 +267,18 @@ export function ProgramEditorClient({ program }: { program: EditableProgram }) {
               <CardTitle className="text-base">What visitors see first</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <Field
+                label="Page title"
+                htmlFor="pageTitle"
+                hint="The big heading visitors see. Leave blank to use the programme name."
+              >
+                <Input
+                  id="pageTitle"
+                  value={form.pageTitle}
+                  onChange={(e) => set('pageTitle', e.target.value)}
+                  placeholder={program.name}
+                />
+              </Field>
               <Field label="Headline" htmlFor="headline">
                 <Input
                   id="headline"
@@ -329,6 +349,50 @@ export function ProgramEditorClient({ program }: { program: EditableProgram }) {
                   placeholder="https://zoom.us/j/000000000"
                 />
               </Field>
+              <Field
+                label="What to call it"
+                htmlFor="zoomLabel"
+                hint="Optional. Defaults to Zoom."
+              >
+                <Input
+                  id="zoomLabel"
+                  value={form.zoomLabel}
+                  onChange={(e) => set('zoomLabel', e.target.value)}
+                  placeholder="Zoom"
+                />
+              </Field>
+
+              <div className="pt-4 mt-2 border-t border-gray-100">
+                <p className="text-sm font-medium text-gray-900">Second meeting link</p>
+                <p className="text-xs text-gray-500 mt-0.5 mb-3">
+                  Optional. Add one if you also run the session on Google Meet, Teams or another
+                  platform. Both links are shown to people who sign up.
+                </p>
+                <div className="space-y-4">
+                  <Field label="Link" htmlFor="secondMeetingUrl">
+                    <Input
+                      id="secondMeetingUrl"
+                      type="url"
+                      value={form.secondMeetingUrl}
+                      onChange={(e) => set('secondMeetingUrl', e.target.value)}
+                      placeholder="https://meet.google.com/abc-defg-hij"
+                    />
+                  </Field>
+                  <Field
+                    label="What to call it"
+                    htmlFor="secondMeetingLabel"
+                    hint="Optional. Defaults to Second link."
+                  >
+                    <Input
+                      id="secondMeetingLabel"
+                      value={form.secondMeetingLabel}
+                      onChange={(e) => set('secondMeetingLabel', e.target.value)}
+                      placeholder="Google Meet"
+                    />
+                  </Field>
+                </div>
+              </div>
+
               <Field label="Joining instructions" htmlFor="zoomInstructions">
                 <Textarea
                   id="zoomInstructions"

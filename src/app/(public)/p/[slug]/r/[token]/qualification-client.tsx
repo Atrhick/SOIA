@@ -21,6 +21,9 @@ import { submitQualification } from '@/lib/actions/program-pages'
 interface QualificationData {
   programName: string
   zoomUrl: string | null
+  zoomLabel: string | null
+  secondMeetingUrl: string | null
+  secondMeetingLabel: string | null
   zoomInstructions: string | null
   eventDatesText: string | null
   qualificationIntro: string | null
@@ -79,15 +82,27 @@ export function QualificationClient({
             Joining details
           </h2>
 
-          {data.zoomUrl ? (
-            <a
-              href={data.zoomUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="block break-all rounded-md bg-white border border-primary-200 px-4 py-3 text-primary-700 hover:underline"
-            >
-              {data.zoomUrl}
-            </a>
+          {data.zoomUrl || data.secondMeetingUrl ? (
+            <div className="space-y-2">
+              {data.zoomUrl && (
+                <MeetingLink
+                  url={data.zoomUrl}
+                  label={data.zoomLabel || 'Zoom'}
+                  primary
+                />
+              )}
+              {data.secondMeetingUrl && (
+                <MeetingLink
+                  url={data.secondMeetingUrl}
+                  label={data.secondMeetingLabel || 'Second link'}
+                />
+              )}
+              {data.zoomUrl && data.secondMeetingUrl && (
+                <p className="text-xs text-gray-500">
+                  Either link gets you into the same session. Use whichever you prefer.
+                </p>
+              )}
+            </div>
           ) : (
             <p className="text-gray-600">
               The meeting link will be shared shortly. Please save this page.
@@ -158,6 +173,32 @@ export function QualificationClient({
         </Card>
       )}
     </div>
+  )
+}
+
+function MeetingLink({
+  url,
+  label,
+  primary,
+}: {
+  url: string
+  label: string
+  primary?: boolean
+}) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className={
+        primary
+          ? 'block rounded-md bg-white border border-primary-200 px-4 py-3 hover:border-primary-400'
+          : 'block rounded-md bg-white border border-gray-200 px-4 py-3 hover:border-gray-400'
+      }
+    >
+      <span className="block text-xs uppercase tracking-wide text-gray-500">{label}</span>
+      <span className="block break-all text-primary-700 mt-0.5">{url}</span>
+    </a>
   )
 }
 

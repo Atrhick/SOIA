@@ -240,6 +240,16 @@ const MIGRATIONS = [
       END $$`,
     ],
   },
+  {
+    id: '2026_08_18_program_title_and_second_meeting_link',
+    description: 'Add page title and a second meeting link to coach programs',
+    sql: [
+      `ALTER TABLE "coach_programs" ADD COLUMN IF NOT EXISTS "pageTitle" TEXT`,
+      `ALTER TABLE "coach_programs" ADD COLUMN IF NOT EXISTS "zoomLabel" TEXT`,
+      `ALTER TABLE "coach_programs" ADD COLUMN IF NOT EXISTS "secondMeetingUrl" TEXT`,
+      `ALTER TABLE "coach_programs" ADD COLUMN IF NOT EXISTS "secondMeetingLabel" TEXT`,
+    ],
+  },
 ]
 
 // Create migrations tracking table if it doesn't exist

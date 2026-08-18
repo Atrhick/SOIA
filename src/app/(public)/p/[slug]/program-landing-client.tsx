@@ -13,6 +13,7 @@ import { registerInterest } from '@/lib/actions/program-pages'
 interface PublicProgram {
   slug: string
   name: string
+  pageTitle: string
   organization: string
   headline: string | null
   coachBio: string | null
@@ -80,7 +81,9 @@ export function ProgramLandingClient({
         <p className="text-sm uppercase tracking-wide text-primary-600 font-medium">
           {program.organization}
         </p>
-        <h1 className="text-3xl font-bold text-gray-900 mt-2">{program.name}</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mt-2">
+          {program.pageTitle || program.name}
+        </h1>
         {program.headline && (
           <p className="text-lg text-gray-600 mt-3 max-w-2xl mx-auto">{program.headline}</p>
         )}

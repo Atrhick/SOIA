@@ -11,7 +11,7 @@ export async function generateMetadata({
   const result = await getPublicProgram(params.slug)
   if ('error' in result) return { title: 'Program not found' }
   return {
-    title: `${result.program.name} | NowTransformed`,
+    title: `${result.program.pageTitle || result.program.name} | NowTransformed`,
     description: result.program.headline ?? result.program.organization,
   }
 }

@@ -63,11 +63,15 @@ const programContentSchema = z.object({
   weeklyEngagement2: z.string().max(200),
   monthlyGrowthGoal: z.string().max(200),
   monthlyImpactGoal: z.string().max(200),
+  pageTitle: z.string().max(150).nullable().optional(),
   headline: z.string().max(200).nullable().optional(),
   coachBio: z.string().max(4000).nullable().optional(),
   programDescription: z.string().max(8000).nullable().optional(),
   eventDatesText: z.string().max(2000).nullable().optional(),
   zoomUrl: z.string().url().max(500).nullable().optional().or(z.literal('')),
+  zoomLabel: z.string().max(60).nullable().optional(),
+  secondMeetingUrl: z.string().url().max(500).nullable().optional().or(z.literal('')),
+  secondMeetingLabel: z.string().max(60).nullable().optional(),
   zoomInstructions: z.string().max(2000).nullable().optional(),
   qualificationIntro: z.string().max(2000).nullable().optional(),
 })
@@ -102,11 +106,15 @@ const SNAPSHOT_FIELDS = [
   'weeklyEngagement2',
   'monthlyGrowthGoal',
   'monthlyImpactGoal',
+  'pageTitle',
   'headline',
   'coachBio',
   'programDescription',
   'eventDatesText',
   'zoomUrl',
+  'zoomLabel',
+  'secondMeetingUrl',
+  'secondMeetingLabel',
   'zoomInstructions',
   'qualificationIntro',
   'extraQuestions',
@@ -239,11 +247,15 @@ export async function getMyProgram(programId: string) {
       weeklyEngagement2: p.weeklyEngagement2,
       monthlyGrowthGoal: p.monthlyGrowthGoal,
       monthlyImpactGoal: p.monthlyImpactGoal,
+      pageTitle: p.pageTitle,
       headline: p.headline,
       coachBio: p.coachBio,
       programDescription: p.programDescription,
       eventDatesText: p.eventDatesText,
       zoomUrl: p.zoomUrl,
+      zoomLabel: p.zoomLabel,
+      secondMeetingUrl: p.secondMeetingUrl,
+      secondMeetingLabel: p.secondMeetingLabel,
       zoomInstructions: p.zoomInstructions,
       qualificationIntro: p.qualificationIntro,
       extraQuestions: (p.extraQuestions as unknown as ProgramQuestion[]) ?? [],
@@ -265,10 +277,16 @@ export async function updateProgram(programId: string, data: unknown) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
   }
 
-  const { zoomUrl, ...rest } = parsed.data
+  // The URL fields accept '' so a coach can clear them in the form; store
+  // that as NULL rather than an empty string the public page would render.
+  const { zoomUrl, secondMeetingUrl, ...rest } = parsed.data
   await prisma.coachProgram.update({
     where: { id: programId },
-    data: { ...rest, zoomUrl: zoomUrl === '' ? null : zoomUrl },
+    data: {
+      ...rest,
+      zoomUrl: zoomUrl === '' ? null : zoomUrl,
+      secondMeetingUrl: secondMeetingUrl === '' ? null : secondMeetingUrl,
+    },
   })
 
   revalidatePath(`/coach/programs/${programId}`)
@@ -788,6 +806,8 @@ export async function getPublicProgram(slug: string) {
     program: {
       slug: program.slug,
       name: (snap.name as string) ?? '',
+      // The public heading, falling back to the grant programme name.
+      pageTitle: ((snap.pageTitle as string) || (snap.name as string)) ?? '',
       organization: (snap.organization as string) ?? '',
       headline: (snap.headline as string) ?? null,
       coachBio: (snap.coachBio as string) ?? null,
@@ -830,6 +850,7 @@ export async function getProgramPreview(slug: string) {
     program: {
       slug: program.slug,
       name: program.name,
+      pageTitle: program.pageTitle || program.name,
       organization: program.organization,
       headline: program.headline,
       coachBio: program.coachBio,
@@ -970,8 +991,11 @@ export async function getLeadQualificationData(slug: string, token: string) {
 
   return {
     data: {
-      programName: (snap.name as string) ?? '',
+      programName: ((snap.pageTitle as string) || (snap.name as string)) ?? '',
       zoomUrl: (snap.zoomUrl as string) ?? null,
+      zoomLabel: (snap.zoomLabel as string) ?? null,
+      secondMeetingUrl: (snap.secondMeetingUrl as string) ?? null,
+      secondMeetingLabel: (snap.secondMeetingLabel as string) ?? null,
       zoomInstructions: (snap.zoomInstructions as string) ?? null,
       eventDatesText: (snap.eventDatesText as string) ?? null,
       qualificationIntro: (snap.qualificationIntro as string) ?? null,

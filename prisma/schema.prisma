@@ -2459,11 +2459,19 @@ model CoachProgram {
   monthlyImpactGoalUnit  String?
 
   // Coach-authored public content
+  // Public heading for the page. Falls back to `name` when unset, so the
+  // grant programme name stays the record while the page can read differently.
+  pageTitle           String?
   headline            String?
   coachBio            String?       @db.Text
   programDescription  String?       @db.Text
   eventDatesText      String?       @db.Text
+  // Primary joining link, plus an optional second one for coaches who run
+  // both Zoom and Google Meet. Labels let the page name them correctly.
   zoomUrl             String?
+  zoomLabel           String?
+  secondMeetingUrl    String?
+  secondMeetingLabel  String?
   zoomInstructions    String?       @db.Text
 
   // Page 2 - coach's ADDITIONAL questions. Core questions are code-defined.
