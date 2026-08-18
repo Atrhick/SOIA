@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { StatsCard } from '@/components/ui/stats-card'
+import { NeedsAttention, TargetBar } from '@/components/dashboard/needs-attention'
+import { getCoachDashboard } from '@/lib/actions/crm'
 import { AlertBanner } from '@/components/ui/alert-banner'
 import { WelcomeHeader, SectionHeader } from '@/components/ui/page-header'
 import { InlineEmptyState } from '@/components/ui/empty-state'
@@ -155,7 +157,11 @@ export default async function CoachDashboard({ searchParams }: PageProps) {
   }
 
   // Fetch ambassador counts in parallel (only after we have coachData.id)
-  const ambassadorCounts = await getAmbassadorCounts(coachData.id)
+  const [ambassadorCounts, dashboard] = await Promise.all([
+    getAmbassadorCounts(coachData.id),
+    getCoachDashboard(),
+  ])
+  const summary = 'error' in dashboard ? null : dashboard
 
   // Calculate onboarding progress
   const completedTasks = coachData.onboardingProgress.filter(
@@ -242,20 +248,90 @@ export default async function CoachDashboard({ searchParams }: PageProps) {
         </div>
       )}
 
+      {/* What needs doing, before how you are tracking. Renders nothing when
+          there is nothing to act on. */}
+      {summary && (
+        <NeedsAttention
+          items={[
+            {
+              count: summary.attention.overdueFollowUps,
+              label: 'follow-ups due',
+              href: '/coach/crm?filter=NEEDS_ATTENTION',
+              urgent: true,
+            },
+            {
+              count: summary.attention.neverContacted,
+              label: 'new contacts not yet contacted',
+              href: '/coach/crm?filter=NEW',
+              urgent: true,
+            },
+            {
+              count: summary.attention.sentBack,
+              label: 'program pages sent back for changes',
+              href: '/coach/programs',
+              urgent: true,
+            },
+            {
+              count: summary.attention.unclassified,
+              label: 'leads not yet classified',
+              href: '/coach/crm?filter=ALL',
+            },
+            {
+              count: summary.attention.incompleteForm,
+              label: 'signups who never finished the form',
+              href: '/coach/crm?filter=ALL',
+            },
+          ]}
+        />
+      )}
+
+      {/* This month against target */}
+      {summary?.month.hasPrograms && (
+        <Card variant="default">
+          <CardHeader>
+            <SectionHeader title="This month" description="Against your monthly targets" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <TargetBar
+              label="Signups from your program pages"
+              actual={summary.month.signups}
+              target={summary.month.signupTarget}
+            />
+            <TargetBar
+              label="Converted"
+              actual={summary.month.converted}
+              target={summary.month.convertTarget}
+            />
+            {summary.month.unparsedGoals > 0 && (
+              <p className="text-xs text-gray-500">
+                {summary.month.unparsedGoals} program
+                {summary.month.unparsedGoals === 1 ? ' has a goal' : 's have goals'} that could not
+                be read as a number, so they are not counted above. An administrator can set these
+                on the program.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="Onboarding Progress"
-          value={`${Math.round(onboardingPercentage)}%`}
-          icon={CheckSquare}
-          iconColor="primary"
-          footer={{
-            label: `${completedTasks} of ${totalTasks} tasks`,
-            href: '/coach/onboarding',
-          }}
-        >
-          <Progress value={onboardingPercentage} className="mt-2" />
-        </StatsCard>
+        {/* Only while onboarding is unfinished - it should not hold prime
+            position for a coach who completed it months ago. */}
+        {coachData.coachStatus === 'ONBOARDING_INCOMPLETE' && (
+          <StatsCard
+            title="Onboarding Progress"
+            value={`${Math.round(onboardingPercentage)}%`}
+            icon={CheckSquare}
+            iconColor="primary"
+            footer={{
+              label: `${completedTasks} of ${totalTasks} tasks`,
+              href: '/coach/onboarding',
+            }}
+          >
+            <Progress value={onboardingPercentage} className="mt-2" />
+          </StatsCard>
+        )}
 
         <StatsCard
           title="Ambassadors"

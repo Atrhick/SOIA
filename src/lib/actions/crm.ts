@@ -130,6 +130,96 @@ export async function getMyContacts(filter?: 'ALL' | 'NEEDS_ATTENTION' | (typeof
   }
 }
 
+/**
+ * Everything the coach dashboard needs, in one call.
+ *
+ * Split into "what needs doing" and "how am I tracking" - the dashboard leads
+ * with the former, because a list of numbers does not tell anyone what to do
+ * next.
+ */
+export async function getCoachDashboard() {
+  const ctx = await requireCoach()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const coachId = ctx.coachProfile.id
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const [
+    unclassified,
+    incompleteForm,
+    overdueFollowUps,
+    neverContacted,
+    sentBack,
+    signupsThisMonth,
+    convertedThisMonth,
+    programs,
+  ] = await Promise.all([
+    prisma.programLead.count({
+      where: { program: { coachId }, association: 'UNCLASSIFIED' },
+    }),
+    prisma.programLead.count({
+      where: { program: { coachId }, qualifiedAt: null },
+    }),
+    prisma.cRMContact.count({
+      where: { ownerId: coachId, nextFollowUpAt: { lte: now } },
+    }),
+    prisma.cRMContact.count({
+      where: { ownerId: coachId, status: 'NEW' },
+    }),
+    prisma.coachProgram.count({
+      where: { coachId, status: 'REJECTED' },
+    }),
+    prisma.programLead.count({
+      where: { program: { coachId }, registeredAt: { gte: monthStart } },
+    }),
+    prisma.cRMContact.count({
+      where: { ownerId: coachId, status: 'CONVERTED', updatedAt: { gte: monthStart } },
+    }),
+    prisma.coachProgram.findMany({
+      where: { coachId },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        monthlyGrowthGoal: true,
+        monthlyGrowthGoalValue: true,
+        monthlyGrowthGoalUnit: true,
+        monthlyImpactGoal: true,
+        monthlyImpactGoalValue: true,
+        monthlyImpactGoalUnit: true,
+      },
+    }),
+  ])
+
+  // Sum the targets across the coach's programs. Goals that could not be
+  // parsed into a number are reported so the dashboard can say so rather than
+  // quietly showing a target of zero.
+  const growthTarget = programs.reduce((sum, p) => sum + (p.monthlyGrowthGoalValue ?? 0), 0)
+  const impactTarget = programs.reduce((sum, p) => sum + (p.monthlyImpactGoalValue ?? 0), 0)
+  const unparsedGoals = programs.filter(
+    (p) => p.monthlyGrowthGoalValue === null || p.monthlyImpactGoalValue === null
+  ).length
+
+  return {
+    attention: {
+      neverContacted,
+      overdueFollowUps,
+      unclassified,
+      incompleteForm,
+      sentBack,
+    },
+    month: {
+      signups: signupsThisMonth,
+      signupTarget: growthTarget,
+      converted: convertedThisMonth,
+      convertTarget: impactTarget,
+      unparsedGoals,
+      hasPrograms: programs.length > 0,
+    },
+  }
+}
+
 export async function getContact(contactId: string) {
   const ctx = await requireContactOwner(contactId)
   if (!ctx.ok) return { error: ctx.error }

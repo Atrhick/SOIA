@@ -2448,8 +2448,15 @@ model CoachProgram {
   servicesDescription String        @db.Text
   weeklyEngagement1   String
   weeklyEngagement2   String
+  // The grant sheet wording, kept verbatim as the record of what was agreed.
   monthlyGrowthGoal   String
   monthlyImpactGoal   String
+  // Parsed from the above so progress can actually be measured. Nullable
+  // because not every goal is a countable number.
+  monthlyGrowthGoalValue Int?
+  monthlyGrowthGoalUnit  String?
+  monthlyImpactGoalValue Int?
+  monthlyImpactGoalUnit  String?
 
   // Coach-authored public content
   headline            String?
