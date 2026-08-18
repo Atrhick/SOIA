@@ -872,8 +872,9 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
   }
 
   const token = `pl_${crypto.randomBytes(24).toString('hex')}`
+  let leadId: string
   try {
-    await prisma.programLead.create({
+    const lead = await prisma.programLead.create({
       data: {
         programId: program.id,
         fullName: parsed.data.fullName.trim(),
@@ -882,6 +883,7 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
         token,
       },
     })
+    leadId = lead.id
   } catch (error) {
     // Two submissions racing (double-click, two tabs) both pass the check
     // above; the loser hits the @@unique([programId, email]) constraint.
@@ -896,8 +898,13 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
     throw error
   }
 
-  // Feed Business Excellence. Never let a logging failure fail the signup.
+  // Everything below is bookkeeping for the coach. None of it may fail the
+  // signup - the visitor has already given us their details and is expecting
+  // their joining link.
   if (program.coachId) {
+    const fullName = parsed.data.fullName.trim()
+
+    // Feed Business Excellence.
     try {
       await prisma.outreachActivityLog.create({
         data: {
@@ -905,15 +912,37 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
           date: new Date(),
           category: 'NEW_CONTACTS',
           quantity: 1,
-          notes: `Program page signup: ${parsed.data.fullName.trim()} (${program.name})`,
+          notes: `Program page signup: ${fullName} (${program.name})`,
         },
       })
     } catch (error) {
       console.error('Outreach log failed for program signup:', error)
     }
+
+    // Create the working record the coach actually manages the person from.
+    // The ProgramLead row stays as the immutable record of what was submitted.
+    try {
+      const [firstName, ...rest] = fullName.split(/\s+/)
+      await prisma.cRMContact.create({
+        data: {
+          ownerId: program.coachId,
+          firstName: firstName || fullName,
+          lastName: rest.join(' '),
+          email,
+          jobTitle: parsed.data.profession.trim(),
+          source: 'PROGRAM_PAGE',
+          status: 'NEW',
+          programLeadId: leadId,
+          tags: [program.name],
+        },
+      })
+    } catch (error) {
+      console.error('CRM contact creation failed for program signup:', error)
+    }
   }
 
   revalidatePath('/coach/business-excellence')
+  revalidatePath('/coach/crm')
   return { success: true, token }
 }
 
