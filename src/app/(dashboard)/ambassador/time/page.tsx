@@ -1,62 +1,46 @@
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { Clock } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { isFeatureEnabled } from '@/lib/actions/feature-config'
-import {
-  getCurrentClockStatus,
-  getTodayClockEntries,
-  getWeeklyTimeStats,
-} from '@/lib/actions/time-clock'
-import { AmbassadorTimeClockClient } from './ambassador-time-clock-client'
-import { Clock } from 'lucide-react'
+import { FeatureDisabled } from '@/components/ui/feature-disabled'
+import { getMyTimeClock } from '@/lib/actions/time-clock'
+import { TimeClockScreen } from '@/components/time/time-clock-screen'
+import { TimeZoneSync } from '@/components/time/time-zone-sync'
 
 export default async function AmbassadorTimePage() {
   const session = await auth()
-
   if (!session || session.user.role !== 'AMBASSADOR') {
     redirect('/login')
   }
 
-  // Check if feature is enabled
   const featureEnabled = await isFeatureEnabled('TIME_CLOCK', 'AMBASSADOR', session.user.id)
   if (!featureEnabled) {
+    return <FeatureDisabled title="Time Clock" icon={Clock} />
+  }
+
+  const result = await getMyTimeClock(cookies().get('tz')?.value)
+  if ('error' in result) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="text-center">
-          <Clock className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900">Time Clock</h2>
-          <p className="text-gray-500 mt-2">This feature is not currently enabled.</p>
+      <>
+        <TimeZoneSync />
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+          {result.error}
         </div>
-      </div>
+      </>
     )
   }
 
-  const [clockStatus, todayEntries, weeklyStats] = await Promise.all([
-    getCurrentClockStatus(session.user.id),
-    getTodayClockEntries(session.user.id),
-    getWeeklyTimeStats(session.user.id),
-  ])
-
-  const serializedTodayEntries = todayEntries.entries?.map((entry) => ({
-    id: entry.id,
-    type: entry.type,
-    timestamp: entry.timestamp.toISOString(),
-    notes: entry.notes,
-  })) || []
-
   return (
     <div className="space-y-6">
+      <TimeZoneSync />
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Time Clock</h1>
-        <p className="text-gray-600">
-          Track your work hours
-        </p>
+        <p className="text-gray-600">Track your hours</p>
       </div>
 
-      <AmbassadorTimeClockClient
-        initialStatus={clockStatus.status}
-        todayEntries={serializedTodayEntries}
-        weeklyStats={weeklyStats}
-      />
+      {/* Ambassadors have no projects to bill against, so no project timer. */}
+      <TimeClockScreen data={result} showProjectTimer={false} />
     </div>
   )
 }

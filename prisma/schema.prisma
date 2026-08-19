@@ -47,6 +47,8 @@ model User {
   messageThreads     MessageThread[] @relation("ThreadParticipants")
   passwordResetTokens PasswordResetToken[]
   associateProfile   AssociateProfile?
+  timeClockEntries   TimeClockEntry[]
+  timeEntries        TimeEntry[]
 
   @@index([role, status])
   @@map("users")
@@ -1624,6 +1626,7 @@ enum ClockEntryType {
 model TimeClockEntry {
   id        String         @id @default(cuid())
   userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type      ClockEntryType
   timestamp DateTime       @default(now())
@@ -1635,12 +1638,14 @@ model TimeClockEntry {
 
   createdAt DateTime       @default(now())
 
+  @@index([userId, timestamp])
   @@map("time_clock_entries")
 }
 
 model TimeEntry {
   id          String    @id @default(cuid())
   userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectId   String?
   project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   taskId      String?
@@ -1656,6 +1661,10 @@ model TimeEntry {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  @@index([userId, startTime])
+  // A partial unique index enforcing at most one running timer per user is
+  // added by migration 2026_08_19_time_clock_integrity - Prisma cannot express
+  // a WHERE clause on an index, so it lives in raw SQL.
   @@map("time_entries")
 }
 

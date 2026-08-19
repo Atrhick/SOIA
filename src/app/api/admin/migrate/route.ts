@@ -250,6 +250,28 @@ const MIGRATIONS = [
       `ALTER TABLE "coach_programs" ADD COLUMN IF NOT EXISTS "secondMeetingLabel" TEXT`,
     ],
   },
+  {
+    id: '2026_08_19_time_clock_integrity',
+    description:
+      'Foreign keys, lookup indexes and a one-running-timer constraint for the time clock',
+    sql: [
+      // Orphan rows would block the foreign keys below. Both tables were
+      // verified clean before this shipped; the deletes are a safety net for
+      // any environment that is not.
+      `DELETE FROM "time_clock_entries" e WHERE NOT EXISTS (SELECT 1 FROM "users" u WHERE u.id = e."userId")`,
+      `DELETE FROM "time_entries" e WHERE NOT EXISTS (SELECT 1 FROM "users" u WHERE u.id = e."userId")`,
+      `CREATE INDEX IF NOT EXISTS "time_clock_entries_userId_timestamp_idx" ON "time_clock_entries" ("userId", "timestamp")`,
+      `CREATE INDEX IF NOT EXISTS "time_entries_userId_startTime_idx" ON "time_entries" ("userId", "startTime")`,
+      // Close any duplicate running timers before the constraint is applied,
+      // keeping the newest one.
+      `UPDATE "time_entries" t SET "endTime" = now(), "duration" = GREATEST(0, EXTRACT(EPOCH FROM (now() - t."startTime"))/60)::int
+         WHERE t."endTime" IS NULL
+           AND EXISTS (SELECT 1 FROM "time_entries" o WHERE o."userId" = t."userId" AND o."endTime" IS NULL AND o."startTime" > t."startTime")`,
+      // Prisma cannot express a partial index, so the "at most one running
+      // timer per user" rule is enforced here. startTimer catches P2002.
+      `CREATE UNIQUE INDEX IF NOT EXISTS "time_entries_one_running_per_user" ON "time_entries" ("userId") WHERE "endTime" IS NULL`,
+    ],
+  },
 ]
 
 // Create migrations tracking table if it doesn't exist
