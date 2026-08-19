@@ -28,12 +28,16 @@ const ACTIVITY_TYPES = ['CALL', 'EMAIL', 'MEETING', 'NOTE', 'TASK'] as const
 // Same `ok` discriminant used in program-pages.ts: a union whose members
 // differ only by an optional property does not narrow reliably.
 
-async function requireCoach() {
+// An impersonating admin may read a coach's contacts - that is the point of
+// looking as them - but must not log activity or move a contact in their name,
+// because none of it is attributable back to the admin. Reads pass
+// `allowImpersonation: true`; writes leave it off.
+async function requireCoach({ allowImpersonation = false } = {}) {
   const session = await auth()
   if (!session || session.user.role !== 'COACH') {
     return { ok: false as const, error: 'Unauthorized' }
   }
-  if (session.user.isImpersonating) {
+  if (session.user.isImpersonating && !allowImpersonation) {
     return { ok: false as const, error: 'Not available while impersonating another user' }
   }
   const enabled = await isFeatureEnabled('CRM', 'COACH', session.user.id)
@@ -47,11 +51,16 @@ async function requireCoach() {
   if (!coachProfile) {
     return { ok: false as const, error: 'Coach profile not found' }
   }
-  return { ok: true as const, session, coachProfile }
+  return {
+    ok: true as const,
+    session,
+    coachProfile,
+    readOnly: Boolean(session.user.isImpersonating),
+  }
 }
 
-async function requireContactOwner(contactId: string) {
-  const ctx = await requireCoach()
+async function requireContactOwner(contactId: string, opts?: { allowImpersonation?: boolean }) {
+  const ctx = await requireCoach(opts)
   if (!ctx.ok) return { ok: false as const, error: ctx.error }
 
   const contact = await prisma.cRMContact.findUnique({ where: { id: contactId } })
@@ -60,7 +69,13 @@ async function requireContactOwner(contactId: string) {
   if (!contact || contact.ownerId !== ctx.coachProfile.id) {
     return { ok: false as const, error: 'Contact not found' }
   }
-  return { ok: true as const, session: ctx.session, coachProfile: ctx.coachProfile, contact }
+  return {
+    ok: true as const,
+    session: ctx.session,
+    coachProfile: ctx.coachProfile,
+    readOnly: ctx.readOnly,
+    contact,
+  }
 }
 
 // ============================================
@@ -68,7 +83,7 @@ async function requireContactOwner(contactId: string) {
 // ============================================
 
 export async function getMyContacts(filter?: 'ALL' | 'NEEDS_ATTENTION' | (typeof CONTACT_STATUSES)[number]) {
-  const ctx = await requireCoach()
+  const ctx = await requireCoach({ allowImpersonation: true })
   if (!ctx.ok) return { error: ctx.error }
 
   const now = new Date()
@@ -108,6 +123,7 @@ export async function getMyContacts(filter?: 'ALL' | 'NEEDS_ATTENTION' | (typeof
   })
 
   return {
+    readOnly: ctx.readOnly,
     contacts: contacts.map((c) => ({
       id: c.id,
       firstName: c.firstName,
@@ -138,7 +154,7 @@ export async function getMyContacts(filter?: 'ALL' | 'NEEDS_ATTENTION' | (typeof
  * next.
  */
 export async function getCoachDashboard() {
-  const ctx = await requireCoach()
+  const ctx = await requireCoach({ allowImpersonation: true })
   if (!ctx.ok) return { error: ctx.error }
 
   const coachId = ctx.coachProfile.id
@@ -221,7 +237,7 @@ export async function getCoachDashboard() {
 }
 
 export async function getContact(contactId: string) {
-  const ctx = await requireContactOwner(contactId)
+  const ctx = await requireContactOwner(contactId, { allowImpersonation: true })
   if (!ctx.ok) return { error: ctx.error }
 
   const [full, activities] = await Promise.all([
@@ -242,6 +258,7 @@ export async function getContact(contactId: string) {
   if (!full) return { error: 'Contact not found' }
 
   return {
+    readOnly: ctx.readOnly,
     contact: {
       id: full.id,
       firstName: full.firstName,

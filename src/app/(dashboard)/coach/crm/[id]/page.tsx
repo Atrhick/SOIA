@@ -22,5 +22,11 @@ export default async function ContactDetailPage({ params }: { params: { id: stri
     notFound()
   }
 
-  return <ContactDetailClient contact={result.contact} activities={result.activities} />
+  return (
+    <ContactDetailClient
+      contact={result.contact}
+      activities={result.activities}
+      readOnly={result.readOnly}
+    />
+  )
 }

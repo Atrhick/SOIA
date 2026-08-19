@@ -137,14 +137,19 @@ function buildSnapshot(program: ProgramRecord) {
 // narrowing - a union whose members differ only by an optional property does
 // not narrow reliably and leaks into every caller's return type.
 
-async function requireCoach() {
+/**
+ * An impersonating admin may look but not touch: they can read a coach's pages
+ * to see exactly what the coach sees, but must not author or publish content in
+ * the coach's name, because coach-side actions write no audit trail.
+ *
+ * Reads pass `allowImpersonation: true`; every write leaves it off.
+ */
+async function requireCoach({ allowImpersonation = false } = {}) {
   const session = await auth()
   if (!session || session.user.role !== 'COACH') {
     return { ok: false as const, error: 'Unauthorized' }
   }
-  // An impersonating admin may look, but must not author or publish content
-  // in a coach's name - coach-side actions write no audit trail.
-  if (session.user.isImpersonating) {
+  if (session.user.isImpersonating && !allowImpersonation) {
     return { ok: false as const, error: 'Not available while impersonating another user' }
   }
   const enabled = await isFeatureEnabled('PROGRAM_PAGES', 'COACH', session.user.id)
@@ -158,11 +163,16 @@ async function requireCoach() {
   if (!coachProfile) {
     return { ok: false as const, error: 'Coach profile not found' }
   }
-  return { ok: true as const, session, coachProfile }
+  return {
+    ok: true as const,
+    session,
+    coachProfile,
+    readOnly: Boolean(session.user.isImpersonating),
+  }
 }
 
-async function requireProgramOwner(programId: string) {
-  const ctx = await requireCoach()
+async function requireProgramOwner(programId: string, opts?: { allowImpersonation?: boolean }) {
+  const ctx = await requireCoach(opts)
   if (!ctx.ok) return { ok: false as const, error: ctx.error }
 
   const program = await prisma.coachProgram.findUnique({ where: { id: programId } })
@@ -170,7 +180,13 @@ async function requireProgramOwner(programId: string) {
     // Same message whether it does not exist or belongs to someone else.
     return { ok: false as const, error: 'Program not found' }
   }
-  return { ok: true as const, session: ctx.session, coachProfile: ctx.coachProfile, program }
+  return {
+    ok: true as const,
+    session: ctx.session,
+    coachProfile: ctx.coachProfile,
+    readOnly: ctx.readOnly,
+    program,
+  }
 }
 
 async function requireAdmin() {
@@ -205,7 +221,7 @@ async function audit(userId: string, action: string, entityId: string, details: 
 // ============================================
 
 export async function getMyPrograms() {
-  const ctx = await requireCoach()
+  const ctx = await requireCoach({ allowImpersonation: true })
   if (!ctx.ok) return { error: ctx.error }
 
   const programs = await prisma.coachProgram.findMany({
@@ -215,6 +231,7 @@ export async function getMyPrograms() {
   })
 
   return {
+    readOnly: ctx.readOnly,
     programs: programs.map((p) => ({
       id: p.id,
       slug: p.slug,
@@ -230,11 +247,12 @@ export async function getMyPrograms() {
 }
 
 export async function getMyProgram(programId: string) {
-  const ctx = await requireProgramOwner(programId)
+  const ctx = await requireProgramOwner(programId, { allowImpersonation: true })
   if (!ctx.ok) return { error: ctx.error }
 
   const p = ctx.program
   return {
+    readOnly: ctx.readOnly,
     program: {
       id: p.id,
       slug: p.slug,

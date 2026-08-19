@@ -95,9 +95,11 @@ const ACTIVITY_ICONS: Record<string, typeof Phone> = {
 export function ContactDetailClient({
   contact,
   activities,
+  readOnly,
 }: {
   contact: Contact
   activities: Activity[]
+  readOnly: boolean
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -108,6 +110,8 @@ export function ContactDetailClient({
   const [logDetail, setLogDetail] = useState('')
   const [followUp, setFollowUp] = useState(contact.nextFollowUpAt?.slice(0, 10) ?? '')
   const [notes, setNotes] = useState(contact.notes ?? '')
+
+  const locked = isPending || readOnly
 
   const run = (fn: () => Promise<{ error?: string; success?: boolean }>, ok: string) => {
     setError(null)
@@ -142,7 +146,7 @@ export function ContactDetailClient({
           <Select
             value={contact.status}
             onValueChange={(v) => run(() => updateContactStatus(contact.id, v), 'Status updated')}
-            disabled={isPending}
+            disabled={locked}
           >
             <SelectTrigger className="w-[170px]">
               <SelectValue />
@@ -157,6 +161,14 @@ export function ContactDetailClient({
           </Select>
         </div>
       </div>
+
+      {readOnly && (
+        <AlertBanner
+          variant="warning"
+          title="Viewing as this coach"
+          message="You can see everything here, but logging activity and changing this contact are turned off while impersonating. Switch back to your admin account to make changes."
+        />
+      )}
 
       {error && (
         <AlertBanner variant="error" message={error} dismissible onDismiss={() => setError(null)} />
@@ -211,7 +223,7 @@ export function ContactDetailClient({
 
               <div className="space-y-3 mb-6 pb-6 border-b border-gray-100">
                 <div className="grid gap-3 sm:grid-cols-[150px_1fr]">
-                  <Select value={logType} onValueChange={setLogType}>
+                  <Select value={logType} onValueChange={setLogType} disabled={locked}>
                     <SelectTrigger aria-label="Interaction type">
                       <SelectValue />
                     </SelectTrigger>
@@ -228,6 +240,7 @@ export function ContactDetailClient({
                     onChange={(e) => setLogTitle(e.target.value)}
                     placeholder="What happened?"
                     aria-label="What happened"
+                    disabled={locked}
                   />
                 </div>
                 <Textarea
@@ -235,11 +248,12 @@ export function ContactDetailClient({
                   onChange={(e) => setLogDetail(e.target.value)}
                   rows={2}
                   placeholder="Any detail worth remembering (optional)"
+                  disabled={locked}
                 />
                 <div className="flex justify-end">
                   <Button
                     size="sm"
-                    disabled={isPending || !logTitle.trim()}
+                    disabled={locked || !logTitle.trim()}
                     onClick={() =>
                       run(async () => {
                         const r = await logActivity(contact.id, {
@@ -307,12 +321,13 @@ export function ContactDetailClient({
                   type="date"
                   value={followUp}
                   onChange={(e) => setFollowUp(e.target.value)}
+                  disabled={locked}
                 />
               </div>
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  disabled={isPending}
+                  disabled={locked}
                   onClick={() =>
                     run(
                       () => setNextFollowUp(contact.id, followUp ? `${followUp}T09:00:00.000Z` : null),
@@ -326,7 +341,7 @@ export function ContactDetailClient({
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={isPending}
+                    disabled={locked}
                     onClick={() => {
                       setFollowUp('')
                       run(() => setNextFollowUp(contact.id, null), 'Follow-up cleared')
@@ -357,7 +372,7 @@ export function ContactDetailClient({
                   onValueChange={(v) =>
                     run(() => setContactAssociation(contact.id, v), 'Classification saved')
                   }
-                  disabled={isPending}
+                  disabled={locked}
                 >
                   <SelectTrigger aria-label="Association type">
                     <SelectValue />
@@ -386,12 +401,13 @@ export function ContactDetailClient({
                 onChange={(e) => setNotes(e.target.value)}
                 rows={5}
                 placeholder="Only you see this."
+                disabled={locked}
               />
               <div className="flex justify-end">
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={isPending}
+                  disabled={locked}
                   onClick={() => run(() => updateContactNotes(contact.id, notes), 'Notes saved')}
                 >
                   Save notes

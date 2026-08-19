@@ -87,7 +87,13 @@ function newQuestionId() {
   return `q_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
 }
 
-export function ProgramEditorClient({ program }: { program: EditableProgram }) {
+export function ProgramEditorClient({
+  program,
+  readOnly,
+}: {
+  program: EditableProgram
+  readOnly: boolean
+}) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -212,7 +218,7 @@ export function ProgramEditorClient({ program }: { program: EditableProgram }) {
           )}
           <Button
             size="sm"
-            disabled={isPending || program.status === 'PENDING_REVIEW'}
+            disabled={isPending || readOnly || program.status === 'PENDING_REVIEW'}
             onClick={() => run(() => submitProgramForReview(program.id), 'Sent for review')}
           >
             {isPending ? (
@@ -224,6 +230,14 @@ export function ProgramEditorClient({ program }: { program: EditableProgram }) {
           </Button>
         </div>
       </div>
+
+      {readOnly && (
+        <AlertBanner
+          variant="warning"
+          title="Viewing as this coach"
+          message="You can see everything on this page, but editing is turned off while impersonating. Switch back to your admin account to make changes."
+        />
+      )}
 
       {program.hasLiveVersion && (
         <AlertBanner
@@ -260,6 +274,7 @@ export function ProgramEditorClient({ program }: { program: EditableProgram }) {
           <TabsTrigger value="grant">Grant details</TabsTrigger>
         </TabsList>
 
+        <fieldset disabled={readOnly} className="min-w-0">
         {/* ---- Page content ---- */}
         <TabsContent value="content" className="space-y-4">
           <Card>
@@ -565,6 +580,7 @@ export function ProgramEditorClient({ program }: { program: EditableProgram }) {
           </Card>
           <SaveBar onSave={saveContent} isPending={isPending} />
         </TabsContent>
+        </fieldset>
       </Tabs>
 
       {program.hasLiveVersion && (
@@ -572,7 +588,7 @@ export function ProgramEditorClient({ program }: { program: EditableProgram }) {
           <Button
             variant="ghost"
             size="sm"
-            disabled={isPending}
+            disabled={isPending || readOnly}
             onClick={() => run(() => unpublishProgram(program.id), 'Page taken offline')}
           >
             Take my page offline
