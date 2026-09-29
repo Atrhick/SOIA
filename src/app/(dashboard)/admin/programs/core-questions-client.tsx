@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AlertBanner } from '@/components/ui/alert-banner'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -33,6 +34,7 @@ import {
   createCoreQuestion,
   reorderCoreQuestions,
   setCoreQuestionActive,
+  setStandardQuestionsEnabled,
   updateCoreQuestion,
 } from '@/lib/actions/program-pages'
 
@@ -64,7 +66,13 @@ const emptyDraft = (): Draft => ({
   likert: { ...DEFAULT_LIKERT },
 })
 
-export function CoreQuestionsClient({ questions }: { questions: CoreQuestionRow[] }) {
+export function CoreQuestionsClient({
+  questions,
+  enabled,
+}: {
+  questions: CoreQuestionRow[]
+  enabled: boolean
+}) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -150,12 +158,39 @@ export function CoreQuestionsClient({ questions }: { questions: CoreQuestionRow[
         />
       )}
 
+      <Card>
+        <CardContent className="flex items-start justify-between gap-4 p-4 flex-wrap">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-gray-900">Ask the standard questions</p>
+              <Badge variant={enabled ? 'success' : 'outline'}>{enabled ? 'On' : 'Off'}</Badge>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              {enabled
+                ? 'Every qualification form asks these before the coach’s own questions.'
+                : 'Off by default. Qualification forms ask only each coach’s own questions - the questions below are kept, and answers already collected stay readable.'}
+            </p>
+          </div>
+          <Switch
+            checked={enabled}
+            disabled={isPending}
+            aria-label="Ask the standard questions on every qualification form"
+            onCheckedChange={(next) =>
+              run(
+                () => setStandardQuestionsEnabled(next),
+                next ? 'Standard questions turned on' : 'Standard questions turned off'
+              )
+            }
+          />
+        </CardContent>
+      </Card>
+
       <AlertBanner
         variant="info"
         message="Rewording a question is safe - answers already collected keep the wording they were answered under. Retiring one stops collection but keeps past answers readable."
       />
 
-      <Card>
+      <Card className={enabled ? undefined : 'opacity-75'}>
         <CardContent className="p-0">
           <ul className="divide-y divide-gray-100">
             {questions.map((q) => {

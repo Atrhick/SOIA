@@ -8,13 +8,23 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { isFeatureEnabled } from '@/lib/actions/feature-config'
 import {
+  AGE_BAND_LABELS,
+  CHILD_AGE_BANDS,
+  FAMILY_QUESTIONS,
+  FAMILY_STAGES,
+  MAX_CHILDREN,
   MAX_EXTRA_QUESTIONS,
   MAX_TEXT_LONG_LENGTH,
+  PROGRAM_AUDIENCES,
   PROGRAM_QUESTION_TYPES,
+  RESERVED_QUESTION_PREFIXES,
+  audienceIncludesChildren,
   slugifyProgramName,
   type ProgramAnswer,
+  type ProgramChild,
   type ProgramQuestion,
 } from '@/lib/program-question-types'
+import { toVideoEmbedUrl } from '@/lib/video-embed'
 
 // ============================================
 // Schemas
@@ -53,6 +63,17 @@ const questionSchema = z
 
 const questionsSchema = z.array(questionSchema).max(MAX_EXTRA_QUESTIONS)
 
+// A video link must be one the public page can actually embed, so a coach
+// finds out at save time rather than an applicant finding a blank player.
+const videoUrlSchema = z
+  .string()
+  .max(500)
+  .refine((v) => v === '' || toVideoEmbedUrl(v) !== null, {
+    message: 'Video links must be a YouTube, Vimeo or Loom link',
+  })
+  .nullable()
+  .optional()
+
 const programContentSchema = z.object({
   name: z.string().min(1).max(150),
   organization: z.string().min(1).max(150),
@@ -74,13 +95,48 @@ const programContentSchema = z.object({
   secondMeetingLabel: z.string().max(60).nullable().optional(),
   zoomInstructions: z.string().max(2000).nullable().optional(),
   qualificationIntro: z.string().max(2000).nullable().optional(),
+  showMeetingDetails: z.boolean().optional(),
+  coachVideoUrl: videoUrlSchema,
+  ntVideoUrl: videoUrlSchema,
+  ntVideoIntro: z.string().max(2000).nullable().optional(),
 })
 
-const registerSchema = z.object({
-  fullName: z.string().min(1, 'Please enter your full name').max(150),
-  email: z.string().email('Please enter a valid email address').max(200),
-  profession: z.string().min(1, 'Please enter your profession').max(150),
+const ntVideoSchema = z.object({
+  ntVideoUrl: videoUrlSchema,
+  ntVideoIntro: z.string().max(2000).nullable().optional(),
 })
+
+const childSchema = z.object({
+  firstName: z.string().trim().min(1, "Please enter each child's first name").max(60),
+  ageBand: z.enum(CHILD_AGE_BANDS, {
+    message: "Please choose each child's age",
+  }),
+})
+
+const registerSchema = z
+  .object({
+    fullName: z.string().min(1, 'Please enter your full name').max(150),
+    email: z.string().email('Please enter a valid email address').max(200),
+    profession: z.string().min(1, 'Please enter your profession').max(150),
+    audience: z.enum(PROGRAM_AUDIENCES, {
+      message: 'Please tell us who this is for',
+    }),
+    children: z.array(childSchema).max(MAX_CHILDREN).optional(),
+    guardianConfirmed: z.boolean().optional(),
+    phone: z.string().trim().max(40).optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (!audienceIncludesChildren(d.audience)) return
+    if (!d.children || d.children.length === 0) {
+      ctx.addIssue({ code: 'custom', message: 'Please add at least one child' })
+    }
+    if (!d.guardianConfirmed) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Please confirm you are the parent or legal guardian',
+      })
+    }
+  })
 
 const createProgramSchema = z.object({
   name: z.string().min(1, 'Program name is required').max(150),
@@ -118,6 +174,10 @@ const SNAPSHOT_FIELDS = [
   'zoomInstructions',
   'qualificationIntro',
   'extraQuestions',
+  'showMeetingDetails',
+  'coachVideoUrl',
+  'ntVideoUrl',
+  'ntVideoIntro',
 ] as const
 
 type ProgramRecord = Record<string, unknown>
@@ -253,6 +313,10 @@ export async function getMyProgram(programId: string) {
   const p = ctx.program
   return {
     readOnly: ctx.readOnly,
+    // What the lead will actually be asked ahead of the coach's own questions.
+    // Empty while an admin has the standard questions switched off, so the
+    // editor never promises questions no form will ask.
+    standardQuestions: await loadCoreQuestions(),
     program: {
       id: p.id,
       slug: p.slug,
@@ -276,6 +340,10 @@ export async function getMyProgram(programId: string) {
       secondMeetingLabel: p.secondMeetingLabel,
       zoomInstructions: p.zoomInstructions,
       qualificationIntro: p.qualificationIntro,
+      showMeetingDetails: p.showMeetingDetails,
+      coachVideoUrl: p.coachVideoUrl,
+      ntVideoUrl: p.ntVideoUrl,
+      ntVideoIntro: p.ntVideoIntro,
       extraQuestions: (p.extraQuestions as unknown as ProgramQuestion[]) ?? [],
       status: p.status,
       reviewNotes: p.reviewNotes,
@@ -297,13 +365,15 @@ export async function updateProgram(programId: string, data: unknown) {
 
   // The URL fields accept '' so a coach can clear them in the form; store
   // that as NULL rather than an empty string the public page would render.
-  const { zoomUrl, secondMeetingUrl, ...rest } = parsed.data
+  const { zoomUrl, secondMeetingUrl, coachVideoUrl, ntVideoUrl, ...rest } = parsed.data
   await prisma.coachProgram.update({
     where: { id: programId },
     data: {
       ...rest,
       zoomUrl: zoomUrl === '' ? null : zoomUrl,
       secondMeetingUrl: secondMeetingUrl === '' ? null : secondMeetingUrl,
+      coachVideoUrl: coachVideoUrl === '' ? null : coachVideoUrl,
+      ntVideoUrl: ntVideoUrl === '' ? null : ntVideoUrl,
     },
   })
 
@@ -323,8 +393,8 @@ export async function saveExtraQuestions(programId: string, questions: unknown) 
 
   const ids = new Set<string>()
   for (const q of parsed.data) {
-    if (q.id.startsWith('core_')) {
-      return { error: 'Question ids beginning with "core_" are reserved' }
+    if (RESERVED_QUESTION_PREFIXES.some((prefix) => q.id.startsWith(prefix))) {
+      return { error: 'That question id is reserved' }
     }
     if (ids.has(q.id)) return { error: 'Duplicate question id' }
     ids.add(q.id)
@@ -351,8 +421,13 @@ export async function submitProgramForReview(programId: string) {
   const missing: string[] = []
   if (!p.programDescription?.trim()) missing.push('program description')
   if (!p.coachBio?.trim()) missing.push('about the coach')
-  if (!p.zoomUrl?.trim()) missing.push('Zoom link')
-  if (!p.eventDatesText?.trim()) missing.push('at least one event date')
+  if (p.showMeetingDetails) {
+    if (!p.zoomUrl?.trim()) missing.push('Zoom link')
+    if (!p.eventDatesText?.trim()) missing.push('at least one event date')
+  } else if (!p.coachVideoUrl?.trim()) {
+    // With the meeting switched off, the video is the whole presentation.
+    missing.push('your program video (or switch the meeting details back on)')
+  }
   if (missing.length > 0) {
     return { error: `Please fill in ${missing.join(', ')} before submitting` }
   }
@@ -419,6 +494,33 @@ export async function setLeadAssociation(leadId: string, association: string) {
   return { success: true }
 }
 
+export async function setLeadFamilyStage(leadId: string, stage: string) {
+  const ctx = await requireCoach()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const parsed = z.enum(FAMILY_STAGES).safeParse(stage)
+  if (!parsed.success) return { error: 'Invalid follow-up stage' }
+
+  const lead = await prisma.programLead.findUnique({
+    where: { id: leadId },
+    select: { id: true, audience: true, program: { select: { coachId: true } } },
+  })
+  if (!lead || lead.program.coachId !== ctx.coachProfile.id) {
+    return { error: 'Lead not found' }
+  }
+  if (!audienceIncludesChildren(lead.audience)) {
+    return { error: 'This lead did not sign up for a child' }
+  }
+
+  await prisma.programLead.update({
+    where: { id: leadId },
+    data: { familyStage: parsed.data },
+  })
+
+  revalidatePath('/coach/business-excellence')
+  return { success: true }
+}
+
 
 // ============================================
 // Admin actions
@@ -459,6 +561,10 @@ export async function getAllPrograms() {
       coachBio: p.coachBio,
       eventDatesText: p.eventDatesText,
       zoomUrl: p.zoomUrl,
+      showMeetingDetails: p.showMeetingDetails,
+      coachVideoUrl: p.coachVideoUrl,
+      ntVideoUrl: p.ntVideoUrl,
+      ntVideoIntro: p.ntVideoIntro,
       extraQuestionCount: ((p.extraQuestions as unknown as ProgramQuestion[]) ?? []).length,
     })),
     coaches: coaches.map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}` })),
@@ -561,6 +667,51 @@ export async function approveProgram(programId: string) {
   return { success: true }
 }
 
+/**
+ * The NowTransformed / sponsorship video is NT's message, so an admin can set
+ * it directly without waiting for the coach to resubmit. An admin edit is
+ * already authorized, so on a live page it goes straight into the published
+ * snapshot as well as the draft - the coach's own draft edits stay unpublished.
+ */
+export async function setProgramNtVideo(programId: string, data: unknown) {
+  const ctx = await requireAdmin()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const parsed = ntVideoSchema.safeParse(data)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+
+  const program = await prisma.coachProgram.findUnique({
+    where: { id: programId },
+    select: { id: true, slug: true, publishedSnapshot: true },
+  })
+  if (!program) return { error: 'Program not found' }
+
+  const ntVideoUrl = parsed.data.ntVideoUrl?.trim() || null
+  const ntVideoIntro = parsed.data.ntVideoIntro?.trim() || null
+  const snapshot = program.publishedSnapshot as PublicSnapshot | null
+
+  await prisma.coachProgram.update({
+    where: { id: programId },
+    data: {
+      ntVideoUrl,
+      ntVideoIntro,
+      ...(snapshot
+        ? { publishedSnapshot: { ...snapshot, ntVideoUrl, ntVideoIntro } as object }
+        : {}),
+    },
+  })
+
+  await audit(ctx.session.user.id, 'SET_PROGRAM_NT_VIDEO', programId, {
+    ntVideoUrl,
+    appliedToLivePage: Boolean(snapshot),
+  })
+  revalidatePath('/admin/programs')
+  revalidatePath('/coach/programs')
+  revalidatePath(`/coach/programs/${programId}`)
+  revalidatePath(`/p/${program.slug}`)
+  return { success: true }
+}
+
 export async function rejectProgram(programId: string, reason: string) {
   const ctx = await requireAdmin()
   if (!ctx.ok) return { error: ctx.error }
@@ -617,6 +768,62 @@ export async function adminUnpublishProgram(programId: string, reason: string) {
   await audit(ctx.session.user.id, 'UNPUBLISH_PROGRAM', programId, { reason: trimmed })
   revalidatePath('/admin/programs')
   revalidatePath(`/p/${program.slug}`)
+  return { success: true }
+}
+
+// ── Standard questions master switch ────────────────────────────────────────
+
+// One row, one flag. `id` is fixed so concurrent upserts converge on the same
+// record instead of racing to create two.
+const PROGRAM_SETTINGS_ID = 'global'
+
+/**
+ * Whether the shared standard questions are asked at all.
+ *
+ * Off by default, and a missing settings row reads as off, so a fresh database
+ * (or one that has never been touched by an admin) collects only the coach's
+ * own questions.
+ */
+async function standardQuestionsEnabled(): Promise<boolean> {
+  const row = await prisma.programQuestionSettings.findUnique({
+    where: { id: PROGRAM_SETTINGS_ID },
+    select: { standardQuestionsEnabled: true },
+  })
+  return row?.standardQuestionsEnabled ?? false
+}
+
+export async function getProgramQuestionSettings() {
+  const ctx = await requireAdmin()
+  if (!ctx.ok) return { error: ctx.error }
+
+  return { settings: { standardQuestionsEnabled: await standardQuestionsEnabled() } }
+}
+
+export async function setStandardQuestionsEnabled(enabled: unknown) {
+  const ctx = await requireAdmin()
+  if (!ctx.ok) return { error: ctx.error }
+
+  const parsed = z.boolean().safeParse(enabled)
+  if (!parsed.success) return { error: 'Invalid value' }
+
+  await prisma.programQuestionSettings.upsert({
+    where: { id: PROGRAM_SETTINGS_ID },
+    update: { standardQuestionsEnabled: parsed.data, updatedBy: ctx.session.user.id },
+    create: {
+      id: PROGRAM_SETTINGS_ID,
+      standardQuestionsEnabled: parsed.data,
+      updatedBy: ctx.session.user.id,
+    },
+  })
+
+  await audit(
+    ctx.session.user.id,
+    parsed.data ? 'ENABLE_STANDARD_QUESTIONS' : 'DISABLE_STANDARD_QUESTIONS',
+    PROGRAM_SETTINGS_ID,
+    {}
+  )
+  revalidatePath('/admin/programs')
+  revalidatePath('/coach/programs')
   return { success: true }
 }
 
@@ -788,8 +995,13 @@ export async function deleteProgram(programId: string) {
  * edit them without a deploy. CORE_QUESTIONS remains the seed source only.
  * Retired questions (isActive false) are excluded, which stops collection
  * without orphaning answers already stored against their key.
+ *
+ * Returns nothing at all while the master switch is off (its default), leaving
+ * each form with only the coach's own questions.
  */
 async function loadCoreQuestions(): Promise<ProgramQuestion[]> {
+  if (!(await standardQuestionsEnabled())) return []
+
   const rows = await prisma.programCoreQuestion.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
@@ -833,7 +1045,80 @@ export async function getPublicProgram(slug: string) {
       targetMarket: (snap.targetMarket as string) ?? '',
       servicesDescription: (snap.servicesDescription as string) ?? '',
       eventDatesText: (snap.eventDatesText as string) ?? null,
+      showMeetingDetails: snapshotShowsMeeting(snap),
     },
+  }
+}
+
+// Snapshots taken before the switch existed have no key, and those pages were
+// published with their meeting showing - so absent reads as on.
+function snapshotShowsMeeting(snap: PublicSnapshot): boolean {
+  return snap.showMeetingDetails !== false
+}
+
+type JourneySource = {
+  pageTitle: string
+  organization: string
+  showMeetingDetails: boolean
+  coachVideoUrl: string | null
+  ntVideoUrl: string | null
+  ntVideoIntro: string | null
+  zoomUrl: string | null
+  zoomLabel: string | null
+  secondMeetingUrl: string | null
+  secondMeetingLabel: string | null
+  zoomInstructions: string | null
+  eventDatesText: string | null
+  qualificationIntro: string | null
+  extraQuestions: ProgramQuestion[]
+}
+
+/**
+ * Everything the post-signup journey renders, from either the published
+ * snapshot or (for a preview) the live draft. Meeting details are withheld
+ * entirely when the coach has switched them off, not merely hidden in the UI.
+ */
+async function buildJourney(src: JourneySource) {
+  const meeting = src.showMeetingDetails
+    ? {
+        zoomUrl: src.zoomUrl,
+        zoomLabel: src.zoomLabel,
+        secondMeetingUrl: src.secondMeetingUrl,
+        secondMeetingLabel: src.secondMeetingLabel,
+        zoomInstructions: src.zoomInstructions,
+        eventDatesText: src.eventDatesText,
+      }
+    : null
+  return {
+    programName: src.pageTitle,
+    organization: src.organization,
+    coachVideoEmbedUrl: toVideoEmbedUrl(src.coachVideoUrl),
+    ntVideoEmbedUrl: toVideoEmbedUrl(src.ntVideoUrl),
+    ntVideoIntro: src.ntVideoIntro,
+    meeting,
+    qualificationIntro: src.qualificationIntro,
+    baseQuestions: [...(await loadCoreQuestions()), ...src.extraQuestions],
+    familyQuestions: FAMILY_QUESTIONS,
+  }
+}
+
+function journeyFromSnapshot(snap: PublicSnapshot): JourneySource {
+  const str = (k: string) => (snap[k] as string | null | undefined) ?? null
+  return {
+    pageTitle: (str('pageTitle') || str('name')) ?? '',
+    organization: str('organization') ?? '',
+    showMeetingDetails: snapshotShowsMeeting(snap),
+    coachVideoUrl: str('coachVideoUrl'),
+    ntVideoUrl: str('ntVideoUrl'),
+    ntVideoIntro: str('ntVideoIntro'),
+    zoomUrl: str('zoomUrl'),
+    zoomLabel: str('zoomLabel'),
+    secondMeetingUrl: str('secondMeetingUrl'),
+    secondMeetingLabel: str('secondMeetingLabel'),
+    zoomInstructions: str('zoomInstructions'),
+    eventDatesText: str('eventDatesText'),
+    qualificationIntro: str('qualificationIntro'),
+    extraQuestions: (snap.extraQuestions as unknown as ProgramQuestion[]) ?? [],
   }
 }
 
@@ -876,7 +1161,26 @@ export async function getProgramPreview(slug: string) {
       targetMarket: program.targetMarket,
       servicesDescription: program.servicesDescription,
       eventDatesText: program.eventDatesText,
+      showMeetingDetails: program.showMeetingDetails,
     },
+    // The draft journey, so the coach can click through the videos and form
+    // exactly as an applicant would before submitting for review.
+    journey: await buildJourney({
+      pageTitle: program.pageTitle || program.name,
+      organization: program.organization,
+      showMeetingDetails: program.showMeetingDetails,
+      coachVideoUrl: program.coachVideoUrl,
+      ntVideoUrl: program.ntVideoUrl,
+      ntVideoIntro: program.ntVideoIntro,
+      zoomUrl: program.zoomUrl,
+      zoomLabel: program.zoomLabel,
+      secondMeetingUrl: program.secondMeetingUrl,
+      secondMeetingLabel: program.secondMeetingLabel,
+      zoomInstructions: program.zoomInstructions,
+      eventDatesText: program.eventDatesText,
+      qualificationIntro: program.qualificationIntro,
+      extraQuestions: (program.extraQuestions as unknown as ProgramQuestion[]) ?? [],
+    }),
   }
 }
 
@@ -897,6 +1201,13 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
   }
 
   const email = parsed.data.email.trim().toLowerCase()
+  const forChildren = audienceIncludesChildren(parsed.data.audience)
+  // Children are dropped entirely for a SELF signup, so a form that was
+  // switched back to "Myself" cannot leave child data behind.
+  const children: ProgramChild[] = forChildren
+    ? (parsed.data.children ?? []).map((c) => ({ firstName: c.firstName.trim(), ageBand: c.ageBand }))
+    : []
+  const phone = parsed.data.phone?.trim() || null
 
   const existing = await prisma.programLead.findUnique({
     where: { programId_email: { programId: program.id, email } },
@@ -920,6 +1231,15 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
         email,
         profession: parsed.data.profession.trim(),
         token,
+        audience: parsed.data.audience,
+        phone,
+        ...(forChildren
+          ? {
+              children: children as unknown as object,
+              guardianConfirmedAt: new Date(),
+              familyStage: 'NEW' as const,
+            }
+          : {}),
       },
     })
     leadId = lead.id
@@ -968,11 +1288,22 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
           firstName: firstName || fullName,
           lastName: rest.join(' '),
           email,
+          phone,
           jobTitle: parsed.data.profession.trim(),
           source: 'PROGRAM_PAGE',
           status: 'NEW',
           programLeadId: leadId,
-          tags: [program.name],
+          tags: forChildren ? [program.name, 'Parent'] : [program.name],
+          ...(forChildren
+            ? {
+                // A parent enquiring for a child should hear back quickly;
+                // this puts them straight onto the coach's follow-up list.
+                nextFollowUpAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+                notes: `Parent/guardian enquiring for: ${children
+                  .map((c) => `${c.firstName} (${AGE_BAND_LABELS[c.ageBand]})`)
+                  .join(', ')}. Contact the parent only - never the child directly.`,
+              }
+            : {}),
         },
       })
     } catch (error) {
@@ -985,61 +1316,75 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
   return { success: true, token }
 }
 
-export async function getLeadQualificationData(slug: string, token: string) {
-  if (!token || token.length < 10 || token.length > 120) return { error: 'Invalid link' }
-
+/**
+ * A lead by its private token, only while its program is live. Same gate as
+ * loadPublishedProgram, including coachId: an unassigned program must not keep
+ * serving its joining details here after /p/[slug] 404s.
+ */
+async function loadLeadForToken(token: string) {
+  if (!token || token.length < 10 || token.length > 120) return null
   const lead = await prisma.programLead.findUnique({
     where: { token },
     include: { program: true },
   })
-  if (!lead) return { error: 'Invalid link' }
-  if (lead.program.slug !== slug) return { error: 'Invalid link' }
-  // Same gate as loadPublishedProgram, including coachId: an unassigned
-  // program must not keep serving its Zoom link here after /p/[slug] 404s.
   if (
+    !lead ||
     lead.program.status !== 'PUBLISHED' ||
     !lead.program.publishedSnapshot ||
     !lead.program.coachId
   ) {
-    return { error: 'Invalid link' }
+    return null
   }
+  return lead
+}
+
+export async function getLeadQualificationData(slug: string, token: string) {
+  const lead = await loadLeadForToken(token)
+  if (!lead || lead.program.slug !== slug) return { error: 'Invalid link' }
 
   const snap = lead.program.publishedSnapshot as PublicSnapshot
-  const extras = (snap.extraQuestions as unknown as ProgramQuestion[]) ?? []
 
   return {
-    data: {
-      programName: ((snap.pageTitle as string) || (snap.name as string)) ?? '',
-      zoomUrl: (snap.zoomUrl as string) ?? null,
-      zoomLabel: (snap.zoomLabel as string) ?? null,
-      secondMeetingUrl: (snap.secondMeetingUrl as string) ?? null,
-      secondMeetingLabel: (snap.secondMeetingLabel as string) ?? null,
-      zoomInstructions: (snap.zoomInstructions as string) ?? null,
-      eventDatesText: (snap.eventDatesText as string) ?? null,
-      qualificationIntro: (snap.qualificationIntro as string) ?? null,
-      questions: [...(await loadCoreQuestions()), ...extras],
-      leadName: lead.fullName,
-      alreadySubmitted: lead.qualifiedAt !== null,
+    journey: await buildJourney(journeyFromSnapshot(snap)),
+    lead: {
+      firstName: lead.fullName.split(/\s+/)[0] || lead.fullName,
+      audience: lead.audience,
+      children: (lead.children as unknown as ProgramChild[] | null) ?? [],
+      interested: lead.interestedAt !== null,
+      submitted: lead.qualifiedAt !== null,
     },
   }
 }
 
-export async function submitQualification(token: string, answers: unknown) {
-  if (!token || token.length < 10 || token.length > 120) return { error: 'Invalid link' }
-
-  const lead = await prisma.programLead.findUnique({
-    where: { token },
-    include: { program: true },
-  })
+/** Records the "I'm interested" click. Idempotent: the first click stands. */
+export async function markLeadInterested(token: string) {
+  const lead = await loadLeadForToken(token)
   if (!lead) return { error: 'Invalid link' }
-  if (lead.program.status !== 'PUBLISHED' || !lead.program.publishedSnapshot) {
-    return { error: 'Invalid link' }
+
+  if (!lead.interestedAt) {
+    await prisma.programLead.update({
+      where: { id: lead.id },
+      data: { interestedAt: new Date() },
+    })
+    revalidatePath('/coach/business-excellence')
   }
+  return { success: true }
+}
+
+export async function submitQualification(token: string, answers: unknown) {
+  const lead = await loadLeadForToken(token)
+  if (!lead) return { error: 'Invalid link' }
   if (lead.qualifiedAt) return { error: 'You have already completed this form' }
 
   const snap = lead.program.publishedSnapshot as PublicSnapshot
   const extras = (snap.extraQuestions as unknown as ProgramQuestion[]) ?? []
-  const questions = [...(await loadCoreQuestions()), ...extras]
+  // Family questions are asked, and therefore validated, only for a signup
+  // that included children. The lead's stored audience decides, not the client.
+  const questions = [
+    ...(await loadCoreQuestions()),
+    ...extras,
+    ...(audienceIncludesChildren(lead.audience) ? FAMILY_QUESTIONS : []),
+  ]
 
   const rawAnswers = z
     .array(z.object({ questionId: z.string(), value: z.union([z.string(), z.number()]) }))
@@ -1089,7 +1434,13 @@ export async function submitQualification(token: string, answers: unknown) {
   // rather than stored, so a crafted payload cannot inject arbitrary content.
   await prisma.programLead.update({
     where: { id: lead.id },
-    data: { answers: stored as unknown as object, qualifiedAt: new Date() },
+    data: {
+      answers: stored as unknown as object,
+      qualifiedAt: new Date(),
+      // Reaching the form is itself the interested click; this covers a
+      // visitor whose click was lost (closed tab, offline) before the submit.
+      interestedAt: lead.interestedAt ?? new Date(),
+    },
   })
 
   revalidatePath('/coach/business-excellence')

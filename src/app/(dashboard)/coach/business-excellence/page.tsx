@@ -96,7 +96,12 @@ export default async function BusinessExcellencePage() {
       profession: lead.profession,
       registeredAt: lead.registeredAt.toISOString(),
       qualifiedAt: lead.qualifiedAt?.toISOString() || null,
+      interestedAt: lead.interestedAt?.toISOString() || null,
       association: lead.association,
+      audience: lead.audience,
+      children: (lead.children as { firstName: string; ageBand: string }[] | null) ?? [],
+      phone: lead.phone,
+      familyStage: lead.familyStage,
       // The coach is the only route back to a lost joining link: the public
       // form deliberately will not re-issue it, and the app sends no email.
       joiningPath: `/p/${program.slug}/r/${lead.token}`,

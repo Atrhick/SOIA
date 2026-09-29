@@ -30,6 +30,7 @@ import {
   Copy,
   Eye,
   ExternalLink,
+  Film,
   Loader2,
   Megaphone,
   Plus,
@@ -43,7 +44,9 @@ import {
   createProgram,
   deleteProgram,
   rejectProgram,
+  setProgramNtVideo,
 } from '@/lib/actions/program-pages'
+import { toVideoEmbedUrl, VIDEO_LINK_HINT } from '@/lib/video-embed'
 
 interface ProgramRow {
   id: string
@@ -61,6 +64,10 @@ interface ProgramRow {
   coachBio: string | null
   eventDatesText: string | null
   zoomUrl: string | null
+  showMeetingDetails: boolean
+  coachVideoUrl: string | null
+  ntVideoUrl: string | null
+  ntVideoIntro: string | null
   extraQuestionCount: number
 }
 
@@ -82,10 +89,12 @@ export function ProgramsAdminClient({
   programs,
   coaches,
   coreQuestions,
+  standardQuestionsEnabled,
 }: {
   programs: ProgramRow[]
   coaches: CoachOption[]
   coreQuestions: CoreQuestionRow[]
+  standardQuestionsEnabled: boolean
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -100,6 +109,16 @@ export function ProgramsAdminClient({
   const [rejectTarget, setRejectTarget] = useState<ProgramRow | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ProgramRow | null>(null)
+  const [videoTarget, setVideoTarget] = useState<ProgramRow | null>(null)
+  const [ntVideoUrl, setNtVideoUrl] = useState('')
+  const [ntVideoIntro, setNtVideoIntro] = useState('')
+  const ntVideoInvalid = ntVideoUrl.trim() !== '' && toVideoEmbedUrl(ntVideoUrl) === null
+
+  const openVideo = (p: ProgramRow) => {
+    setVideoTarget(p)
+    setNtVideoUrl(p.ntVideoUrl ?? '')
+    setNtVideoIntro(p.ntVideoIntro ?? '')
+  }
 
   const pending = useMemo(() => programs.filter((p) => p.status === 'PENDING_REVIEW'), [programs])
 
@@ -141,11 +160,18 @@ export function ProgramsAdminClient({
       <Tabs defaultValue="programs">
         <TabsList>
           <TabsTrigger value="programs">Programs</TabsTrigger>
-          <TabsTrigger value="questions">Standard questions</TabsTrigger>
+          <TabsTrigger value="questions">
+            Standard questions
+            {!standardQuestionsEnabled && (
+              <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">
+                Off
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="questions">
-          <CoreQuestionsClient questions={coreQuestions} />
+          <CoreQuestionsClient questions={coreQuestions} enabled={standardQuestionsEnabled} />
         </TabsContent>
 
         <TabsContent value="programs" className="space-y-6">
@@ -290,6 +316,16 @@ export function ProgramsAdminClient({
                             Review
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openVideo(p)}
+                          title="Set the NowTransformed and sponsorship video"
+                        >
+                          <Film className="h-4 w-4 mr-1.5" />
+                          NT video
+                          {p.ntVideoUrl && <Check className="h-3.5 w-3.5 ml-1 text-green-600" />}
+                        </Button>
                         {p.status === 'PUBLISHED' && (
                           <Button
                             size="sm"
@@ -389,8 +425,22 @@ export function ProgramsAdminClient({
           <div className="space-y-4 max-h-[50vh] overflow-y-auto text-sm">
             <ReviewField label="About the coach" value={reviewTarget?.coachBio} />
             <ReviewField label="Program description" value={reviewTarget?.programDescription} />
-            <ReviewField label="Event dates" value={reviewTarget?.eventDatesText} />
-            <ReviewField label="Zoom link" value={reviewTarget?.zoomUrl} />
+            <ReviewVideo label="Coach's program video" url={reviewTarget?.coachVideoUrl} />
+            <ReviewVideo
+              label="NowTransformed and sponsorship video"
+              url={reviewTarget?.ntVideoUrl}
+            />
+            <ReviewField label="Text above the NT video" value={reviewTarget?.ntVideoIntro} />
+            {reviewTarget?.showMeetingDetails ? (
+              <>
+                <ReviewField label="Event dates" value={reviewTarget?.eventDatesText} />
+                <ReviewField label="Zoom link" value={reviewTarget?.zoomUrl} />
+              </>
+            ) : (
+              <p className="text-gray-500">
+                Live meeting switched off: the coach&apos;s video replaces it.
+              </p>
+            )}
             <p className="text-gray-500">
               {reviewTarget?.extraQuestionCount ?? 0} coach question
               {reviewTarget?.extraQuestionCount === 1 ? '' : 's'} in addition to the core set.
@@ -482,6 +532,68 @@ export function ProgramsAdminClient({
         </DialogContent>
       </Dialog>
 
+      {/* NowTransformed / sponsorship video */}
+      <Dialog open={videoTarget !== null} onOpenChange={(open) => !open && setVideoTarget(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>NowTransformed video for {videoTarget?.name}</DialogTitle>
+            <DialogDescription>
+              {videoTarget?.isLive
+                ? 'This page is live, so saving updates the public page straight away. The coach’s own unapproved edits are not published.'
+                : 'Saved to the program. It goes live when the page is next approved.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="nt-video-url">Video link</Label>
+              <Input
+                id="nt-video-url"
+                type="url"
+                value={ntVideoUrl}
+                onChange={(e) => setNtVideoUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                aria-invalid={ntVideoInvalid}
+              />
+              <p className={`text-xs mt-1 ${ntVideoInvalid ? 'text-red-600' : 'text-gray-500'}`}>
+                {ntVideoInvalid ? 'This link cannot be embedded. ' : ''}
+                {VIDEO_LINK_HINT} Leave empty to remove the video.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="nt-video-intro">Text above the video (optional)</Label>
+              <Textarea
+                id="nt-video-intro"
+                rows={3}
+                value={ntVideoIntro}
+                onChange={(e) => setNtVideoIntro(e.target.value)}
+                placeholder="The sponsorship opportunities available through this program."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVideoTarget(null)} disabled={isPending}>
+              Cancel
+            </Button>
+            <Button
+              disabled={isPending || ntVideoInvalid}
+              onClick={() =>
+                run(async () => {
+                  const result = await setProgramNtVideo(videoTarget!.id, {
+                    ntVideoUrl,
+                    ntVideoIntro,
+                  })
+                  if (!result?.error) setVideoTarget(null)
+                  return result
+                }, 'NowTransformed video saved')
+              }
+            >
+              {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete */}
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
@@ -516,6 +628,29 @@ export function ProgramsAdminClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function ReviewVideo({ label, url }: { label: string; url?: string | null }) {
+  const embedUrl = toVideoEmbedUrl(url)
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">{label}</p>
+      {embedUrl ? (
+        <div className="relative w-full max-w-md overflow-hidden rounded-md bg-black aspect-video">
+          <iframe
+            src={embedUrl}
+            title={label}
+            className="absolute inset-0 h-full w-full"
+            allow="encrypted-media; fullscreen; picture-in-picture"
+            allowFullScreen
+            loading="lazy"
+          />
+        </div>
+      ) : (
+        <p className="text-gray-400">Not provided - this step is skipped</p>
+      )}
     </div>
   )
 }

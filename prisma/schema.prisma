@@ -2430,6 +2430,25 @@ enum ProgramStatus {
   REJECTED       // admin sent it back with reviewNotes
 }
 
+// Who the visitor is exploring the program for. Nullable on the lead because
+// signups from before this question existed never answered it.
+enum ProgramLeadAudience {
+  SELF
+  CHILDREN
+  BOTH
+}
+
+// Coach-tracked progress on a family lead. Every step is with the parent:
+// the child is never contacted directly from a program page signup.
+enum FamilyFollowUpStage {
+  NEW
+  PARENT_CONTACTED
+  INTRO_CALL_HELD
+  ENROLLING
+  ENROLLED
+  NOT_A_FIT
+}
+
 enum ProgramLeadAssociation {
   UNCLASSIFIED
   AMBASSADOR
@@ -2482,6 +2501,18 @@ model CoachProgram {
   secondMeetingUrl    String?
   secondMeetingLabel  String?
   zoomInstructions    String?       @db.Text
+  // Coach's switch for the joining details and session dates. The coach video
+  // can stand in for the live meeting, so the meeting is optional. Defaults to
+  // on so pages published before the video flow keep showing their link.
+  showMeetingDetails  Boolean       @default(true)
+
+  // Video journey after signup: the coach explains their program, then a
+  // NowTransformed video covers NT and the sponsorship opportunities for this
+  // program. Coach or admin may set the NT video; like everything above it
+  // reaches the public only through publishedSnapshot.
+  coachVideoUrl       String?
+  ntVideoUrl          String?
+  ntVideoIntro        String?       @db.Text
 
   // Page 2 - coach's ADDITIONAL questions. Core questions are code-defined.
   extraQuestions      Json          @default("[]")
@@ -2517,6 +2548,19 @@ model ProgramLead {
   email        String
   profession   String
   registeredAt DateTime               @default(now())
+
+  // Family signups. The adult who signs up is the parent or guardian and the
+  // only contact. Children are kept to first name and age band - no child
+  // email, phone, surname or date of birth - so a lead never holds more about
+  // a minor than the coach needs for a first conversation with the parent.
+  audience            ProgramLeadAudience?
+  children            Json?                 // [{ firstName, ageBand }]
+  guardianConfirmedAt DateTime?
+  phone               String?
+  familyStage         FamilyFollowUpStage?
+
+  // Clicked "I'm interested" after the videos.
+  interestedAt DateTime?
 
   // Page 2
   token        String                 @unique
@@ -2571,6 +2615,22 @@ model ProgramCoreQuestion {
 
   @@index([isActive, sortOrder])
   @@map("program_core_questions")
+}
+
+// Single-row settings for the standard questions as a whole. Absent row or a
+// false flag both mean "off", so the feature stays disabled until an admin
+// deliberately turns it on - which is why the default is false rather than
+// true. Individual questions keep their own isActive; this is the master
+// switch above them.
+model ProgramQuestionSettings {
+  id                       String   @id @default("global")
+  standardQuestionsEnabled Boolean  @default(false)
+
+  updatedBy                String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("program_question_settings")
 }
 
 // ============================================

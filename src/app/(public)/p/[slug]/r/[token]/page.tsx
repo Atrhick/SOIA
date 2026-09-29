@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
 import { getLeadQualificationData } from '@/lib/actions/program-pages'
-import { QualificationClient } from './qualification-client'
+import { JourneyClient } from './journey-client'
 
 export const metadata = {
-  title: 'Your meeting details | NowTransformed',
+  title: 'Your program | NowTransformed',
 }
 
 export default async function ProgramRegistrationPage({
@@ -16,5 +16,5 @@ export default async function ProgramRegistrationPage({
     notFound()
   }
 
-  return <QualificationClient token={params.token} data={result.data} />
+  return <JourneyClient token={params.token} journey={result.journey} lead={result.lead} />
 }

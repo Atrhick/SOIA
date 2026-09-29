@@ -42,13 +42,14 @@ export default async function PublicProgramPage({
         <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
           <p className="font-medium text-amber-900">Preview — not visible to the public</p>
           <p className="text-sm text-amber-800 mt-0.5">
-            {STATUS_LABELS[result.status] ?? result.status}. The signup form is disabled here.
+            {STATUS_LABELS[result.status] ?? result.status}. Continue to click through the
+            videos and questions — nothing is saved.
           </p>
         </div>
         <ProgramLandingClient
           slug={params.slug}
           program={result.program}
-          previewMode
+          previewJourney={result.journey}
         />
       </div>
     )

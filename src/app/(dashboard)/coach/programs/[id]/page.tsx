@@ -26,5 +26,11 @@ export default async function CoachProgramEditorPage({
     notFound()
   }
 
-  return <ProgramEditorClient program={result.program} readOnly={result.readOnly} />
+  return (
+    <ProgramEditorClient
+      program={result.program}
+      readOnly={result.readOnly}
+      standardQuestions={result.standardQuestions}
+    />
+  )
 }

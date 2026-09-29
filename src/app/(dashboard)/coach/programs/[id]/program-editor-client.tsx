@@ -16,7 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toVideoEmbedUrl, VIDEO_LINK_HINT } from '@/lib/video-embed'
 import {
   ArrowLeft,
   Check,
@@ -29,7 +31,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import {
-  CORE_QUESTIONS,
   DEFAULT_LIKERT,
   MAX_EXTRA_QUESTIONS,
   PROGRAM_QUESTION_TYPES,
@@ -67,6 +68,10 @@ interface EditableProgram {
   zoomUrl: string | null
   zoomInstructions: string | null
   qualificationIntro: string | null
+  showMeetingDetails: boolean
+  coachVideoUrl: string | null
+  ntVideoUrl: string | null
+  ntVideoIntro: string | null
   extraQuestions: ProgramQuestion[]
   status: string
   reviewNotes: string | null
@@ -90,9 +95,13 @@ function newQuestionId() {
 export function ProgramEditorClient({
   program,
   readOnly,
+  standardQuestions,
 }: {
   program: EditableProgram
   readOnly: boolean
+  /** Admin-managed questions asked ahead of the coach's own. Empty when an
+   *  admin has switched the standard questions off. */
+  standardQuestions: ProgramQuestion[]
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -120,7 +129,11 @@ export function ProgramEditorClient({
     zoomUrl: program.zoomUrl ?? '',
     zoomInstructions: program.zoomInstructions ?? '',
     qualificationIntro: program.qualificationIntro ?? '',
+    coachVideoUrl: program.coachVideoUrl ?? '',
+    ntVideoUrl: program.ntVideoUrl ?? '',
+    ntVideoIntro: program.ntVideoIntro ?? '',
   })
+  const [showMeetingDetails, setShowMeetingDetails] = useState(program.showMeetingDetails)
   const [questions, setQuestions] = useState<ProgramQuestion[]>(program.extraQuestions)
 
   const meta = STATUS_META[program.status] ?? { label: program.status, variant: 'outline' as const }
@@ -137,7 +150,8 @@ export function ProgramEditorClient({
     })
   }
 
-  const saveContent = () => run(() => updateProgram(program.id, form), 'Changes saved')
+  const saveContent = () =>
+    run(() => updateProgram(program.id, { ...form, showMeetingDetails }), 'Changes saved')
   const saveQuestions = () =>
     run(() => saveExtraQuestions(program.id, questions), 'Questions saved')
 
@@ -269,6 +283,7 @@ export function ProgramEditorClient({
       <Tabs defaultValue="content">
         <TabsList>
           <TabsTrigger value="content">Page content</TabsTrigger>
+          <TabsTrigger value="videos">Videos</TabsTrigger>
           <TabsTrigger value="event">Event &amp; Zoom</TabsTrigger>
           <TabsTrigger value="questions">Questions</TabsTrigger>
           <TabsTrigger value="grant">Grant details</TabsTrigger>
@@ -331,6 +346,51 @@ export function ProgramEditorClient({
           <SaveBar onSave={saveContent} isPending={isPending} />
         </TabsContent>
 
+        {/* ---- Videos ---- */}
+        <TabsContent value="videos" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">What people watch after signing up</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <p className="text-sm text-gray-500">
+                After signing up, visitors watch your video, then the NowTransformed video, and
+                then choose <span className="font-medium text-gray-700">I&apos;m interested</span>{' '}
+                to answer your questions. A step without a video is skipped.
+              </p>
+              <VideoField
+                label="Your program video"
+                htmlFor="coachVideoUrl"
+                hint={`You explaining your program. ${VIDEO_LINK_HINT}`}
+                value={form.coachVideoUrl}
+                onChange={(v) => set('coachVideoUrl', v)}
+              />
+              <div className="pt-4 border-t border-gray-100 space-y-4">
+                <VideoField
+                  label="NowTransformed and sponsorship video"
+                  htmlFor="ntVideoUrl"
+                  hint={`Introduces NowTransformed and the sponsorship opportunities for this program. An administrator may also set this for you. ${VIDEO_LINK_HINT}`}
+                  value={form.ntVideoUrl}
+                  onChange={(v) => set('ntVideoUrl', v)}
+                />
+                <Field
+                  label="Text above the NowTransformed video"
+                  htmlFor="ntVideoIntro"
+                  hint="Optional. A line or two about the sponsorship available for this program."
+                >
+                  <Textarea
+                    id="ntVideoIntro"
+                    rows={3}
+                    value={form.ntVideoIntro}
+                    onChange={(e) => set('ntVideoIntro', e.target.value)}
+                  />
+                </Field>
+              </div>
+            </CardContent>
+          </Card>
+          <SaveBar onSave={saveContent} isPending={isPending} />
+        </TabsContent>
+
         {/* ---- Event & Zoom ---- */}
         <TabsContent value="event" className="space-y-4">
           <Card>
@@ -338,6 +398,22 @@ export function ProgramEditorClient({
               <CardTitle className="text-base">Weekly meeting</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-start justify-between gap-4 rounded-md border border-gray-200 p-3">
+                <div>
+                  <Label htmlFor="showMeetingDetails">Show the live meeting</Label>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {showMeetingDetails
+                      ? 'Your dates and joining link appear on your page.'
+                      : 'Off: your program video takes the place of the live meeting. Dates and links are hidden, and your video is required before you can submit.'}
+                  </p>
+                </div>
+                <Switch
+                  id="showMeetingDetails"
+                  checked={showMeetingDetails}
+                  onCheckedChange={setShowMeetingDetails}
+                />
+              </div>
+              <fieldset disabled={!showMeetingDetails} className="space-y-4 disabled:opacity-60">
               <Field
                 label="Upcoming dates"
                 htmlFor="eventDatesText"
@@ -417,6 +493,7 @@ export function ProgramEditorClient({
                   placeholder="Dial in five minutes early. Passcode 1234."
                 />
               </Field>
+              </fieldset>
             </CardContent>
           </Card>
           <SaveBar onSave={saveContent} isPending={isPending} />
@@ -424,29 +501,33 @@ export function ProgramEditorClient({
 
         {/* ---- Questions ---- */}
         <TabsContent value="questions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Standard questions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500 mb-3">
-                Every program asks these. They cannot be edited or removed, so leads stay comparable
-                across coaches.
-              </p>
-              <ol className="space-y-2 text-sm">
-                {CORE_QUESTIONS.map((q, i) => (
-                  <li key={q.id} className="flex gap-2 text-gray-700">
-                    <span className="text-gray-400 tabular-nums">{i + 1}.</span>
-                    <span>
-                      {q.label}
-                      <span className="text-gray-400"> · {QUESTION_TYPE_LABELS[q.type]}</span>
-                      {q.required && <span className="text-red-500"> *</span>}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </CardContent>
-          </Card>
+          {/* Hidden entirely when an admin has the standard questions switched
+              off - the form then asks only what is below. */}
+          {standardQuestions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Standard questions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-500 mb-3">
+                  Every program asks these. They cannot be edited or removed, so leads stay
+                  comparable across coaches.
+                </p>
+                <ol className="space-y-2 text-sm">
+                  {standardQuestions.map((q, i) => (
+                    <li key={q.id} className="flex gap-2 text-gray-700">
+                      <span className="text-gray-400 tabular-nums">{i + 1}.</span>
+                      <span>
+                        {q.label}
+                        <span className="text-gray-400"> · {QUESTION_TYPE_LABELS[q.type]}</span>
+                        {q.required && <span className="text-red-500"> *</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -616,6 +697,53 @@ function Field({
       {hint && <p className="text-xs text-gray-500 mb-1">{hint}</p>}
       {children}
     </div>
+  )
+}
+
+function VideoField({
+  label,
+  htmlFor,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string
+  htmlFor: string
+  hint: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  const embedUrl = toVideoEmbedUrl(value)
+  const invalid = value.trim() !== '' && embedUrl === null
+
+  return (
+    <Field label={label} htmlFor={htmlFor} hint={hint}>
+      <Input
+        id={htmlFor}
+        type="url"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="https://www.youtube.com/watch?v=..."
+        aria-invalid={invalid}
+      />
+      {invalid && (
+        <p className="text-xs text-red-600 mt-1">
+          This link cannot be played on your page. {VIDEO_LINK_HINT}
+        </p>
+      )}
+      {embedUrl && (
+        <div className="relative mt-3 w-full max-w-md overflow-hidden rounded-md bg-black aspect-video">
+          <iframe
+            src={embedUrl}
+            title={`${label} preview`}
+            className="absolute inset-0 h-full w-full"
+            allow="encrypted-media; fullscreen; picture-in-picture"
+            allowFullScreen
+            loading="lazy"
+          />
+        </div>
+      )}
+    </Field>
   )
 }
 

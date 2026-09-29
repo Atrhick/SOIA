@@ -7,8 +7,26 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AlertBanner } from '@/components/ui/alert-banner'
-import { CalendarDays, Loader2, Users } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { CalendarDays, Loader2, Plus, Trash2, Users } from 'lucide-react'
 import { registerInterest } from '@/lib/actions/program-pages'
+import {
+  AGE_BAND_LABELS,
+  AUDIENCE_LABELS,
+  CHILD_AGE_BANDS,
+  MAX_CHILDREN,
+  PROGRAM_AUDIENCES,
+  audienceIncludesChildren,
+  type ChildAgeBand,
+  type ProgramAudience,
+} from '@/lib/program-question-types'
+import { JourneyClient, type JourneyData } from './r/[token]/journey-client'
 
 interface PublicProgram {
   slug: string
@@ -21,43 +39,81 @@ interface PublicProgram {
   targetMarket: string
   servicesDescription: string
   eventDatesText: string | null
+  showMeetingDetails: boolean
 }
+
+interface ChildRow {
+  firstName: string
+  ageBand: ChildAgeBand | ''
+}
+
+const emptyChild = (): ChildRow => ({ firstName: '', ageBand: '' })
 
 export function ProgramLandingClient({
   slug,
   program,
-  previewMode = false,
+  previewJourney,
 }: {
   slug: string
   program: PublicProgram
-  /** Rendered from draft content for the coach/admin. Signup is disabled so a
-   *  preview never creates a real lead. */
-  previewMode?: boolean
+  /** Present only in preview: the draft journey to click through after
+   *  "Continue", without creating a real lead. */
+  previewJourney?: JourneyData
 }) {
+  const previewMode = previewJourney !== undefined
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [alreadyRegistered, setAlreadyRegistered] = useState(false)
+  const [showPreviewJourney, setShowPreviewJourney] = useState(false)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [profession, setProfession] = useState('')
+  const [audience, setAudience] = useState<ProgramAudience | ''>('')
+  const [children, setChildren] = useState<ChildRow[]>([emptyChild()])
+  const [guardianConfirmed, setGuardianConfirmed] = useState(false)
+  const [phone, setPhone] = useState('')
   // Honeypot: hidden from real users, so anything here means a bot.
   const [website, setWebsite] = useState('')
 
-  const dates = (program.eventDatesText ?? '')
-    .split('\n')
-    .map((d) => d.trim())
-    .filter(Boolean)
+  const forChildren = audienceIncludesChildren(audience)
+
+  const dates = program.showMeetingDetails
+    ? (program.eventDatesText ?? '')
+        .split('\n')
+        .map((d) => d.trim())
+        .filter(Boolean)
+    : []
+
+  const patchChild = (index: number, patch: Partial<ChildRow>) =>
+    setChildren((prev) => prev.map((c, i) => (i === index ? { ...c, ...patch } : c)))
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (previewMode) return
     setError(null)
     setAlreadyRegistered(false)
+
+    if (!audience) {
+      setError('Please tell us who this is for')
+      return
+    }
+
+    if (previewMode) {
+      setShowPreviewJourney(true)
+      window.scrollTo({ top: 0 })
+      return
+    }
+
     startTransition(async () => {
       const result = await registerInterest(
         slug,
-        { fullName, email, profession },
+        {
+          fullName,
+          email,
+          profession,
+          audience,
+          ...(forChildren ? { children, guardianConfirmed, phone } : { phone }),
+        },
         website
       )
       if (result?.error) {
@@ -73,6 +129,32 @@ export function ProgramLandingClient({
       // otherwise retrieve someone else's private joining link.
       setAlreadyRegistered(true)
     })
+  }
+
+  if (previewJourney && showPreviewJourney) {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={() => setShowPreviewJourney(false)}
+          className="text-sm text-primary-600 hover:underline"
+        >
+          Back to the landing page
+        </button>
+        <JourneyClient
+          token={null}
+          journey={previewJourney}
+          lead={{
+            firstName: fullName.split(/\s+/)[0] || 'there',
+            audience: audience || 'SELF',
+            children: children
+              .filter((c) => c.firstName.trim() && c.ageBand)
+              .map((c) => ({ firstName: c.firstName.trim(), ageBand: c.ageBand as ChildAgeBand })),
+            interested: false,
+            submitted: false,
+          }}
+        />
+      </div>
+    )
   }
 
   return (
@@ -134,9 +216,9 @@ export function ProgramLandingClient({
 
       <Card id="signup">
         <CardContent className="pt-6">
-          <h2 className="font-semibold text-gray-900">Get the meeting link</h2>
+          <h2 className="font-semibold text-gray-900">Get started</h2>
           <p className="text-sm text-gray-500 mt-1 mb-4">
-            Tell us who you are and we will take you straight to the joining details.
+            Tell us who you are and we will take you to a short video from your coach.
           </p>
 
           {error && <AlertBanner variant="error" message={error} className="mb-4" />}
@@ -145,14 +227,41 @@ export function ProgramLandingClient({
             <AlertBanner
               variant="info"
               title="You are already registered"
-              message="Open the joining link from when you first signed up — it is still valid. If you no longer have it, contact your coach and they can resend it."
+              message="Open the link from when you first signed up — it is still valid. If you no longer have it, contact your coach and they can resend it."
               className="mb-4"
             />
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <fieldset>
+              <legend className="text-sm font-medium text-gray-900 mb-2">
+                Who are you exploring this program for?
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {PROGRAM_AUDIENCES.map((a) => (
+                  <label
+                    key={a}
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2.5 cursor-pointer text-sm ${
+                      audience === a
+                        ? 'border-primary-500 bg-primary-50 text-primary-900'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="audience"
+                      value={a}
+                      checked={audience === a}
+                      onChange={() => setAudience(a)}
+                    />
+                    {AUDIENCE_LABELS[a]}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             <div>
-              <Label htmlFor="fullName">Full name</Label>
+              <Label htmlFor="fullName">{forChildren ? 'Your full name (parent or guardian)' : 'Full name'}</Label>
               <Input
                 id="fullName"
                 value={fullName}
@@ -184,6 +293,100 @@ export function ProgramLandingClient({
               />
             </div>
 
+            {forChildren && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">About your children</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Just a first name and age range. Everything else goes through you, and we
+                    never contact your child directly.
+                  </p>
+                </div>
+
+                {children.map((child, i) => (
+                  <div key={i} className="flex gap-2 items-end">
+                    <div className="flex-1 min-w-0">
+                      <Label htmlFor={`child-name-${i}`}>First name</Label>
+                      <Input
+                        id={`child-name-${i}`}
+                        value={child.firstName}
+                        onChange={(e) => patchChild(i, { firstName: e.target.value })}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="w-36">
+                      <Label htmlFor={`child-age-${i}`}>Age</Label>
+                      <Select
+                        value={child.ageBand}
+                        onValueChange={(v) => patchChild(i, { ageBand: v as ChildAgeBand })}
+                      >
+                        <SelectTrigger id={`child-age-${i}`}>
+                          <SelectValue placeholder="Choose" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CHILD_AGE_BANDS.map((b) => (
+                            <SelectItem key={b} value={b}>
+                              {AGE_BAND_LABELS[b]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {children.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setChildren((prev) => prev.filter((_, x) => x !== i))}
+                        aria-label={`Remove child ${i + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-gray-400" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+
+                {children.length < MAX_CHILDREN && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setChildren((prev) => [...prev, emptyChild()])}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add another child
+                  </Button>
+                )}
+
+                <div>
+                  <Label htmlFor="phone">Your phone number (optional)</Label>
+                  <p className="text-xs text-gray-500 mb-1">
+                    So your coach can call you to talk it through.
+                  </p>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    autoComplete="tel"
+                  />
+                </div>
+
+                <label className="flex items-start gap-2 cursor-pointer text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={guardianConfirmed}
+                    onChange={(e) => setGuardianConfirmed(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    I am the parent or legal guardian of the children above, and I am happy for
+                    the coach to contact me about the program.
+                  </span>
+                </label>
+              </div>
+            )}
+
             {/* Honeypot - visually hidden and off the tab order. */}
             <div aria-hidden="true" className="absolute left-[-9999px] w-px h-px overflow-hidden">
               <label htmlFor="website-url">Leave this field empty</label>
@@ -198,9 +401,9 @@ export function ProgramLandingClient({
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isPending || previewMode}>
+            <Button type="submit" className="w-full" disabled={isPending}>
               {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {previewMode ? 'Continue (disabled in preview)' : 'Continue'}
+              {previewMode ? 'Continue (preview - nothing is saved)' : 'Continue'}
             </Button>
           </form>
         </CardContent>
