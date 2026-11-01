@@ -121,6 +121,8 @@ export function AlertBanner({
 
   return (
     <div
+      // Errors interrupt screen readers; other variants are announced politely.
+      role={variant === 'error' ? 'alert' : 'status'}
       className={cn(
         'relative rounded-xl border p-4 transition-all duration-200',
         styles.container,

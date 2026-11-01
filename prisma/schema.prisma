@@ -47,8 +47,8 @@ model User {
   messageThreads     MessageThread[] @relation("ThreadParticipants")
   passwordResetTokens PasswordResetToken[]
   associateProfile   AssociateProfile?
-  timeClockEntries   TimeClockEntry[]
   timeEntries        TimeEntry[]
+  timeEntryEdits     TimeEntryChange[] @relation("TimeEntryEditor")
 
   @@index([role, status])
   @@map("users")
@@ -1358,14 +1358,20 @@ enum TaskPriority {
 
 model Project {
   id          String             @id @default(cuid())
-  ownerId     String             // User ID (Coach or Ambassador)
-  ownerType   String             // "COACH" or "AMBASSADOR"
+  ownerId     String             // User ID (creator; an admin for shared projects)
+  ownerType   String             // "COACH", "AMBASSADOR" or "ADMIN"
 
   name        String
   description String?            @db.Text
   status      ProjectStatus      @default(PLANNING)
   startDate   DateTime?
   endDate     DateTime?
+
+  // Shared projects are created by admins and offered to everyone; the rest
+  // are personal and offered only to their owner.
+  isShared    Boolean            @default(false)
+  // Archived projects drop out of pickers but keep their hours in reports.
+  archivedAt  DateTime?
 
   tasks       Task[]
   milestones  ProjectMilestone[]
@@ -1374,6 +1380,7 @@ model Project {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
+  @@index([ownerId])
   @@map("projects")
 }
 
@@ -1406,8 +1413,6 @@ model Task {
   priority    TaskPriority @default(MEDIUM)
   dueDate     DateTime?
   completedAt DateTime?
-
-  timeEntries TimeEntry[]
 
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -1613,59 +1618,53 @@ model MeetingLink {
 }
 
 // ============================================
-// TIME CLOCK & TIME TRACKING
+// TIME TRACKING
 // ============================================
 
-enum ClockEntryType {
-  CLOCK_IN
-  CLOCK_OUT
-  BREAK_START
-  BREAK_END
-}
-
-model TimeClockEntry {
-  id        String         @id @default(cuid())
-  userId    String
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  type      ClockEntryType
-  timestamp DateTime       @default(now())
-  notes     String?
-
-  // Location if mobile clock-in
-  latitude  Float?
-  longitude Float?
-
-  createdAt DateTime       @default(now())
-
-  @@index([userId, timestamp])
-  @@map("time_clock_entries")
-}
-
+// One row per stretch of work. A running timer is a row with no endTime; hours
+// are always endTime - startTime, so nothing is stored that could drift.
 model TimeEntry {
   id          String    @id @default(cuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectId   String?
   project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  taskId      String?
-  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   description String?
   startTime   DateTime
   endTime     DateTime?
-  duration    Int?      // Minutes (calculated)
+  // Typed in after the fact rather than timed.
+  isManual    Boolean   @default(false)
 
-  isBillable  Boolean   @default(false)
+  changes     TimeEntryChange[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([userId, startTime])
-  // A partial unique index enforcing at most one running timer per user is
-  // added by migration 2026_08_19_time_clock_integrity - Prisma cannot express
-  // a WHERE clause on an index, so it lives in raw SQL.
+  @@index([startTime])
+  // At most one running timer per user is enforced by the partial unique index
+  // time_entries_one_running_per_user (migration 2026_08_19_time_clock_integrity);
+  // Prisma cannot express a WHERE clause on an index.
   @@map("time_entries")
+}
+
+// History of edits to an entry. Admins must give a reason; owners may not.
+model TimeEntryChange {
+  id        String    @id @default(cuid())
+  entryId   String
+  entry     TimeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  editorId  String?
+  editor    User?     @relation("TimeEntryEditor", fields: [editorId], references: [id], onDelete: SetNull)
+
+  reason    String?
+  // { field: [before, after] } for each field that changed.
+  diff      Json
+
+  createdAt DateTime  @default(now())
+
+  @@index([entryId])
+  @@map("time_entry_changes")
 }
 
 // ============================================

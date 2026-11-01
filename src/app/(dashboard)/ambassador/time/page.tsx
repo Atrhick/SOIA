@@ -4,8 +4,8 @@ import { Clock } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { isFeatureEnabled } from '@/lib/actions/feature-config'
 import { FeatureDisabled } from '@/components/ui/feature-disabled'
-import { getMyTimeClock } from '@/lib/actions/time-clock'
-import { TimeClockScreen } from '@/components/time/time-clock-screen'
+import { getMyTime } from '@/lib/actions/time'
+import { TimeScreen } from '@/components/time/time-screen'
 import { TimeZoneSync } from '@/components/time/time-zone-sync'
 
 export default async function AmbassadorTimePage() {
@@ -19,28 +19,22 @@ export default async function AmbassadorTimePage() {
     return <FeatureDisabled title="Time Clock" icon={Clock} />
   }
 
-  const result = await getMyTimeClock(cookies().get('tz')?.value)
-  if ('error' in result) {
-    return (
-      <>
-        <TimeZoneSync />
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-          {result.error}
-        </div>
-      </>
-    )
-  }
+  // Set by TimeZoneSync on the first visit; "today" and "this week" depend on it.
+  const result = await getMyTime(cookies().get('tz')?.value)
 
   return (
     <div className="space-y-6">
       <TimeZoneSync />
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Time Clock</h1>
-        <p className="text-gray-600">Track your hours</p>
+        <p className="text-gray-600">Start a timer when you begin, stop it when you&apos;re done.</p>
       </div>
 
-      {/* Ambassadors have no projects to bill against, so no project timer. */}
-      <TimeClockScreen data={result} showProjectTimer={false} />
+      {'error' in result ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{result.error}</div>
+      ) : (
+        <TimeScreen data={result} />
+      )}
     </div>
   )
 }

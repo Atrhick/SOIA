@@ -106,7 +106,7 @@ Session includes: `id`, `email`, `role`, `coachId` (for coaches), `ambassadorId`
 - `PostAttachment` - File attachments linked to posts/replies
 - `MeetingLink` - Meeting URLs (Zoom, Google Meet, Teams)
 - `SharedDocument` - Document sharing with role-based access
-- `TimeClockEntry` / `TimeEntry` - Time tracking (attendance + project-based)
+- `TimeEntry` / `TimeEntryChange` - Time tracking: one row per timed stretch (running = no `endTime`), plus an edit history. Shared projects (`Project.isShared`) are admin-made; coaches can add personal ones. Admin view at `/admin/time`
 - `CalendarEvent` / `EventAttendee` - Scheduling and calendar
 - `KBCategory` / `KBArticle` - Knowledge base with publishing workflow
 

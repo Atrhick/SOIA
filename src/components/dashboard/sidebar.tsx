@@ -232,6 +232,7 @@ const adminNavSections: NavSection[] = [
     icon: Shield,
     items: [
       { href: '/admin/features', label: 'Feature Config', icon: Settings2 },
+      { href: '/admin/time', label: 'Timesheets', icon: Clock },
       { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
       { href: '/admin/audit-logs', label: 'Audit Logs', icon: FileText },
       { href: '/admin/settings', label: 'Settings', icon: Settings },

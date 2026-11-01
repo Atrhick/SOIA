@@ -60,7 +60,7 @@ const FEATURE_INFO: Record<string, { label: string; description: string }> = {
   CRM: { label: 'CRM', description: 'Manage contacts, deals, and sales pipeline' },
   PROJECT_MANAGEMENT: { label: 'Project Management', description: 'Create and track projects and tasks' },
   COLLABORATION: { label: 'Collaboration', description: 'Team discussions and document sharing' },
-  TIME_CLOCK: { label: 'Time Clock', description: 'Clock in/out and time tracking' },
+  TIME_CLOCK: { label: 'Time Clock', description: 'Start/stop timer and timesheets' },
   SCHEDULING: { label: 'Scheduling', description: 'Calendar events and appointments' },
   KNOWLEDGE_BASE: { label: 'Knowledge Base', description: 'Articles and documentation' },
 }

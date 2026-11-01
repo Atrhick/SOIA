@@ -51,7 +51,7 @@ const FEATURE_META: Record<string, {
   },
   TIME_CLOCK: {
     label: 'Time Clock',
-    description: 'Clock in/out and track time on projects',
+    description: 'Start/stop timer, projects and timesheets',
     icon: Clock,
     color: 'bg-orange-500',
   },
