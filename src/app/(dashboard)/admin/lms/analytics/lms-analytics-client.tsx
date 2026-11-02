@@ -347,7 +347,7 @@ export function LMSAnalyticsClient({
       )}
 
       {activeTab === 'courses' && (
-        <div className="bg-white rounded-lg border overflow-hidden">
+        <div className="bg-white rounded-lg border overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -436,7 +436,7 @@ export function LMSAnalyticsClient({
       )}
 
       {activeTab === 'enrollments' && (
-        <div className="bg-white rounded-lg border overflow-hidden">
+        <div className="bg-white rounded-lg border overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>

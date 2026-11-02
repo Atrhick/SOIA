@@ -304,7 +304,7 @@ export function LMSAdminClient({ courses, stats }: LMSAdminClientProps) {
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border overflow-hidden">
+        <div className="bg-white rounded-lg border overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
