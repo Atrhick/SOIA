@@ -183,7 +183,6 @@ export function EntryDialog({
                   groups={projectGroups}
                   onChange={setProject}
                   onCreate={onCreateProject}
-                  className="inline-block"
                 />
               </div>
             </div>
