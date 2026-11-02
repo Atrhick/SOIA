@@ -37,9 +37,11 @@ import {
   Mail,
   UserPlus,
   Handshake,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import { ASSOCIATE_LABELS, isAssociateRole, type AssociateRole } from '@/lib/roles'
+import { useMobileNav } from '@/components/dashboard/mobile-nav'
 
 interface SidebarProps {
   role: 'ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
@@ -337,6 +339,7 @@ function findActiveSectionIndex(sections: NavSection[], pathname: string, basePa
 
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
+  const mobileNav = useMobileNav()
 
   const getHomeLink = () => {
     // Associate roles must be handled before the default, or they inherit
@@ -503,10 +506,35 @@ export function Sidebar({ role }: SidebarProps) {
   )
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-white border-r border-gray-200 sidebar-shadow">
+    <>
+    {/* Phones and tablets: the sidebar is a drawer over a dimmed page. */}
+    {mobileNav.open && (
+      <div
+        className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+        aria-hidden="true"
+        onClick={() => mobileNav.setOpen(false)}
+      />
+    )}
+    <aside
+      id="dashboard-sidebar"
+      className={cn(
+        'fixed left-0 top-0 z-50 h-screen w-64 bg-white border-r border-gray-200 sidebar-shadow transition-[transform,visibility] duration-200 lg:z-40 lg:translate-x-0',
+        // Invisible when closed: hides its shadow at the screen edge and keeps
+        // its links out of the tab order.
+        mobileNav.open ? 'translate-x-0' : '-translate-x-full max-lg:invisible'
+      )}
+    >
       <div className="flex h-full flex-col">
         {/* Logo */}
-        <div className="flex h-16 items-center justify-center border-b border-gray-100 px-4">
+        <div className="relative flex h-16 items-center justify-center border-b border-gray-100 px-4">
+          <button
+            type="button"
+            onClick={() => mobileNav.setOpen(false)}
+            aria-label="Close menu"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
           <Link href={getHomeLink()} className="flex items-center gap-3">
             <div className={cn(
               "w-10 h-10 rounded-xl flex items-center justify-center shadow-sm",
@@ -542,5 +570,6 @@ export function Sidebar({ role }: SidebarProps) {
         </div>
       </div>
     </aside>
+    </>
   )
 }

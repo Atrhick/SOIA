@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
-import { LogOut, User, Users, ChevronDown, ArrowLeftRight, Shield } from 'lucide-react'
+import { LogOut, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu } from 'lucide-react'
+import { useMobileNav } from '@/components/dashboard/mobile-nav'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ interface ImpersonationUser {
 export function Header({ user }: HeaderProps) {
   const { update } = useSession()
   const router = useRouter()
+  const mobileNav = useMobileNav()
   const [users, setUsers] = useState<ImpersonationUser[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
 
@@ -87,13 +89,13 @@ export function Header({ user }: HeaderProps) {
 
   return (
     <>
-      <header className="fixed top-0 left-64 right-0 z-30 bg-white border-b border-gray-200">
+      <header className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 lg:left-64">
         {/* Impersonation Banner */}
         {user.isImpersonating && (
           <div className="bg-amber-500 text-white px-4 py-1.5">
             <div className="flex items-center justify-center gap-3">
-              <Shield className="w-4 h-4" />
-              <span className="text-sm font-medium">
+              <Shield className="w-4 h-4 shrink-0" />
+              <span className="min-w-0 truncate text-sm font-medium">
                 Viewing as: <strong>{user.email}</strong> ({user.role})
               </span>
               <Button
@@ -109,14 +111,24 @@ export function Header({ user }: HeaderProps) {
           </div>
         )}
 
-        <div className="flex h-16 items-center justify-between px-6">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">
+        <div className="flex h-16 items-center justify-between gap-2 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => mobileNav.setOpen(true)}
+              aria-label="Open menu"
+              aria-controls="dashboard-sidebar"
+              aria-expanded={mobileNav.open}
+              className="-ml-2 rounded-md p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <h1 className="truncate text-lg font-semibold text-gray-900">
               Welcome back!
             </h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             {/* Notifications - Only for Admin */}
             {user.role === 'ADMIN' && <NotificationBell />}
 

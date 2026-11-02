@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { Header } from '@/components/dashboard/header'
+import { MobileNavProvider } from '@/components/dashboard/mobile-nav'
 import { prisma } from '@/lib/prisma'
 import { isAssociateRole, type AssociateRole } from '@/lib/roles'
 
@@ -49,6 +50,7 @@ export default async function DashboardLayout({
   }
 
   return (
+    <MobileNavProvider>
     <div className="min-h-screen bg-gray-50">
       <Sidebar role={role} />
       <Header user={{
@@ -58,9 +60,10 @@ export default async function DashboardLayout({
         isImpersonating,
         originalAdminId: session.user.originalAdminId
       }} />
-      <main className={`ml-64 ${isImpersonating ? 'pt-24' : 'pt-16'} p-6`}>
+      <main className={`lg:ml-64 ${isImpersonating ? 'pt-24' : 'pt-16'} px-4 pb-6 sm:px-6`}>
         {children}
       </main>
     </div>
+    </MobileNavProvider>
   )
 }

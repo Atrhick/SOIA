@@ -189,8 +189,9 @@ export function EntryDialog({
             </div>
           )}
 
-          <div className={running ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-3 gap-3'}>
-            <div className="space-y-1.5">
+          {/* On phones the date gets its own row so it is not cut off. */}
+          <div className={running ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-2 gap-3 sm:grid-cols-3'}>
+            <div className={running ? 'space-y-1.5' : 'col-span-2 space-y-1.5 sm:col-span-1'}>
               <Label htmlFor="entry-date">Date</Label>
               <input id="entry-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
             </div>

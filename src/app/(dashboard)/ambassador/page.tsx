@@ -315,7 +315,7 @@ export default async function AmbassadorDashboardPage() {
             <Link href="/ambassador/time" className="quick-action group">
               <Clock className="h-6 w-6 text-gray-400 quick-action-icon mb-2 group-hover:text-amber-600" />
               <span className="text-sm font-medium text-gray-700 group-hover:text-amber-700">
-                Clock In/Out
+                Time Clock
               </span>
             </Link>
             <Link href="/ambassador/collaboration" className="quick-action group">

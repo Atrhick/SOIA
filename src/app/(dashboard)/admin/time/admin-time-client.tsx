@@ -24,6 +24,9 @@ import {
 
 type Editing = { person: TimesheetPerson; entry: EntryView }
 
+// Keeps names in view while the day columns scroll sideways on narrow screens.
+const stickyCol = 'sticky left-0 z-10'
+
 export function AdminTimeClient({ data }: { data: Timesheet }) {
   const router = useRouter()
   const now = useNow(data.asOf)
@@ -163,7 +166,7 @@ export function AdminTimeClient({ data }: { data: Timesheet }) {
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-600">
-                <th className="px-4 py-3 text-left">Person</th>
+                <th className={cn(stickyCol, 'bg-gray-50 px-4 py-3 text-left')}>Person</th>
                 {data.days.map((d) => (
                   <th key={d} className="px-3 py-3 text-right">
                     {formatIn(d, 'EEE', zone)}
@@ -187,7 +190,7 @@ export function AdminTimeClient({ data }: { data: Timesheet }) {
                 return (
                   <Fragment key={person.userId}>
                     <tr className={cn('border-b border-gray-100', flagged && 'bg-amber-50')}>
-                      <td className="px-4 py-3">
+                      <td className={cn(stickyCol, 'px-4 py-3', flagged ? 'bg-amber-50' : 'bg-white')}>
                         <button
                           type="button"
                           aria-expanded={open}
@@ -223,7 +226,9 @@ export function AdminTimeClient({ data }: { data: Timesheet }) {
                     </tr>
                     {open && (
                       <tr className="border-b border-gray-100 bg-gray-50/60">
-                        <td colSpan={9} className="px-4 pb-3 pl-10 pt-1">
+                        <td colSpan={9} className="p-0">
+                          {/* Pinned to the visible width, so a phone does not have to scroll sideways through 860px of entries. */}
+                          <div className="sticky left-0 pb-3 pl-10 pr-4 pt-1 max-sm:w-[calc(100vw-2rem-2px)] sm:max-lg:w-[calc(100vw-3rem-2px)]">
                           {entries.map((e) => (
                             <div key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-gray-200 py-2.5 last:border-0">
                               <span className="w-24 text-[13px] text-gray-600">{formatIn(e.startTime, 'EEE MMM d', zone)}</span>
@@ -244,6 +249,7 @@ export function AdminTimeClient({ data }: { data: Timesheet }) {
                               </Button>
                             </div>
                           ))}
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -254,7 +260,7 @@ export function AdminTimeClient({ data }: { data: Timesheet }) {
             {data.people.length > 0 && (
               <tfoot>
                 <tr className="font-mono text-[13px]">
-                  <td className="px-4 py-3 font-sans font-semibold">All people</td>
+                  <td className={cn(stickyCol, 'bg-white px-4 py-3 font-sans font-semibold')}>All people</td>
                   {dayKeys.map((key) => (
                     <td key={key} className="px-3 py-3 text-right">
                       {formatHM(countedMinutes(weekEntries.filter((e) => dayKey(e.startTime, zone) === key), now))}
