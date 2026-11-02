@@ -46,11 +46,15 @@ export function AdminTimeClient({ data }: { data: Timesheet }) {
   const weekEntries = data.people.flatMap((p) => p.entries.filter(inWeek))
   const weekTotal = countedMinutes(weekEntries, now)
 
+  // The projects this person could pick themselves: ambassadors only see shared ones.
   const projectGroupsFor = (person: TimesheetPerson): ProjectGroup[] => [
     { label: 'NT projects', options: data.projects.filter((p) => p.isShared && !p.archived) },
     {
       label: `${person.name}'s projects`,
-      options: data.projects.filter((p) => !p.isShared && !p.archived && p.ownerId === person.userId),
+      options:
+        person.role === 'COACH'
+          ? data.projects.filter((p) => !p.isShared && !p.archived && p.ownerId === person.userId)
+          : [],
     },
   ]
 
@@ -286,7 +290,7 @@ export function AdminTimeClient({ data }: { data: Timesheet }) {
           onOpenChange={(open) => !open && setEditing(null)}
           entry={editing.entry}
           timeZone={zone}
-          projectGroups={editing.person.role === 'COACH' ? projectGroupsFor(editing.person) : null}
+          projectGroups={projectGroupsFor(editing.person)}
           requireReason
           requireEnd
           title={`Edit entry · ${editing.person.name}`}

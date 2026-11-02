@@ -208,13 +208,13 @@ export async function adminUpdateEntry(input: unknown) {
   if (rangeError) return { error: rangeError }
 
   const result = await prisma.$transaction(async (tx) => {
-    const existing = await tx.timeEntry.findUnique({ where: { id } })
+    const existing = await tx.timeEntry.findUnique({ where: { id }, include: { user: { select: { role: true } } } })
     if (!existing) return { error: 'Entry not found.' }
 
     // The project must be one the person could pick, or the one already on the entry.
     if (projectId && projectId !== existing.projectId) {
       const allowed = await tx.project.findFirst({
-        where: { id: projectId, ...projectsForUser(existing.userId) },
+        where: { id: projectId, ...projectsForUser(existing.userId, existing.user.role) },
         select: { id: true },
       })
       if (!allowed) return { error: 'That project is not available to this person.' }

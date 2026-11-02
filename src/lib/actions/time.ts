@@ -48,11 +48,11 @@ function revalidate() {
   revalidatePath('/admin/time')
 }
 
-/** Only coaches log time against projects; anything else is stored without one. */
+/** Coaches log time to shared or their own projects, ambassadors to shared ones only. */
 async function checkProject(userId: string, role: string, projectId: string | null | undefined) {
-  if (!projectId || role !== 'COACH') return { ok: true as const, projectId: null }
+  if (!projectId) return { ok: true as const, projectId: null }
   const project = await prisma.project.findFirst({
-    where: { id: projectId, ...projectsForUser(userId) },
+    where: { id: projectId, ...projectsForUser(userId, role) },
     select: { id: true },
   })
   if (!project) return { ok: false as const, error: 'That project is not available.' }
@@ -68,7 +68,10 @@ export interface MyTime {
   /** When this was read; the screen's clock starts here so it renders the same on server and client. */
   asOf: string
   readOnly: boolean
+  /** False hides the project picker: an ambassador with no shared projects to pick from. */
   useProjects: boolean
+  /** Only coaches add projects of their own. */
+  canCreateProjects: boolean
   running: EntryView | null
   /** This week and last, newest first. */
   entries: EntryView[]
@@ -83,7 +86,6 @@ export async function getMyTime(timeZone?: string) {
   const zone = resolveZone(timeZone)
   const days = weekDays(zone)
   const lastWeekStart = weekDays(zone, -1)[0]
-  const useProjects = ctx.role === 'COACH'
 
   const [rows, projects] = await Promise.all([
     prisma.timeEntry.findMany({
@@ -91,13 +93,11 @@ export async function getMyTime(timeZone?: string) {
       include: ENTRY_INCLUDE,
       orderBy: { startTime: 'desc' },
     }),
-    useProjects
-      ? prisma.project.findMany({
-          where: projectsForUser(ctx.userId),
-          select: { id: true, name: true, isShared: true },
-          orderBy: { name: 'asc' },
-        })
-      : Promise.resolve([]),
+    prisma.project.findMany({
+      where: projectsForUser(ctx.userId, ctx.role),
+      select: { id: true, name: true, isShared: true },
+      orderBy: { name: 'asc' },
+    }),
   ])
 
   const entries = rows.map(toEntryView)
@@ -105,7 +105,8 @@ export async function getMyTime(timeZone?: string) {
     timeZone: zone,
     asOf: new Date().toISOString(),
     readOnly: ctx.readOnly,
-    useProjects,
+    useProjects: ctx.role === 'COACH' || projects.length > 0,
+    canCreateProjects: ctx.role === 'COACH',
     running: entries.find((e) => !e.endTime) ?? null,
     entries,
     weekStart: days[0].toISOString(),
@@ -299,7 +300,7 @@ export async function createMyProject(name: unknown) {
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid name' }
 
   const existing = await prisma.project.findFirst({
-    where: { ...projectsForUser(ctx.userId), name: { equals: parsed.data, mode: 'insensitive' } },
+    where: { ...projectsForUser(ctx.userId, ctx.role), name: { equals: parsed.data, mode: 'insensitive' } },
     select: { id: true, name: true },
   })
   if (existing) return { success: true, project: existing }

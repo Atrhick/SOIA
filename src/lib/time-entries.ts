@@ -21,8 +21,12 @@ export function toEntryView(e: EntryRow): EntryView {
   }
 }
 
-/** Projects `userId` may log time to: shared ones plus their own, never archived. */
-export function projectsForUser(userId: string): Prisma.ProjectWhereInput {
+/**
+ * Projects `userId` may log time to, never archived: coaches get shared ones
+ * plus their own, ambassadors only the shared ones.
+ */
+export function projectsForUser(userId: string, role: string): Prisma.ProjectWhereInput {
+  if (role !== 'COACH') return { archivedAt: null, isShared: true }
   return { archivedAt: null, OR: [{ isShared: true }, { ownerId: userId }] }
 }
 

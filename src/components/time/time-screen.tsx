@@ -79,6 +79,8 @@ export function TimeScreen({ data }: { data: MyTime }) {
     router.refresh()
     return result.project
   }
+  // Ambassadors pick from the shared projects only.
+  const onCreateProject = data.canCreateProjects ? createProject : undefined
 
   /**
    * Changes to the bar while a timer runs are saved straight onto that entry.
@@ -174,7 +176,7 @@ export function TimeScreen({ data }: { data: MyTime }) {
               setProject(p)
               updateRunning({ project: p })
             }}
-            onCreate={createProject}
+            onCreate={onCreateProject}
             disabled={locked}
           />
         )}
@@ -310,7 +312,7 @@ export function TimeScreen({ data }: { data: MyTime }) {
         entry={editing === 'new' ? null : editing}
         timeZone={zone}
         projectGroups={groups}
-        onCreateProject={createProject}
+        onCreateProject={onCreateProject}
         onSave={async (v: EntryValues) => {
           const result = await saveEntry(v)
           router.refresh()
