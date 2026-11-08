@@ -26,7 +26,8 @@ import { DateOfBirthInput } from '@/components/ui/date-of-birth-input'
 import { AddressInput, type AddressData } from '@/components/ui/address-input'
 import { updateAmbassadorStatus } from '@/lib/actions/ambassadors'
 import { createAmbassadorAccount } from '@/lib/actions/ambassador-auth'
-import { Check, X, Users, Plus, AlertTriangle } from 'lucide-react'
+import { Check, X, Users, Plus, AlertTriangle, Pencil } from 'lucide-react'
+import { EditAmbassadorDialog } from './edit-ambassador-dialog'
 import type { Prisma } from '@prisma/client'
 
 // Mirrors the query in ./page.tsx exactly: only a safe subset of `coach.user`
@@ -101,6 +102,8 @@ function calculateAgeFromDate(dateString: string): number | null {
 
 export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAmbassadorTableProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const editing = ambassadors.find((a) => a.id === editingId) ?? null
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -507,6 +510,14 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAm
 
   return (
     <div className="space-y-4">
+      {editing && (
+        <EditAmbassadorDialog
+          key={editing.id}
+          ambassador={editing}
+          coaches={coaches}
+          onClose={() => setEditingId(null)}
+        />
+      )}
       <div className="flex justify-end">{createButton}</div>
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -561,6 +572,15 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAm
                 </td>
                 <td className="py-4">
                   <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingId(ambassador.id)}
+                      aria-label={`Edit ${ambassador.firstName} ${ambassador.lastName}`}
+                      title="Edit details"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     {ambassador.status === 'PENDING' && (
                       <>
                         <Button
