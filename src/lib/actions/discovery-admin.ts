@@ -7,13 +7,14 @@ import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import type { Session } from 'next-auth'
 import { sendEmail } from '@/lib/email'
-import { GetInvolvedRoleValue, MAX_NO_SHOWS, isGetInvolvedRole, rolesForAge } from '@/lib/get-involved/core'
+import { AgeRangeValue, CALL_MINUTES, GetInvolvedRoleValue, MAX_NO_SHOWS, dayKeyIn, generateSlots, isDayKey, isGetInvolvedRole, pickHost, rolesForAge } from '@/lib/get-involved/core'
 import { validateCallRecord } from '@/lib/get-involved/call-record'
 import { sendAssessmentInviteAfterCall, sendGiveLinkAfterCall, tellInviterRoleChosen } from '@/lib/get-involved/call-outcome'
 import * as mail from '@/lib/get-involved/emails'
 import { afterNotAFitEmails, chooseRole, markNotAFit } from '@/lib/get-involved/journey'
 import { listRoleConfigs } from '@/lib/get-involved/roles'
-import { afterCancelEmails, emailInviter, journeyUrl, setStatus } from '@/lib/get-involved/server'
+import { afterCancelEmails, busyBlocks, eligibleHosts, emailInviter, journeyUrl, setStatus, upcomingCounts } from '@/lib/get-involved/server'
+import { afterStaffMoveEmails, blockedDaysByUser, bookedCallsOnDays, hostsForSlots, lockBookings, notifyWaitingProspects, openSlotsWithBlocks } from '@/lib/get-involved/discovery-slots'
 
 type Result = { success: true } | { error: string }
 
@@ -59,6 +60,7 @@ export async function saveDiscoveryHost(input: z.input<typeof hostSchema>): Prom
     await tx.discoveryHost.upsert({ where: { userId }, create: { userId, ...data }, update: data })
     await tx.auditLog.create({ data: { userId: g.session.user.id, action: 'SAVE_DISCOVERY_HOST', entityType: 'DiscoveryHost', entityId: userId, details: JSON.stringify({ ageRanges: data.ageRanges, active: data.active }) } })
   })
+  await notifyWaitingProspects()
   refresh()
   return { success: true }
 }
@@ -96,6 +98,7 @@ export async function saveAvailability(hostUserId: string, windows: z.input<type
     prisma.discoveryAvailability.deleteMany({ where: { hostId: host.id } }),
     prisma.discoveryAvailability.createMany({ data: sorted.map((w) => ({ ...w, hostId: host.id })) }),
   ])
+  await notifyWaitingProspects()
   refresh()
   return { success: true }
 }
@@ -303,5 +306,125 @@ export async function staffCancelCall(callId: string, input: z.input<typeof staf
   if (!ok) return { error: 'This call was already changed.' }
   await afterCancelEmails(call.prospect, call, { byHost: true, noParent: parsed.data.noParent })
   refresh()
+  return { success: true }
+}
+
+// ---------- blocked dates (a host's day off) ----------
+
+const blockSchema = z.object({
+  day: z.string().refine(isDayKey, 'Pick a date'),
+  note: z.string().trim().max(120).optional().default(''),
+})
+
+type MessageResult = { success: true; message: string } | { error: string }
+
+/** Block off one whole day for a host. No new slots that day; calls already booked stay and are listed. */
+export async function blockDiscoveryDate(hostUserId: string, input: z.input<typeof blockSchema>): Promise<MessageResult> {
+  const g = await requireAdmin()
+  if (!g.session) return { error: g.error }
+  const parsed = blockSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Pick a date' }
+  const host = await prisma.discoveryHost.findUnique({ where: { userId: String(hostUserId ?? '') }, select: { id: true, userId: true, timezone: true } })
+  if (!host) return { error: 'That person is not set up as a host yet.' }
+  const { day, note } = parsed.data
+  const now = new Date()
+  if (day < dayKeyIn(now, host.timezone)) return { error: 'That date has already passed.' }
+  if (day > dayKeyIn(new Date(now.getTime() + 366 * 86400_000), host.timezone)) return { error: 'Pick a date within the next year.' }
+  await prisma.$transaction(async (tx) => {
+    await tx.discoveryBlockedDate.upsert({
+      where: { hostId_day: { hostId: host.id, day } },
+      create: { hostId: host.id, day, note: note || null, createdById: g.session.user.id },
+      update: { note: note || null },
+    })
+    await tx.auditLog.create({ data: { userId: g.session.user.id, action: 'BLOCK_DISCOVERY_DATE', entityType: 'DiscoveryHost', entityId: host.userId, details: JSON.stringify({ day }) } })
+  })
+  const booked = await bookedCallsOnDays(host, [day])
+  refresh()
+  const n = booked.length
+  return { success: true, message: n ? `Blocked. ${n} call${n === 1 ? ' is' : 's are'} still booked that day: move ${n === 1 ? 'it' : 'them'} below.` : 'Blocked. No one can book that day.' }
+}
+
+export async function unblockDiscoveryDate(hostUserId: string, day: string): Promise<Result> {
+  const g = await requireAdmin()
+  if (!g.session) return { error: g.error }
+  if (typeof day !== 'string' || !isDayKey(day)) return { error: 'Pick a date' }
+  const host = await prisma.discoveryHost.findUnique({ where: { userId: String(hostUserId ?? '') }, select: { id: true, userId: true } })
+  if (!host) return { error: 'That person is not set up as a host yet.' }
+  await prisma.$transaction([
+    prisma.discoveryBlockedDate.deleteMany({ where: { hostId: host.id, day } }),
+    prisma.auditLog.create({ data: { userId: g.session.user.id, action: 'UNBLOCK_DISCOVERY_DATE', entityType: 'DiscoveryHost', entityId: host.userId, details: JSON.stringify({ day }) } }),
+  ])
+  await notifyWaitingProspects()
+  refresh()
+  return { success: true }
+}
+
+// ---------- move an upcoming call (staff) ----------
+
+export type MoveSlot = { startsAt: string; hosts: string[] }
+
+/** Times this call can move to: the prospect's own booking rules (age range, hours, blocked days, 12 h notice). */
+export async function slotsForMove(callId: string): Promise<{ slots: MoveSlot[] } | { error: string }> {
+  const g = await requireAdmin()
+  if (!g.session) return { error: g.error }
+  const call = await prisma.discoveryCall.findUnique({ where: { id: String(callId ?? '') }, select: { id: true, status: true, startsAt: true, prospect: { select: { ageRange: true } } } })
+  const now = new Date()
+  if (!call || call.status !== 'BOOKED' || call.startsAt <= now) return { error: 'Only upcoming booked calls can be moved.' }
+  const { slots, hosts } = await openSlotsWithBlocks(call.prospect.ageRange as AgeRangeValue | null, now, call.id)
+  const names = new Map(hosts.map((h) => [h.userId, h.displayName]))
+  return {
+    slots: slots
+      .filter((s) => s.startsAt.getTime() !== call.startsAt.getTime())
+      .slice(0, 400)
+      .map((s) => ({ startsAt: s.startsAt.toISOString(), hosts: s.hostIds.map((id) => names.get(id) ?? 'Host') })),
+  }
+}
+
+const moveSchema = z.object({ startsAt: z.string().datetime() })
+
+/**
+ * Move an upcoming call to another open slot. Same checks as the prospect's own move in
+ * bookDiscoveryCall (advisory lock, slot still open, keep the host when free) and the same emails.
+ */
+export async function moveDiscoveryCall(callId: string, input: z.input<typeof moveSchema>): Promise<Result> {
+  const g = await requireAdmin()
+  if (!g.session) return { error: g.error }
+  const parsed = moveSchema.safeParse(input)
+  if (!parsed.success) return { error: 'Pick a new time.' }
+  const call = await prisma.discoveryCall.findUnique({ where: { id: String(callId ?? '') }, include: { prospect: true } })
+  const now = new Date()
+  if (!call || call.status !== 'BOOKED' || call.startsAt <= now) return { error: 'Only upcoming booked calls can be moved.' }
+  const startsAt = new Date(parsed.data.startsAt)
+  if (startsAt.getTime() === call.startsAt.getTime()) return { error: 'That is the current time. Pick a different one.' }
+  const hosts = await eligibleHosts(call.prospect.ageRange as AgeRangeValue | null)
+  if (hosts.length === 0) return { error: 'No active host covers this age range.' }
+  const old = { startsAt: call.startsAt, hostId: call.hostId }
+  let moved: { startsAt: Date; hostId: string | null; meetingUrl: string | null; timezone: string }
+  try {
+    moved = await prisma.$transaction(async (tx) => {
+      await lockBookings(tx)
+      const cur = await tx.discoveryCall.findUnique({ where: { id: call.id }, select: { status: true, startsAt: true } })
+      if (!cur || cur.status !== 'BOOKED' || cur.startsAt.getTime() !== call.startsAt.getTime()) throw new Error('CHANGED')
+      const [busy, blocked] = await Promise.all([busyBlocks(hosts.map((h) => h.userId), now, call.id, tx), blockedDaysByUser(hosts, now, tx)])
+      const slot = generateSlots(hostsForSlots(hosts, blocked), busy, now).find((s) => s.startsAt.getTime() === startsAt.getTime())
+      if (!slot) throw new Error('SLOT_TAKEN')
+      const hostId = call.hostId && slot.hostIds.includes(call.hostId) ? call.hostId : pickHost(slot.hostIds, await upcomingCounts(slot.hostIds, now))
+      const host = hosts.find((h) => h.userId === hostId)!
+      const c = await tx.discoveryCall.update({
+        where: { id: call.id },
+        data: { hostId, startsAt, endsAt: new Date(startsAt.getTime() + CALL_MINUTES * 60_000), meetingUrl: host.meetingUrl, reminder24hSentAt: null, reminder1hSentAt: null, rescheduleCount: { increment: 1 } },
+      })
+      await tx.auditLog.create({ data: { userId: g.session.user.id, action: 'MOVE_DISCOVERY_CALL', entityType: 'DiscoveryCall', entityId: call.id, details: JSON.stringify({ from: old.startsAt.toISOString(), to: startsAt.toISOString(), hostId }) } })
+      return c
+    })
+  } catch (e) {
+    if (e instanceof Error && e.message === 'SLOT_TAKEN') return { error: 'That time is no longer open. Pick another.' }
+    if (e instanceof Error && e.message === 'CHANGED') return { error: 'This call just changed. Reload the page.' }
+    console.error('[GET-INVOLVED] staff move failed', e)
+    return { error: 'Something went wrong. Please try again.' }
+  }
+  await afterStaffMoveEmails(call.prospect, moved, old)
+  refresh()
+  revalidatePath(`/admin/discovery-calls/${call.id}`)
   return { success: true }
 }

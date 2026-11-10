@@ -33,6 +33,7 @@ export default async function DiscoveryCallsPage({ searchParams }: { searchParam
     email: c.prospect.email,
     phone: c.prospect.phone,
     age: ageRangeLabel(c.prospect.ageRange),
+    ageRange: c.prospect.ageRange,
     minor: c.prospect.ageRange === 'UNDER_18',
     parent: c.prospect.parentName ? `${c.prospect.parentName} · ${c.prospect.parentEmail ?? ''}` : null,
     inviter: c.prospect.invitedById ? names.get(c.prospect.invitedById) ?? null : null,

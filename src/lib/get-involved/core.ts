@@ -40,6 +40,27 @@ export interface HostForSlots {
   id: string // user id
   timezone: string
   availability: HostWindow[]
+  /** Whole days off, as yyyy-mm-dd in the host's own timezone (DiscoveryBlockedDate.day). No slots on these days. */
+  blockedDays?: readonly string[]
+}
+
+/** yyyy-mm-dd for a calendar date given its year, 0-based month and day. */
+export function dayKey(y: number, monthIndex: number, d: number): string {
+  return `${y}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+/** True for a real calendar date written yyyy-mm-dd. */
+export function isDayKey(v: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
+  if (!m) return false
+  const dt = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]))
+  return dt.getUTCFullYear() === +m[1] && dt.getUTCMonth() === +m[2] - 1 && dt.getUTCDate() === +m[3]
+}
+
+/** The yyyy-mm-dd an instant falls on in a timezone (the host's "day" for blocked dates). */
+export function dayKeyIn(d: Date, tz: string): string {
+  const z = new TZDate(d.getTime(), tz)
+  return dayKey(z.getFullYear(), z.getMonth(), z.getDate())
 }
 
 export interface BusyBlock {
@@ -56,8 +77,8 @@ export interface Slot {
 /**
  * All open 30-minute slots across the given hosts. A slot is open for a host
  * when it falls inside one of their weekly windows (in their own timezone),
- * is at least MIN_NOTICE_HOURS away, within the booking window, and does not
- * overlap a busy block for that host.
+ * is at least MIN_NOTICE_HOURS away, within the booking window, not on one of the
+ * host's blocked days, and does not overlap a busy block for that host.
  */
 export function generateSlots(
   hosts: HostForSlots[],
@@ -73,9 +94,11 @@ export function generateSlots(
 
   for (const host of hosts) {
     const hostBusy = busy.filter((b) => b.hostId === host.id)
+    const blocked = new Set(host.blockedDays ?? [])
     const today = new TZDate(now.getTime(), host.timezone)
     for (let d = 0; d <= days; d++) {
       const day = new TZDate(today.getFullYear(), today.getMonth(), today.getDate() + d, 0, 0, 0, host.timezone)
+      if (blocked.has(dayKey(day.getFullYear(), day.getMonth(), day.getDate()))) continue
       const dow = day.getDay()
       for (const w of host.availability) {
         if (w.dayOfWeek !== dow) continue

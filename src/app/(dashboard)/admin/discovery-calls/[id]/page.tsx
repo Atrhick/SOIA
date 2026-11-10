@@ -9,6 +9,7 @@ import { journeyStateFor } from '@/lib/get-involved/journey'
 import { listRoleConfigs } from '@/lib/get-involved/roles'
 import { userDisplayName } from '@/lib/get-involved/server'
 import { CallRecordClient, CallRecordData } from './call-record-client'
+import { MoveCall } from '../move-call'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,6 +85,12 @@ export default async function CallRecordPage({ params }: { params: { id: string 
           <li aria-current="page" className="font-semibold text-gray-900">{data.prospect.name}</li>
         </ol>
       </nav>
+      {call.status === 'BOOKED' && call.startsAt > new Date() && (
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4">
+          <p className="text-sm text-gray-700 pt-1.5">Need a different time? Move the call instead of cancelling it. Everyone gets the usual &quot;call moved&quot; email.</p>
+          <MoveCall callId={call.id} name={data.prospect.name} />
+        </div>
+      )}
       <CallRecordClient data={data} now={new Date().toISOString()} />
     </div>
   )

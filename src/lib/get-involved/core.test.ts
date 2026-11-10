@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   generateSlots, pickHost, computeStreak, rankLeaderboard, linkStillValid,
-  canProspectChange, slugifyName, businessDay, formatCallTime, journeyOpen,
+  canProspectChange, slugifyName, businessDay, formatCallTime, journeyOpen, dayKey, dayKeyIn, isDayKey,
 } from './core'
 import {
   DEFAULT_ROLE_CONFIGS, GET_INVOLVED_ROLES, JourneyFacts, canAcceptTerms, canAnswerAssessment, canChooseRole, canCreateLogin,
@@ -43,6 +43,37 @@ describe('generateSlots', () => {
     const slots = generateSlots([lina, eliz], [], NOW, { days: 7 })
     expect(slots[0]).toEqual({ startsAt: new Date('2026-11-12T20:00:00Z'), hostIds: ['eliz', 'lina'] })
     expect(slots[1].hostIds).toEqual(['lina'])
+  })
+
+  it('skips a host\'s blocked days (in the host timezone) but keeps other hosts and other weeks', () => {
+    const blocked = { ...lina, blockedDays: ['2026-11-12'] }
+    expect(generateSlots([blocked], [], NOW, { days: 7 })).toEqual([])
+    expect(generateSlots([blocked], [], NOW, { days: 10 }).map((s) => s.startsAt.toISOString())).toEqual([])
+    expect(generateSlots([blocked], [], NOW, { days: 14 }).map((s) => s.startsAt.toISOString())).toEqual([
+      '2026-11-19T20:00:00.000Z', '2026-11-19T20:30:00.000Z',
+    ])
+    const eliz = { id: 'eliz', timezone: 'America/New_York', availability: [{ dayOfWeek: 4, startMinute: 15 * 60, endMinute: 15 * 60 + 30 }] }
+    expect(generateSlots([blocked, eliz], [], NOW, { days: 7 })).toEqual([{ startsAt: new Date('2026-11-12T20:00:00Z'), hostIds: ['eliz'] }])
+  })
+
+  it('reads the blocked day in the host timezone, not UTC', () => {
+    // Thu 7:00-7:30 PM Central is already Friday in UTC; blocking Thursday must hide it.
+    const late = { id: 'late', timezone: CT, availability: [{ dayOfWeek: 4, startMinute: 19 * 60, endMinute: 19 * 60 + 30 }] }
+    expect(generateSlots([late], [], NOW, { days: 7 }).map((s) => s.startsAt.toISOString())).toEqual(['2026-11-13T01:00:00.000Z'])
+    expect(generateSlots([{ ...late, blockedDays: ['2026-11-13'] }], [], NOW, { days: 7 })).toHaveLength(1)
+    expect(generateSlots([{ ...late, blockedDays: ['2026-11-12'] }], [], NOW, { days: 7 })).toEqual([])
+  })
+})
+
+describe('day keys', () => {
+  it('validates real yyyy-mm-dd dates', () => {
+    expect(isDayKey('2026-11-12')).toBe(true)
+    expect(isDayKey('2026-02-30')).toBe(false)
+    expect(isDayKey('2026-1-2')).toBe(false)
+    expect(isDayKey('x')).toBe(false)
+    expect(dayKey(2026, 0, 5)).toBe('2026-01-05')
+    expect(dayKeyIn(new Date('2026-11-13T01:00:00Z'), CT)).toBe('2026-11-12')
+    expect(dayKeyIn(new Date('2026-11-13T01:00:00Z'), 'UTC')).toBe('2026-11-13')
   })
 })
 

@@ -2175,6 +2175,7 @@ model Prospect {
   parentConsentDeclinedAt DateTime?
   noShowCount           Int                 @default(0)
   discoveryCalls        DiscoveryCall[]
+  discoverySlotRequests DiscoverySlotRequest[]
 
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
@@ -2230,6 +2231,7 @@ model DiscoveryHost {
   meetingUrl   String?
   timezone     String                  @default("America/Chicago")
   availability DiscoveryAvailability[]
+  blockedDates DiscoveryBlockedDate[]
   createdAt    DateTime                @default(now())
   updatedAt    DateTime                @updatedAt
 
@@ -2247,6 +2249,36 @@ model DiscoveryAvailability {
 
   @@index([hostId])
   @@map("discovery_availability")
+}
+
+// A whole day a host is away. `day` is yyyy-mm-dd in the host's own timezone; no slots are offered that day.
+// Calls already booked that day are NOT moved automatically: the Availability page lists them for staff.
+model DiscoveryBlockedDate {
+  id          String        @id @default(cuid())
+  hostId      String
+  host        DiscoveryHost @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  day         String
+  note        String?
+  createdById String?
+  createdAt   DateTime      @default(now())
+
+  @@unique([hostId, day])
+  @@map("discovery_blocked_dates")
+}
+
+// "No open times" on the booking page: the prospect asked to be emailed when times open (NOTIFY)
+// or for someone to reach out (REACH_OUT). handledAt = NOTIFY email sent.
+model DiscoverySlotRequest {
+  id         String    @id @default(cuid())
+  prospectId String
+  prospect   Prospect  @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  kind       String    // NOTIFY | REACH_OUT
+  createdAt  DateTime  @default(now())
+  handledAt  DateTime?
+
+  @@index([prospectId])
+  @@index([kind, handledAt])
+  @@map("discovery_slot_requests")
 }
 
 model DiscoveryCall {
