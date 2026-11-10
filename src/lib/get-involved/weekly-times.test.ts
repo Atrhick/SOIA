@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { copyDay, nextBlock, preset, sameWindows, weeklySlots, windowErrors } from './weekly-times'
+import { copyDay, daysSummary, nextBlock, preset, sameWindows, weekSummary, weeklySlots, windowErrors } from './weekly-times'
 
 const w = (d: number, s: number, e: number) => ({ dayOfWeek: d, startMinute: s * 60, endMinute: e * 60 })
 
@@ -30,5 +30,14 @@ describe('weekly times', () => {
     expect(weeklySlots([w(1, 9, 12), w(1, 11, 13)])).toBe(8)
     expect(sameWindows([w(1, 9, 12), w(2, 9, 12)], [w(2, 9, 12), w(1, 9, 12)])).toBe(true)
     expect(sameWindows([w(1, 9, 12)], [w(1, 9, 13)])).toBe(false)
+  })
+  it('summarises the week for the host list', () => {
+    expect(daysSummary(preset([1, 2, 3, 4, 5], 540, 1020))).toBe('Mon–Fri')
+    expect(daysSummary(preset([1, 3, 5], 540, 600))).toBe('Mon, Wed, Fri')
+    expect(daysSummary(preset([1, 2, 6, 0], 540, 600))).toBe('Mon, Tue, Sat, Sun')
+    expect(daysSummary(preset([1, 2, 3, 5, 6, 0], 540, 600))).toBe('Mon–Wed, Fri–Sun')
+    expect(weekSummary(preset([1, 2, 3, 4, 5], 540, 1020))).toBe('Mon–Fri · 40 h a week')
+    expect(weekSummary([w(2, 9, 10.5)])).toBe('Tue · 1.5 h a week')
+    expect(weekSummary([])).toBeNull()
   })
 })

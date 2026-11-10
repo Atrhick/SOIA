@@ -70,3 +70,24 @@ export function sameWindows(a: Win[], b: Win[]): boolean {
   const f = (l: Win[]) => [...l].sort(sortKey).map((w) => `${w.dayOfWeek}:${w.startMinute}-${w.endMinute}`).join()
   return f(a) === f(b)
 }
+
+const SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Which days have times, Monday first, runs joined: "Mon–Fri", "Mon, Wed, Fri", "Mon–Wed, Sat–Sun". */
+export function daysSummary(list: Win[]): string {
+  const on = WEEK_ORDER.filter((d) => list.some((w) => w.dayOfWeek === d))
+  const runs: number[][] = []
+  for (const d of on) {
+    const last = runs[runs.length - 1]
+    if (last && WEEK_ORDER.indexOf(d) === WEEK_ORDER.indexOf(last[last.length - 1]) + 1) last.push(d)
+    else runs.push([d])
+  }
+  return runs.map((r) => (r.length >= 3 ? `${SHORT[r[0]]}–${SHORT[r[r.length - 1]]}` : r.map((d) => SHORT[d]).join(', '))).join(', ')
+}
+
+/** One line for a host list: "Mon–Fri · 40 h a week", or null with no times. */
+export function weekSummary(list: Win[]): string | null {
+  if (!list.length) return null
+  const h = weeklySlots(list) / 2
+  return `${daysSummary(list)} · ${Number.isInteger(h) ? h : h.toFixed(1)} h a week`
+}
