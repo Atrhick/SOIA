@@ -159,6 +159,8 @@ model Ambassador {
 
   coachId          String
   coach            CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  // Program pages this ambassador owns (CoachProgram.ambassadorId).
+  programs         CoachProgram[]
 
   // Basic Info
   firstName        String
@@ -2160,6 +2162,9 @@ model Prospect {
   contactConsentAt      DateTime?
   invitedById           String?
   invitedBy             User?               @relation("ProspectInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  // The inviter's program page whose share link they used (picks the welcome email). Optional.
+  programId             String?
+  program               CoachProgram?       @relation(fields: [programId], references: [id], onDelete: SetNull)
   inviteSource          ProspectSource?
   inviterNote           String?             @db.Text
   journeyToken          String?             @unique
@@ -2213,6 +2218,7 @@ model Prospect {
   @@index([status])
   @@index([assessmentSurveyId])
   @@index([invitedById, createdAt])
+  @@index([programId])
   @@map("prospects")
 }
 
@@ -2659,9 +2665,11 @@ model CoachProgram {
   id                  String        @id @default(cuid())
   slug                String        @unique
 
-  // Owner. Null only until an admin assigns it.
+  // Owner: a coach OR an ambassador (at most one is set). Both null only until an admin assigns it.
   coachId             String?
   coach               CoachProfile? @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  ambassadorId        String?
+  ambassador          Ambassador?   @relation(fields: [ambassadorId], references: [id], onDelete: SetNull)
   assignedAt          DateTime?
   assignedBy          String?
 
@@ -2725,11 +2733,22 @@ model CoachProgram {
   reviewedBy          String?
   reviewNotes         String?       @db.Text
 
+  // Get Involved welcome email: the paragraph about this program. Drafted by AI or written by the owner;
+  // emails use it only once approved (welcomeNoteApprovedAt set). Editing it clears the approval.
+  welcomeNote           String?     @db.Text
+  welcomeNoteSource     String?     // AI | MANUAL
+  welcomeNoteDraftedAt  DateTime?
+  welcomeNoteApprovedAt DateTime?
+  welcomeNoteApprovedBy String?
+  // Get Involved prospects who came in through this program's share link.
+  prospects           Prospect[]
+
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
   leads               ProgramLead[]
 
+  @@index([ambassadorId])
   @@index([coachId])
   @@index([status])
   @@map("coach_programs")
