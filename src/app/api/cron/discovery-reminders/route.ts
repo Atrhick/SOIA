@@ -3,7 +3,8 @@
  * Meant to be hit every 15 minutes by Cloud Scheduler with the header
  * `x-cron-secret: $CRON_SECRET`. Safe to run often or twice at once: each
  * reminder is claimed with a conditional update before it is sent.
- * Also deletes under-18 sign-ups whose parent never answered within 14 days.
+ * Also deletes under-18 sign-ups whose parent never answered within 14 days, and sends the
+ * journey reminders (assessment after 2 days; orientation at the time the prospect picked).
  */
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
@@ -12,6 +13,7 @@ import { sendEmail } from '@/lib/email'
 import * as mail from '@/lib/get-involved/emails'
 import { LINK_VALID_DAYS } from '@/lib/get-involved/core'
 import { journeyUrl, userDisplayName } from '@/lib/get-involved/server'
+import { runJourneyReminders } from '@/lib/get-involved/journey-steps'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,7 +74,9 @@ export async function POST(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
     const sent = await run()
-    return NextResponse.json({ ok: true, sent, deleted: await sweepUnansweredConsent() })
+    const deleted = await sweepUnansweredConsent()
+    const journey = await runJourneyReminders()
+    return NextResponse.json({ ok: true, sent, deleted, journey })
   } catch (e) {
     console.error('[CRON] discovery reminders failed', e)
     return NextResponse.json({ ok: false }, { status: 500 })

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
-import { AgeRangeValue, canProspectChange, journeyOpen } from '@/lib/get-involved/core'
+import { redirect } from 'next/navigation'
+import { AgeRangeValue, canProspectChange, journeyOpen, journeyPosition, stagePath } from '@/lib/get-involved/core'
 import { journeyUsable, openSlotsFor, prospectByJourneyToken } from '@/lib/get-involved/server'
+import { journeyStateFor } from '@/lib/get-involved/journey'
 import { DiscoveryClient, DiscoveryView } from './discovery-client'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +16,13 @@ export default async function DiscoveryPage({ params }: { params: { token: strin
   if (!p) view = { kind: 'expired' }
   else if (p.ageRange === 'UNDER_18' && !p.parentConsentAt) view = { kind: 'message', title: 'Waiting on your parent', body: "We've emailed your parent or guardian. Once they give consent, you'll be able to book your call here." }
   else if (p.status === 'PAUSED' || p.status === 'NOT_A_FIT') view = { kind: 'message', title: 'Please get in touch', body: 'To book a new call, please reach out to the person who invited you, or reply to any of our emails.' }
-  else if (!journeyOpen(p.status)) view = { kind: 'message', title: 'Your call is done', body: "Thanks for talking with us. We'll email you about your next step." }
+  else if (!journeyOpen(p.status)) {
+    // After the call: once a role is chosen, send them on to their next step.
+    const { facts } = await journeyStateFor(p)
+    const next = p.journeyToken ? stagePath(journeyPosition(facts).stage, p.journeyToken) : null
+    if (next && !next.startsWith('/discovery/')) redirect(next)
+    view = { kind: 'message', title: 'Your call is done', body: "Thanks for talking with us. We'll email you about your next step." }
+  }
   else if (!journeyUsable(p, now)) view = { kind: 'expired' }
   else {
     const call = p.discoveryCalls[0] ?? null
