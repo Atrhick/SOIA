@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { inviterDashboard } from '@/lib/get-involved/queries'
+import { withJourneyStages } from '@/lib/get-involved/leaderboard-extra'
 import { userDisplayName } from '@/lib/get-involved/server'
 import { OneADayClient } from '@/components/get-involved/one-a-day-client'
 
@@ -9,7 +10,8 @@ export const dynamic = 'force-dynamic'
 export default async function OneADayPage() {
   const session = await auth()
   if (!session || session.user.role !== 'AMBASSADOR') redirect('/login')
-  const [data, name] = await Promise.all([inviterDashboard(session.user.id, 'AMBASSADOR'), userDisplayName(session.user.id)])
+  const [base, name] = await Promise.all([inviterDashboard(session.user.id, 'AMBASSADOR'), userDisplayName(session.user.id)])
+  const data = await withJourneyStages(session.user.id, base)
   return (
     <div className="space-y-6">
       <div>

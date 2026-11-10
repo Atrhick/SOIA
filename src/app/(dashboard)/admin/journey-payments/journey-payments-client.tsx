@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
@@ -19,10 +19,12 @@ export function JourneyPaymentsClient({ rows }: { rows: PaymentRow[] }) {
   const waiting = rows.filter((r) => r.status === 'PENDING' || r.status === 'PROCESSING')
   const recent = rows.filter((r) => r.status !== 'PENDING' && r.status !== 'PROCESSING').reverse()
   const [done, setDone] = useState<string | null>(null)
+  const doneRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { if (done) doneRef.current?.focus() }, [done])
   return (
     <div className="space-y-6">
       <div role="status" aria-live="polite">
-        {done && <p className="text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg px-3 py-2">{done}</p>}
+        {done && <p ref={doneRef} tabIndex={-1} className="text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600">{done}</p>}
       </div>
       <section className={`bg-white border rounded-xl p-5 ${waiting.length ? 'border-orange-300' : 'border-gray-200'}`}>
         <h2 className="font-bold text-gray-900">Waiting for payment ({waiting.length})</h2>
@@ -59,12 +61,27 @@ function WaitingCard({ r, onDone }: { r: PaymentRow; onDone: (msg: string) => vo
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const ref = `ref-${r.prospectId}`
+  const panelId = `mark-paid-${r.prospectId}`
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  // Where focus goes after the panel changes: into the reference field on open, back to the toggle on close.
+  const focusNext = useRef<'input' | 'toggle' | null>(null)
+
+  useEffect(() => {
+    if (focusNext.current === 'input' && open) inputRef.current?.focus()
+    else if (focusNext.current === 'toggle' && !open) toggleRef.current?.focus()
+    focusNext.current = null
+  }, [open])
+
+  function openPanel() { focusNext.current = 'input'; setErr(null); setOpen(true) }
+  function close() { focusNext.current = 'toggle'; setOpen(false) }
 
   async function confirm() {
     setBusy(true); setErr(null)
     try {
       const res = await markJourneyPaymentReceived({ prospectId: r.prospectId, reference })
       if ('error' in res) setErr(res.error)
+      // This card leaves the waiting list on refresh, so the parent moves focus to the status message.
       else { onDone(res.message); setOpen(false); router.refresh() }
     } catch { setErr('Something went wrong. Please try again.') }
     setBusy(false)
@@ -83,16 +100,16 @@ function WaitingCard({ r, onDone }: { r: PaymentRow; onDone: (msg: string) => vo
         </div>
         <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${BADGE[r.status]}`}>{LABEL[r.status]}</span>
       </div>
-      {!open ? (
-        <button type="button" onClick={() => { setOpen(true); setErr(null) }} aria-expanded={false}
-          className="h-10 px-4 rounded-lg bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2">
-          Mark payment received
-        </button>
-      ) : (
-        <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-3">
+      {/* One toggle that stays mounted, so focus has somewhere to return to and aria-expanded is real. */}
+      <button ref={toggleRef} type="button" onClick={() => (open ? close() : openPanel())} aria-expanded={open} aria-controls={panelId} disabled={busy}
+        className={`h-10 px-4 rounded-lg text-sm font-semibold disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2 ${open ? 'border border-gray-300 bg-white text-gray-800' : 'bg-primary-700 hover:bg-primary-800 text-white'}`}>
+        Mark payment received
+      </button>
+      {open && (
+        <div id={panelId} onKeyDown={(e) => { if (e.key === 'Escape' && !busy) { e.preventDefault(); close() } }} className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-3">
           <div>
             <label htmlFor={ref} className="block text-sm font-semibold text-gray-700 mb-1">Reference (optional)</label>
-            <input id={ref} value={reference} onChange={(e) => setReference(e.target.value)} maxLength={200} placeholder="e.g. Cheque 1042 or Zelle confirmation"
+            <input ref={inputRef} id={ref} value={reference} onChange={(e) => setReference(e.target.value)} maxLength={200} placeholder="e.g. Cheque 1042 or Zelle confirmation"
               className="w-full h-10 rounded-lg border border-gray-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600" />
           </div>
           <p className="text-sm text-gray-700">This records {r.amount} as paid, creates {r.name.split(' ')[0]}&apos;s login and emails them how to sign in.</p>
@@ -102,7 +119,7 @@ function WaitingCard({ r, onDone }: { r: PaymentRow; onDone: (msg: string) => vo
               className="h-10 px-4 rounded-lg bg-green-700 hover:bg-green-800 text-white text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-2">
               {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Yes, payment received
             </button>
-            <button type="button" onClick={() => setOpen(false)} disabled={busy}
+            <button type="button" onClick={close} disabled={busy}
               className="h-10 px-4 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600">Cancel</button>
           </div>
         </div>

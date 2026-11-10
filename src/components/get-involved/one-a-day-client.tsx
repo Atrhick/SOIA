@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import { Check, Copy, Flame, Loader2, Share2, Trophy, UserPlus, X } from 'lucide-react'
 import { addPersonAsInviter } from '@/lib/actions/get-involved'
 import { ageRangeLabel } from '@/lib/get-involved/core'
+import type { PersonStage } from '@/lib/get-involved/inviter-people'
 import { IntakeFields } from './intake-fields'
 
-interface Person { id: string; name: string; ageRange: string | null; status: string; createdAt: string; added: boolean; nextCall: string | null }
+interface Person { id: string; name: string; ageRange: string | null; status: string; createdAt: string; added: boolean; nextCall: string | null; stage?: PersonStage }
 interface Row { userId: string; name: string; role: string; forms: number; joined: number; streak: number; rank: number }
 export interface OneADayData {
   shareUrl: string
@@ -21,17 +22,13 @@ export interface OneADayData {
   overallBoard: Row[]
 }
 
-const STAGE: Record<string, { label: string; cls: string }> = {
-  FORM_SUBMITTED: { label: 'Form sent', cls: 'bg-gray-100 text-gray-700' },
-  AWAITING_PARENT_CONSENT: { label: 'Waiting on parent', cls: 'bg-amber-100 text-amber-800' },
-  DISCOVERY_BOOKED: { label: 'Call booked', cls: 'bg-sky-100 text-sky-800' },
-  DISCOVERY_COMPLETED: { label: 'Call kept', cls: 'bg-blue-100 text-blue-800' },
-  PAUSED: { label: 'Paused', cls: 'bg-red-100 text-red-800' },
-  NOT_A_FIT: { label: 'Not a fit', cls: 'bg-gray-100 text-gray-600' },
-  ACCOUNT_CREATED: { label: 'Joined', cls: 'bg-green-100 text-green-800' },
-}
-const stage = (s: string) => STAGE[s] ?? { label: 'In progress', cls: 'bg-purple-100 text-purple-800' }
 const when = (iso: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(iso))
+/** The page sends each person's journey stage (inviterPeopleStages); this fallback is only for a missing one. */
+function stageOf(p: Person): PersonStage {
+  if (p.stage) return p.stage
+  return { label: 'In progress', cls: 'bg-gray-100 text-gray-700', detail: p.nextCall ? `Call ${when(p.nextCall)}` : `${p.added ? 'Added' : 'Signed up'} ${new Date(p.createdAt).toLocaleDateString()}` }
+}
+const focusRing = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
 
 export function OneADayClient({ data, roleLabel, firstName, meId }: { data: OneADayData; roleLabel: string; firstName: string; meId: string }) {
   const router = useRouter()
@@ -109,9 +106,9 @@ export function OneADayClient({ data, roleLabel, firstName, meId }: { data: OneA
                     <span className="flex-none w-9 h-9 rounded-full bg-primary-50 text-primary-800 text-xs font-bold flex items-center justify-center">{p.name.split(' ').map((x) => (x?.[0] || '?').toUpperCase()).slice(0, 2).join('')}</span>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 text-sm truncate">{p.name}</p>
-                      <p className="text-xs text-gray-600">{ageRangeLabel(p.ageRange)} · {p.nextCall ? `Call ${when(p.nextCall)}` : `${p.added ? 'Added' : 'Signed up'} ${new Date(p.createdAt).toLocaleDateString()}`}</p>
+                      <p className="text-xs text-gray-600 break-words">{stageOf(p).detail} · {ageRangeLabel(p.ageRange)}</p>
                     </div>
-                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${stage(p.status).cls}`}>{stage(p.status).label}</span>
+                    <span className={`flex-none text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${stageOf(p).cls}`}><span className="sr-only">Stage: </span>{stageOf(p).label}</span>
                   </li>
                 ))}
               </ul>
@@ -128,9 +125,9 @@ export function OneADayClient({ data, roleLabel, firstName, meId }: { data: OneA
 
         <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
           <div className="flex items-center justify-between"><h2 className="font-bold text-gray-900 flex items-center gap-2"><Trophy className="h-5 w-5 text-amber-600" aria-hidden />Leaderboard</h2><span className="text-xs text-gray-600">This month</span></div>
-          <div className="flex gap-2" role="tablist">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Show leaderboard for">
             {(['role', 'all'] as const).map((t) => (
-              <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`h-9 px-3.5 rounded-full text-sm font-semibold border ${tab === t ? 'bg-primary-700 border-primary-700 text-white' : 'border-gray-300 text-gray-700'}`}>{t === 'role' ? roleLabel : 'Overall'}</button>
+              <button key={t} type="button" aria-pressed={tab === t} onClick={() => setTab(t)} className={`h-9 px-3.5 rounded-full text-sm font-semibold border ${focusRing} ${tab === t ? 'bg-primary-700 border-primary-700 text-white' : 'border-gray-300 text-gray-700'}`}>{t === 'role' ? roleLabel : 'Overall'}</button>
             ))}
           </div>
           {board.length === 0 ? <p className="text-sm text-gray-600">No activity yet this month. Be the first!</p> : (
