@@ -16,6 +16,8 @@ import { prospectRoleConfig } from '@/lib/get-involved/roles'
 import { sendAssessmentInvite } from '@/lib/get-involved/journey-steps'
 import { sendGiveLinkAfterCall } from '@/lib/get-involved/call-outcome'
 import { completeJourney } from '@/lib/get-involved/login'
+import { afterLoginExtras } from '@/lib/get-involved/after-login'
+import { isStatusConflict } from '@/lib/get-involved/server'
 
 type Result = { success: true; message?: string } | { error: string }
 type Guard = { error: string; session?: never } | { session: Session; error?: never }
@@ -100,6 +102,9 @@ export async function changeProspectRole(prospectId: string, input: z.input<type
       })
     }
     return res
+  }).catch((e) => {
+    if (isStatusConflict(e)) return { ok: false as const, error: 'Someone else just updated this person. Please reload and try again.' }
+    throw e
   })
   if (!r.ok) return { error: r.error }
 
@@ -178,9 +183,15 @@ export async function assignCoachAndCreateLogin(prospectId: string, input: z.inp
   if (!p || (p.journeyRole !== 'AMBASSADOR' && p.journeyRole !== 'YOUTH_AMBASSADOR')) return { error: 'Only ambassadors need a coach to finish.' }
   if (p.userId) return { error: 'Their login already exists.' }
   if (!p.roleTermsAcceptedAt) return { error: 'They have not accepted the terms yet.' }
+  // Uses the password the prospect chose on the Join page (kept as pendingPasswordHash) when there is one.
   const r = await completeJourney(p.id, { byUserId: g.session.user.id, coachProfileId: coach.id })
   if (!r.ok) return { error: r.error }
+  // Same extras as the Join page: ambassador onboarding tasks, and a parent login for 17 and under.
+  await afterLoginExtras(p.id)
   await prisma.auditLog.create({ data: { userId: g.session.user.id, action: 'ASSIGN_COACH_CREATE_LOGIN', entityType: 'Prospect', entityId: p.id, details: JSON.stringify({ coachProfileId: coach.id }) } })
   refresh(p.id)
-  return { success: true, message: `Login created and placed with ${coach.firstName} ${coach.lastName}. We emailed them a link to set their password.` }
+  return {
+    success: true,
+    message: `Login created and placed with ${coach.firstName} ${coach.lastName}. ${r.needsPasswordSetup ? 'We emailed them a link to set their password.' : 'We emailed them that they can sign in with the password they chose.'}`,
+  }
 }

@@ -21,7 +21,8 @@ export default async function AssessmentPage({ params }: { params: { token: stri
   }
   return (
     <JourneyStepFrame stage={pos.stage} role={p.journeyRole} ageRange={p.ageRange} roleLabel={cfg.label} invitedBy={d.invitedBy}>
-      <AssessmentClient token={params.token} firstName={p.firstName} roleLabel={cfg.label} questions={cfg.questions} />
+      <AssessmentClient token={params.token} firstName={p.firstName} roleLabel={cfg.label} questions={cfg.questions}
+        marker={{ role: p.journeyRole ?? '', chosenAt: p.journeyRoleChosenAt?.toISOString() ?? null }} />
     </JourneyStepFrame>
   )
 }

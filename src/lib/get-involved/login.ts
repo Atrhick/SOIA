@@ -13,7 +13,7 @@ import { billingLabel, canCreateLogin, formatDollars, isPaidRole, roleHasLogin, 
 import { appUrl } from './emails'
 import { accountReadyEmail } from './emails/joined'
 import { sendInviterJoined } from './emails/team'
-import { notifyAdmins, setStatus } from './server'
+import { emailEquals, notifyAdmins, transitionStatus } from './server'
 import { prospectRoleConfig } from './roles'
 
 /** Where an inviter's My Team page is. */
@@ -26,7 +26,32 @@ export const hashJourneyPassword = (plain: string) => bcrypt.hash(plain, 12)
 
 export type CreateLoginResult =
   | { ok: true; userId: string; userRole: string; needsPasswordSetup: boolean }
-  | { ok: false; error: string }
+  | { ok: false; error: string; code?: 'NEEDS_COACH' }
+
+export const NEEDS_COACH_ERROR = 'We need to match you with a coach first. Our team has been told and will email you as soon as your login is ready.'
+const NEEDS_COACH_TITLE = 'Ambassador needs a coach'
+
+type InviterCoach = { coachProfile: { id: string } | null; ambassadorProfile: { coachId: string } | null; associateProfile: { coachId: string | null } | null } | null
+
+/** The coach an ambassador login is placed with: an admin's choice, else the inviter's coach. */
+export function sponsorCoachId(invitedBy: InviterCoach, chosen?: string | null): string | null {
+  return chosen ?? invitedBy?.coachProfile?.id ?? invitedBy?.ambassadorProfile?.coachId ?? invitedBy?.associateProfile?.coachId ?? null
+}
+
+/**
+ * True when this prospect's login can't be made until an admin picks a coach (an ambassador role
+ * whose inviter has no coach). The Join page uses it to say "we're matching you with a coach".
+ */
+export async function needsCoachMatch(prospectId: string): Promise<boolean> {
+  const p = await prisma.prospect.findUnique({
+    where: { id: prospectId },
+    select: { userId: true, journeyRole: true, roleConfigSnapshot: true, invitedBy: { select: { coachProfile: { select: { id: true } }, ambassadorProfile: { select: { coachId: true } }, associateProfile: { select: { coachId: true } } } } },
+  })
+  if (!p || p.userId) return false
+  const cfg = await prospectRoleConfig(p)
+  if (!cfg || userRoleFor(cfg.role) !== 'AMBASSADOR') return false
+  return !sponsorCoachId(p.invitedBy)
+}
 
 /**
  * Create the User and its profile, link Prospect.userId, set joinedAt and move to ACCOUNT_CREATED
@@ -52,23 +77,26 @@ export async function createJourneyLogin(prospectId: string, opts: { passwordHas
     return { ok: false, error: p.userId ? 'Your login already exists. Please sign in.' : 'This step is not ready yet.' }
   }
   const userRole = userRoleFor(cfg.role)!
-  const existing = await prisma.user.findUnique({ where: { email: p.email }, select: { id: true } })
+  // Case-insensitive: older paths stored emails as typed, and the unique index is case-sensitive.
+  const existing = await prisma.user.findFirst({ where: { email: emailEquals(p.email) }, select: { id: true } })
   if (existing) return { ok: false, error: 'An account with this email already exists. Please sign in, or reply to any of our emails and we will link it for you.' }
 
   // An admin-chosen coach (assignCoachAndCreateLogin) wins; otherwise the inviter's coach.
-  const sponsorCoachId = opts.coachProfileId ?? p.invitedBy?.coachProfile?.id ?? p.invitedBy?.ambassadorProfile?.coachId ?? p.invitedBy?.associateProfile?.coachId ?? null
-  if (userRole === 'AMBASSADOR' && !sponsorCoachId) return { ok: false, error: 'We need to match you with a coach first. Our team has been told and will email you shortly.' }
+  const coachId = sponsorCoachId(p.invitedBy, opts.coachProfileId)
+  if (userRole === 'AMBASSADOR' && !coachId) return { ok: false, error: NEEDS_COACH_ERROR, code: 'NEEDS_COACH' }
 
   const supplied = opts.passwordHash ?? p.pendingPasswordHash
   const passwordHash = supplied ?? (await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 12))
   const minor = p.ageRange === 'UNDER_18'
+  const email = p.email.trim().toLowerCase()
 
   try {
     const userId = await prisma.$transaction(async (tx) => {
-      // Re-check inside the transaction so two clicks can't create two logins.
-      const fresh = await tx.prospect.findUnique({ where: { id: p.id }, select: { userId: true, status: true } })
-      if (!fresh || fresh.userId || fresh.status !== p.status) throw new Error('STALE')
-      const user = await tx.user.create({ data: { email: p.email, password: passwordHash, role: userRole, status: 'ACTIVE' } })
+      // Guarded move first (status unchanged and no login yet), so two clicks, or a Not a fit at the same
+      // moment, can't both win. The whole transaction rolls back on STALE.
+      const moved = await transitionStatus(tx, p.id, p.status, 'ACCOUNT_CREATED', opts.byUserId ?? null, `Login created (${cfg.label})`, { where: { userId: null } })
+      if (!moved) throw new Error('STALE')
+      const user = await tx.user.create({ data: { email, password: passwordHash, role: userRole, status: 'ACTIVE' } })
       let coachProfileId: string | null = null
       if (userRole === 'COACH') {
         const coach = await tx.coachProfile.create({
@@ -81,18 +109,17 @@ export async function createJourneyLogin(prospectId: string, opts: { passwordHas
         const [parentFirst, ...parentRest] = (p.parentName ?? '').trim().split(/\s+/)
         await tx.ambassador.create({
           data: {
-            userId: user.id, coachId: sponsorCoachId!, firstName: p.firstName, lastName: p.lastName, email: p.email, phone: p.phone, city: p.city,
+            userId: user.id, coachId: coachId!, firstName: p.firstName, lastName: p.lastName, email: p.email, phone: p.phone, city: p.city,
             ...(minor ? { parentFirstName: parentFirst || null, parentLastName: parentRest.join(' ') || null, parentEmail: p.parentEmail, parentPhone: p.parentPhone, parentRelationship: p.parentRelationship, parentalConsentGiven: !!p.parentConsentAt, parentalConsentDate: p.parentConsentAt } : {}),
           },
         })
       } else {
-        await tx.associateProfile.create({ data: { userId: user.id, type: userRole, firstName: p.firstName, lastName: p.lastName, phone: p.phone, coachId: sponsorCoachId } })
+        await tx.associateProfile.create({ data: { userId: user.id, type: userRole, firstName: p.firstName, lastName: p.lastName, phone: p.phone, coachId } })
       }
       await tx.prospect.update({
         where: { id: p.id },
         data: { userId: user.id, joinedAt: new Date(), pendingPasswordHash: null, ...(coachProfileId && !p.coachProfileId ? { coachProfileId } : {}) },
       })
-      await setStatus(tx, p.id, p.status, 'ACCOUNT_CREATED', opts.byUserId ?? null, `Login created (${cfg.label})`)
       return user.id
     })
     return { ok: true, userId, userRole, needsPasswordSetup: !supplied }
@@ -111,8 +138,14 @@ export async function createJourneyLogin(prospectId: string, opts: { passwordHas
 export async function completeJourney(prospectId: string, opts: { passwordHash?: string | null; byUserId?: string | null; coachProfileId?: string | null } = {}): Promise<CreateLoginResult> {
   const r = await createJourneyLogin(prospectId, opts)
   if (!r.ok) {
-    if (r.error.startsWith('We need to match you with a coach')) {
-      await notifyAdmins('Ambassador needs a coach', 'A prospect finished the journey but their inviter has no coach to place them with. Please assign one.', prospectId).catch(() => {})
+    if (r.code === 'NEEDS_COACH') {
+      // Once per prospect while the notice is unread, not on every retry.
+      try {
+        const open = await prisma.adminNotification.findFirst({ where: { entityType: 'Prospect', entityId: prospectId, title: NEEDS_COACH_TITLE, isRead: false }, select: { id: true } })
+        if (!open) await notifyAdmins(NEEDS_COACH_TITLE, 'A prospect finished the journey but their inviter has no coach to place them with. Open the record and choose "Place with this coach and create login".', prospectId)
+      } catch (e) {
+        console.error('[GET-INVOLVED] needs-coach notice failed', e)
+      }
     }
     return r
   }

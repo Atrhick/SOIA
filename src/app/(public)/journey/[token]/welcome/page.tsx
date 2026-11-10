@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
-import { journeyPosition, stagePath } from '@/lib/get-involved/core'
+import { canInvite, journeyPosition, stagePath } from '@/lib/get-involved/core'
+import { CLOSED_BODY, CLOSED_TITLE } from '@/lib/get-involved/journey-page'
 import { appUrl } from '@/lib/get-involved/emails'
 import { journeyFactsFor, journeyLinkUsable, prospectForJourney } from '@/lib/get-involved/journey'
 import { prospectRoleConfig } from '@/lib/get-involved/roles'
@@ -20,6 +21,15 @@ export default async function WelcomePage({ params }: { params: { token: string 
   if (!p) return <JourneyExpired />
   const cfg = await prospectRoleConfig(p)
   const pos = journeyPosition(journeyFactsFor(p, cfg))
+  // Closed (not a fit, paused): same message as every other journey page, no promise of an email.
+  if (pos.stage === 'CLOSED') {
+    return (
+      <div className={`${journeyCard} max-w-2xl mx-auto`}>
+        <h1 className="text-2xl font-bold text-gray-900">{CLOSED_TITLE}</h1>
+        <p className="text-gray-700">{CLOSED_BODY}</p>
+      </div>
+    )
+  }
   if (pos.stage !== 'DONE' || !p.userId) {
     const path = stagePath(pos.stage, params.token)
     if (path && pos.stage !== 'DONE') redirect(path)
@@ -46,7 +56,10 @@ export default async function WelcomePage({ params }: { params: { token: string 
 
   const inviter = p.invitedById ? (await userDisplayName(p.invitedById))?.full ?? null : null
   let inviteUrl: string | null = null
-  try { inviteUrl = appUrl(`/join/${await ensureInviteSlug(p.userId)}`) } catch { inviteUrl = null }
+  // Only coaches and ambassadors have a One-A-Day page and leaderboard for their invites.
+  if (canInvite(user?.role)) {
+    try { inviteUrl = appUrl(`/join/${await ensureInviteSlug(p.userId)}`) } catch { inviteUrl = null }
+  }
   const paid = p.payment?.status === 'COMPLETED'
   return (
     <WelcomeClient
@@ -57,6 +70,7 @@ export default async function WelcomePage({ params }: { params: { token: string 
       paymentReceived={paid}
       businessRole={BUSINESS_ROLES.includes(p.journeyRole ?? '')}
       signInPath={signInPath}
+      inviter={canInvite(user?.role)}
     />
   )
 }

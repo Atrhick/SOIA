@@ -10,9 +10,10 @@ export const metadata: Metadata = { title: 'Parent consent | NowTransformed', ro
 export default async function ConsentPage({ params }: { params: { token: string } }) {
   const p = await prisma.prospect.findUnique({
     where: { parentConsentToken: params.token },
-    select: { firstName: true, parentName: true, parentConsentAt: true, parentConsentRequestedAt: true, journeyToken: true, invitedById: true },
+    select: { firstName: true, parentName: true, status: true, parentConsentAt: true, parentConsentRequestedAt: true, journeyToken: true, invitedById: true },
   })
-  if (!p || (!p.parentConsentAt && !linkStillValid(p.parentConsentRequestedAt, new Date()))) {
+  // Not yet given: only valid while the young person is still waiting for consent (not closed by staff).
+  if (!p || (!p.parentConsentAt && (p.status !== 'AWAITING_PARENT_CONSENT' || !linkStillValid(p.parentConsentRequestedAt, new Date())))) {
     return (
       <div className="max-w-lg mx-auto bg-white border border-gray-200 rounded-2xl p-8 text-center">
         <h1 className="text-2xl font-bold text-gray-900">This consent link is no longer valid</h1>

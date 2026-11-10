@@ -11,11 +11,13 @@ import { JourneyExpired } from '@/components/get-involved/journey-expired'
 const draftKey = (token: string) => `gi-assessment-draft:${token}`
 const MAX = 2000
 
-export function AssessmentClient({ token, firstName, roleLabel, questions }: {
+export function AssessmentClient({ token, firstName, roleLabel, questions, marker }: {
   token: string
   firstName: string
   roleLabel: string
   questions: AssessmentQuestion[]
+  /** The role choice these questions belong to; the server refuses answers if it has changed. */
+  marker: { role: string; chosenAt: string | null }
 }) {
   const router = useRouter()
   const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ''))
@@ -59,13 +61,21 @@ export function AssessmentClient({ token, firstName, roleLabel, questions }: {
     if (Object.keys(local).length) { setErrors(local); setError('Please answer every question.'); focusFirstError(local); return }
     setBusy(true); setError(null)
     try {
-      const r = await submitAssessment(token, answers)
+      const r = await submitAssessment(token, answers, marker)
       if (r.ok) {
         try { localStorage.removeItem(draftKey(token)) } catch { /* ignore */ }
         router.push(r.next)
         return
       }
       if (r.expired) { setExpired(true); return }
+      if (r.stale) {
+        // The questions changed: drop the draft for the old ones and show the new questions.
+        try { localStorage.removeItem(draftKey(token)) } catch { /* ignore */ }
+        setError(r.error)
+        setBusy(false)
+        router.refresh()
+        return
+      }
       setError(r.error)
       if (r.fieldErrors) { setErrors(r.fieldErrors); focusFirstError(r.fieldErrors) }
       setBusy(false)

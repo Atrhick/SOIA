@@ -19,6 +19,7 @@ export type JoinView =
     })
   | (Base & { kind: 'payment'; amount: string; billing: string; termsVersion: number | null; acceptedAt: string | null; online: boolean; failed: boolean; notice: 'paid' | 'cancelled' | null })
   | (Base & { kind: 'login'; paymentReceived: boolean })
+  | (Base & { kind: 'coach'; passwordSaved: boolean; paymentReceived: boolean })
 
 const asA = (label: string) => `${/^[aeiou]/i.test(label) ? 'an' : 'a'} ${label}`
 const PW_HINT = 'At least 8 characters, with an upper-case letter, a lower-case letter and a number.'
@@ -26,7 +27,38 @@ const PW_HINT = 'At least 8 characters, with an upper-case letter, a lower-case 
 export function JoinClient({ token, view }: { token: string; view: JoinView }) {
   if (view.kind === 'payment') return <Payment token={token} v={view} />
   if (view.kind === 'login') return <Login token={token} v={view} />
+  if (view.kind === 'coach') return <CoachMatch v={view} />
   return <Terms token={token} v={view} />
+}
+
+/** Terms accepted, login waiting for an admin to place an ambassador with a coach. */
+function CoachMatch({ v }: { v: Extract<JoinView, { kind: 'coach' }> }) {
+  return (
+    <div className={journeyCard}>
+      <InvitedBy name={v.inviterName} />
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900">We&apos;re matching you with a coach</h1>
+      {v.paymentReceived && (
+        <p className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
+          <Check className="h-4 w-4 flex-none" aria-hidden /> Payment received. Thank you!
+        </p>
+      )}
+      <p role="status" className="flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
+        <Check className="h-4 w-4 mt-0.5 flex-none" aria-hidden />
+        <span>Thanks, {v.firstName}. You&apos;ve accepted the {v.roleLabel} terms{v.passwordSaved ? ' and your password is saved' : ''}.</span>
+      </p>
+      <div className="flex gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-900">
+        <Mail className="h-5 w-5 flex-none mt-0.5" aria-hidden />
+        <div className="min-w-0">
+          <p className="font-semibold">One more thing on our side</p>
+          <p className="text-sm mt-1 break-words">
+            Every ambassador is placed with a coach. Our team is choosing yours now and will email <strong className="break-all">{v.email}</strong> as soon as your login is ready
+            {v.passwordSaved ? ', so you can sign in with the password you just chose.' : ', with a link to set your password.'}
+          </p>
+        </div>
+      </div>
+      <p className="text-sm text-gray-600">There&apos;s nothing else to do for now. You can come back to this link at any time to see where things stand.</p>
+    </div>
+  )
 }
 
 function InvitedBy({ name }: { name: string | null }) {
@@ -245,6 +277,7 @@ function Login({ token, v }: { token: string; v: Extract<JoinView, { kind: 'logi
     try {
       const r = await createMyLogin(token, { password })
       if (!r.ok) { setError(r.error); setPwError(r.fieldErrors?.password); setBusy(false); return }
+      if (r.next === 'coach') { router.refresh(); setBusy(false); return }
       router.push(`/journey/${token}/welcome`)
     } catch {
       setError('Something went wrong. Please try again.')

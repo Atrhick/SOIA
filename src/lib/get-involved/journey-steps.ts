@@ -8,7 +8,7 @@ import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import { ASSESSMENT_REMINDER_DAYS, ORIENTATION_REPEAT_DAYS, RoleConfig } from './core'
-import { journeyLink } from './journey'
+import { journeyLink, refreshJourneyToken } from './journey'
 import { prospectRoleConfig } from './roles'
 import { assessmentInviteEmail, assessmentReminderEmail } from './emails/assessment'
 import { orientationReminderEmail } from './emails/orientation'
@@ -39,8 +39,9 @@ export async function sendAssessmentInvite(prospectId: string): Promise<{ ok: tr
     if (p.status !== 'ASSESSMENT_PENDING' || !p.journeyRole || p.journeyRole === 'SPONSOR') return { ok: false, error: 'This prospect is not waiting for an assessment.' }
     const cfg = await prospectRoleConfig(p)
     if (!cfg) return { ok: false, error: 'No role chosen.' }
-    await prisma.prospect.update({ where: { id: p.id }, data: { journeyTokenIssuedAt: new Date() } })
-    const url = journeyLink(p.journeyToken, 'assessment')
+    // A (re)sent link gets a new token, so any older link stops working.
+    const token = await refreshJourneyToken(prisma, p.id)
+    const url = journeyLink(token, 'assessment')
     await toProspectAndParent(p, (parentFirst) => assessmentInviteEmail({ firstName: p.firstName, roleLabel: cfg.label, questions: questionTexts(cfg), url, parentFirst }))
     await prisma.prospect.update({ where: { id: p.id }, data: { assessmentSentAt: new Date(), assessmentReminderSentAt: null } })
     return { ok: true }
@@ -50,7 +51,11 @@ export async function sendAssessmentInvite(prospectId: string): Promise<{ ok: tr
   }
 }
 
-/** One reminder ASSESSMENT_REMINDER_DAYS after the questions were sent. */
+/**
+ * One reminder ASSESSMENT_REMINDER_DAYS after the questions were sent. Reminders keep the current
+ * token (only the 14-day clock restarts): they are sent by the system on a schedule, not on request,
+ * and a new token would throw away the prospect's draft answers (stored per link on their device).
+ */
 async function assessmentReminders(now: Date): Promise<number> {
   const due = await prisma.prospect.findMany({
     where: {

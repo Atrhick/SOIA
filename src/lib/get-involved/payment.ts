@@ -6,7 +6,7 @@
 import { PaymentMethod, Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { RoleConfig, isPaidRole } from './core'
-import { setStatus } from './server'
+import { StatusConflictError, isStatusConflict, mustTransition, transitionStatus } from './server'
 import { completeJourney } from './login'
 
 /**
@@ -19,8 +19,8 @@ export async function openJourneyPayment(tx: Prisma.TransactionClient, prospectI
   const p = await tx.prospect.findUnique({ where: { id: prospectId }, select: { status: true } })
   if (!p) throw new Error('Prospect not found')
   const data = { method, status: 'PENDING' as const, amount: new Prisma.Decimal(cfg.priceCents).div(100), currency: 'USD', journeyRole: cfg.role, billing: cfg.billing, failedAt: null, failureReason: null, checkoutUrl: null, invoSessionId: null, invoClientRequestId: null }
+  if (p.status !== 'PAYMENT_PENDING') await mustTransition(tx, prospectId, p.status, 'PAYMENT_PENDING', changedBy, 'Terms accepted: waiting for payment')
   const payment = await tx.prospectPayment.upsert({ where: { prospectId }, create: { prospectId, ...data }, update: data })
-  if (p.status !== 'PAYMENT_PENDING') await setStatus(tx, prospectId, p.status, 'PAYMENT_PENDING', changedBy, 'Terms accepted: waiting for payment')
   return payment
 }
 
@@ -33,8 +33,10 @@ export async function markJourneyPaid(prospectId: string, opts: { method?: Payme
   const changed = await prisma.$transaction(async (tx) => {
     const p = await tx.prospect.findUnique({ where: { id: prospectId }, select: { status: true, payment: { select: { status: true } } } })
     if (!p || !p.payment || p.payment.status === 'COMPLETED' || p.status !== 'PAYMENT_PENDING') return false
-    await tx.prospectPayment.update({
-      where: { prospectId },
+    // Guarded: a Not a fit (or a second confirmation) committed meanwhile wins and nothing is written here.
+    if (!(await transitionStatus(tx, prospectId, 'PAYMENT_PENDING', 'PAYMENT_COMPLETED', opts.byUserId ?? null, 'Payment received'))) return false
+    const paid = await tx.prospectPayment.updateMany({
+      where: { prospectId, status: { not: 'COMPLETED' } },
       data: {
         status: 'COMPLETED', paidAt: new Date(),
         ...(opts.method ? { method: opts.method } : {}),
@@ -46,9 +48,9 @@ export async function markJourneyPaid(prospectId: string, opts: { method?: Payme
         ...(opts.invoSessionId ? { invoSessionId: opts.invoSessionId } : {}),
       },
     })
-    await setStatus(tx, prospectId, p.status, 'PAYMENT_COMPLETED', opts.byUserId ?? null, 'Payment received')
+    if (paid.count !== 1) throw new StatusConflictError('PAYMENT_PENDING', 'PAYMENT_COMPLETED')
     return true
-  })
+  }).catch((e) => { if (isStatusConflict(e)) return false; throw e })
   if (!changed) return { ok: false as const, error: 'This payment is not waiting to be completed.' }
   return completeJourney(prospectId, { byUserId: opts.byUserId ?? null })
 }

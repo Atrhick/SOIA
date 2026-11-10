@@ -7,11 +7,11 @@ import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import {
-  GetInvolvedRoleValue, JourneyFacts, JourneyStage, RoleConfig, canChooseRole, canMarkNotAFit, isPaidRole, linkStillValid,
-  roleConfigSnapshot, rolesForAge, stagePath, statusAfterRoleChosen,
+  GetInvolvedRoleValue, JourneyFacts, JourneyStage, RoleConfig, canChooseRole, canMarkNotAFit, canResendLink, isPaidRole, journeyPosition,
+  linkStillValid, roleConfigSnapshot, rolesForAge, stagePath, statusAfterRoleChosen,
 } from './core'
 import * as mail from './emails'
-import { emailInviter, newToken, setStatus } from './server'
+import { StatusConflictError, emailInviter, newToken, transitionStatus } from './server'
 import { getRoleConfig, prospectRoleConfig } from './roles'
 
 type Db = Prisma.TransactionClient | typeof prisma
@@ -31,14 +31,49 @@ export function journeyStageUrl(token: string, stage: JourneyStage): string | nu
 }
 
 /**
- * Restart the 14-day link clock (and create the token if an old prospect has none). Call it in the
- * same transaction as any write that is followed by an email containing a journey link.
+ * Issue a NEW journey token and restart the 14-day clock. Use it whenever a link is (re-)sent by
+ * email: every older link stops working, so a leaked old link can't be revived by asking for a new
+ * one. Always put the RETURNED token in the email. The /discovery/[token] page is keyed on the same
+ * token, so a booked call's manage link is the new /discovery link (journeyUrl(token)).
  */
 export async function refreshJourneyToken(db: Db, prospectId: string): Promise<string> {
+  const token = newToken()
+  await db.prospect.update({ where: { id: prospectId }, data: { journeyToken: token, journeyTokenIssuedAt: new Date() } })
+  return token
+}
+
+/**
+ * Restart the 14-day clock WITHOUT changing the token. Only for actions taken through the current
+ * link (the person has just proved they hold it and is still on that page), e.g. cancelling a call
+ * or accepting the terms. Returns the current token (creating one if an old prospect has none).
+ */
+export async function extendJourneyLink(db: Db, prospectId: string): Promise<string> {
   const p = await db.prospect.findUnique({ where: { id: prospectId }, select: { journeyToken: true } })
   const token = p?.journeyToken ?? newToken()
   await db.prospect.update({ where: { id: prospectId }, data: { journeyToken: token, journeyTokenIssuedAt: new Date() } })
   return token
+}
+
+/**
+ * "Email me a new link" (expired-link pages, or the public form filled in again with a known email):
+ * only for a Get Involved prospect whose journey is still open (booking, or a later step to do). Issues
+ * a new token (old links die) and emails the link to the current step, e.g. /discovery/[new] for a
+ * booked call, /journey/[new]/join for the terms. Never re-arms NOT_A_FIT, PAUSED, ACCOUNT_CREATED,
+ * DONATION_HANDOFF or a minor still waiting for consent. Returns whether an email went out.
+ * The caller rate limits and gives the same answer either way.
+ */
+export async function sendFreshJourneyLink(email: string): Promise<boolean> {
+  const p = await prisma.prospect.findFirst({ where: { email: { equals: email.trim(), mode: 'insensitive' } }, include: { payment: true } })
+  if (!p?.journeyToken || !canResendLink(p.status)) return false
+  const cfg = await prospectRoleConfig(p)
+  const stage = journeyPosition(journeyFactsFor(p, cfg)).stage
+  if (!journeyStageUrl('x', stage)) return false
+  // Guarded on the status we just read, so a Not a fit at the same moment isn't re-armed.
+  const token = newToken()
+  const r = await prisma.prospect.updateMany({ where: { id: p.id, status: p.status }, data: { journeyToken: token, journeyTokenIssuedAt: new Date() } })
+  if (r.count === 0) return false
+  await sendEmail({ to: p.email, ...mail.continueLinkEmail({ firstName: p.firstName, url: journeyStageUrl(token, stage)! }) })
+  return true
 }
 
 /** A prospect by journey token with what the later steps need. null for unknown or malformed tokens. */
@@ -95,6 +130,12 @@ export async function markNotAFit(tx: Prisma.TransactionClient, prospectId: stri
   const p = await tx.prospect.findUnique({ where: { id: prospectId }, select: { status: true } })
   if (!p || !canMarkNotAFit(p.status)) return false
   const now = new Date()
+  // Guarded move first: if a payment, consent or booking changed the status meanwhile, nothing is written.
+  // The consent link is voided so a parent can't reopen a closed prospect.
+  const moved = await transitionStatus(tx, prospectId, p.status, 'NOT_A_FIT', byUserId, note?.trim() ? `Not a fit: ${note.trim()}` : 'Not a fit', {
+    data: { notAFitAt: now, pendingPasswordHash: null, parentConsentToken: null },
+  })
+  if (!moved) return false
   await tx.discoveryCall.updateMany({
     where: { prospectId, status: 'BOOKED' },
     data: { status: 'CANCELLED', cancelledAt: now, cancelledBy: 'ADMIN', cancelReason: 'Not a fit' },
@@ -103,8 +144,6 @@ export async function markNotAFit(tx: Prisma.TransactionClient, prospectId: stri
     where: { prospectId, status: { in: ['PENDING', 'PROCESSING'] } },
     data: { status: 'FAILED', failedAt: now, failureReason: 'Closed: not a fit' },
   })
-  await tx.prospect.update({ where: { id: prospectId }, data: { notAFitAt: now, pendingPasswordHash: null } })
-  await setStatus(tx, prospectId, p.status, 'NOT_A_FIT', byUserId, note?.trim() ? `Not a fit: ${note.trim()}` : 'Not a fit')
   return true
 }
 
@@ -138,8 +177,17 @@ export async function chooseRole(tx: Prisma.TransactionClient, prospectId: strin
   const config = await getRoleConfig(role, tx)
   if (!rolesForAge([config], p.ageRange).length) return { ok: false, error: `${config.label} is not open to this age range.` }
   const status = statusAfterRoleChosen(role)
-  await tx.prospect.update({
-    where: { id: prospectId },
+  const CHANGED = 'Someone else just updated this person. Please reload and try again.'
+  // DISCOVERY_BOOKED (recording the call now) passes through DISCOVERY_COMPLETED so history shows the call was kept.
+  // Every move is guarded on the status read above and on the terms still being open, so a concurrent
+  // Not a fit, terms acceptance or second role change can't be overwritten.
+  let from = p.status
+  if (from === 'DISCOVERY_BOOKED') {
+    if (!(await transitionStatus(tx, prospectId, from, 'DISCOVERY_COMPLETED', byUserId, 'Discovery call kept', { where: { roleTermsAcceptedAt: null } }))) return { ok: false, error: CHANGED }
+    from = 'DISCOVERY_COMPLETED'
+  }
+  const moved = await transitionStatus(tx, prospectId, from, status, byUserId, `Role chosen: ${config.label}`, {
+    where: { roleTermsAcceptedAt: null },
     data: {
       journeyRole: role, journeyRoleChosenAt: new Date(), journeyRoleChosenById: byUserId,
       roleConfigSnapshot: roleConfigSnapshot(config) as Prisma.InputJsonValue,
@@ -147,10 +195,12 @@ export async function chooseRole(tx: Prisma.TransactionClient, prospectId: strin
       orientationWatchedAt: null, orientationRemindAt: null, orientationReminderSentAt: null, orientationCheckAnswer: null,
     },
   })
+  if (!moved) {
+    // Nothing else was written yet unless the call step above ran; roll that back too.
+    if (from !== p.status) throw new StatusConflictError(from, status)
+    return { ok: false, error: CHANGED }
+  }
+  // A new token: any link sent for the previous role stops working.
   const token = await refreshJourneyToken(tx, prospectId)
-  // DISCOVERY_BOOKED (recording the call now) passes through DISCOVERY_COMPLETED so history shows the call was kept.
-  let from = p.status
-  if (from === 'DISCOVERY_BOOKED') { await setStatus(tx, prospectId, from, 'DISCOVERY_COMPLETED', byUserId, 'Discovery call kept'); from = 'DISCOVERY_COMPLETED' }
-  await setStatus(tx, prospectId, from, status, byUserId, `Role chosen: ${config.label}`)
   return { ok: true, token, config, status }
 }

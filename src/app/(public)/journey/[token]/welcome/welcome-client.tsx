@@ -15,6 +15,8 @@ export function WelcomeClient(p: {
   paymentReceived: boolean
   businessRole: boolean
   signInPath: string
+  /** Coaches and ambassadors invite people; other roles see a plain "sign in" welcome. */
+  inviter: boolean
 }) {
   const [copied, setCopied] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -44,6 +46,13 @@ export function WelcomeClient(p: {
         </p>
       </div>
 
+      {!p.inviter ? (
+        <section aria-labelledby="next-title" className={`${panel} max-w-2xl`}>
+          <h2 id="next-title" className="text-[13px] font-bold uppercase tracking-wide text-primary-800">What&apos;s next</h2>
+          <p className="text-gray-700">Sign in to your dashboard to get started. Our team will be in touch about your first steps.</p>
+          <a href={p.signInPath} className={journeyBtn}>Sign in to my dashboard</a>
+        </section>
+      ) : (
       <div className="grid gap-4 md:gap-6 md:grid-cols-2 items-start">
         <section aria-labelledby="link-title" className={panel}>
           <h2 id="link-title" className="text-[13px] font-bold uppercase tracking-wide text-primary-800">Your Get Involved link</h2>
@@ -83,6 +92,7 @@ export function WelcomeClient(p: {
           <a href={p.signInPath} className={journeyBtn}>Sign in to my dashboard</a>
         </section>
       </div>
+      )}
     </div>
   )
 }

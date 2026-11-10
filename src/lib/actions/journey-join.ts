@@ -15,13 +15,12 @@ import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import {
-  billingLabel, canAcceptTerms, canCreateLogin, canPay, formatDollars, isPaidRole, priceLabel, roleHasLogin,
+  billingLabel, canAcceptTerms, canCreateLogin, canPay, defaultTermsBody, formatDollars, isPaidRole, priceLabel, roleHasLogin, termsStillMatch,
 } from '@/lib/get-involved/core'
-import * as mail from '@/lib/get-involved/emails'
 import { paymentArrangedEmail } from '@/lib/get-involved/emails/account'
-import { clientIp, emailInviter, notifyAdmins, rateLimited } from '@/lib/get-involved/server'
+import { clientIp, emailInviter, isStatusConflict, notifyAdmins, rateLimited } from '@/lib/get-involved/server'
 import { ensureLiveTerms, getLiveTerms, prospectRoleConfig } from '@/lib/get-involved/roles'
-import { journeyFactsFor, journeyLink, journeyLinkUsable, journeyStageUrl, prospectForJourney, refreshJourneyToken } from '@/lib/get-involved/journey'
+import { extendJourneyLink, journeyLink, journeyLinkUsable, prospectForJourney } from '@/lib/get-involved/journey'
 import { completeJourney, hashJourneyPassword } from '@/lib/get-involved/login'
 import { markJourneyPaid, openJourneyPayment } from '@/lib/get-involved/payment'
 import { afterLoginExtras } from '@/lib/get-involved/after-login'
@@ -29,10 +28,12 @@ import { CheckoutError, getPaymentProvider, onlinePaymentAvailableFor } from '@/
 import { newClientRequestId } from '@/lib/payments/invo'
 
 export type JoinResult =
-  | { ok: true; next: 'welcome' | 'payment' }
+  | { ok: true; next: 'welcome' | 'payment' | 'coach' }
   | { ok: false; error: string; fieldErrors?: { accept?: string; password?: string } }
 
 const GENERIC = 'This link is no longer valid. Please ask for a new one below.'
+const TERMS_CHANGED = 'TERMS_CHANGED'
+const TERMS_UPDATED = 'The terms were updated while you were reading. Please reload the page and read the new version.'
 
 // Same rule as src/lib/actions/password-reset.ts
 const passwordSchema = z.string()
@@ -83,34 +84,46 @@ export async function acceptTermsAndJoin(token: string, input: unknown): Promise
   if (fieldErrors.accept || fieldErrors.password) return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors }
 
   const live = await getLiveTerms(cfg.role)
-  if (live.version !== parsed.data.termsVersion) {
-    return { ok: false, error: 'The terms were updated while you were reading. Please reload the page and read the new version.' }
-  }
+  if (live.version !== parsed.data.termsVersion) return { ok: false, error: TERMS_UPDATED }
 
   const paid = isPaidRole(cfg)
   const passwordHash = await hashJourneyPassword(pw.data!)
   const online = paid && onlinePaymentAvailableFor(cfg.billing)
 
   let termsVersion = live.version
-  const accepted = await prisma.$transaction(async (tx) => {
-    const terms = await ensureLiveTerms(tx, cfg.role)
-    termsVersion = terms.version
-    // Conditional write: a double submit or a second tab can only accept once.
-    const r = await tx.prospect.updateMany({
-      where: { id: p.id, status: 'ORIENTATION_COMPLETED', roleTermsAcceptedAt: null, userId: null },
-      data: { roleTermsAcceptedAt: new Date(), acceptedTermsId: terms.id, ...(paid ? { pendingPasswordHash: passwordHash } : {}) },
+  let accepted: boolean
+  try {
+    accepted = await prisma.$transaction(async (tx) => {
+      const terms = await ensureLiveTerms(tx, cfg.role)
+      // Checked again here, after the password hash: the prospect is only ever bound to the text they read.
+      if (!termsStillMatch(parsed.data.termsVersion, terms, defaultTermsBody(cfg.role))) throw new Error(TERMS_CHANGED)
+      termsVersion = terms.version
+      // Conditional write: a double submit or a second tab can only accept once. The chosen password is
+      // kept for every role, so it still works if the login has to wait (paid roles, or an ambassador
+      // who needs a coach matched first). It is cleared when the login is made.
+      const r = await tx.prospect.updateMany({
+        where: { id: p.id, status: 'ORIENTATION_COMPLETED', roleTermsAcceptedAt: null, userId: null },
+        data: { roleTermsAcceptedAt: new Date(), acceptedTermsId: terms.id, pendingPasswordHash: passwordHash },
+      })
+      if (r.count !== 1) return false
+      if (paid) {
+        await openJourneyPayment(tx, p.id, cfg, online ? 'INVO' : 'MANUAL', null)
+        // Same token: the prospect is on this page now and the email below links back to it.
+        await extendJourneyLink(tx, p.id)
+      }
+      return true
     })
-    if (r.count !== 1) return false
-    if (paid) {
-      await openJourneyPayment(tx, p.id, cfg, online ? 'INVO' : 'MANUAL', null)
-      await refreshJourneyToken(tx, p.id)
-    }
-    return true
-  })
+  } catch (e) {
+    if (e instanceof Error && e.message === TERMS_CHANGED) return { ok: false, error: TERMS_UPDATED }
+    if (isStatusConflict(e)) return { ok: false, error: 'This step just changed. Please reload the page.' }
+    throw e
+  }
   if (!accepted) return { ok: false, error: 'You have already accepted the terms. Please reload the page.' }
 
   if (!paid) {
     const r = await completeJourney(p.id, { passwordHash })
+    // Waiting for a coach: the terms and password are saved; the Join page explains what happens next.
+    if (!r.ok && r.code === 'NEEDS_COACH') return { ok: true, next: 'coach' }
     if (!r.ok) return { ok: false, error: r.error }
     await afterLoginExtras(p.id)
     return { ok: true, next: 'welcome' }
@@ -153,7 +166,13 @@ export async function createMyLogin(token: string, input: unknown): Promise<Join
   const pw = passwordSchema.safeParse(parsed.data.password)
   if (!pw.success) return { ok: false, error: 'Please fix the highlighted field.', fieldErrors: { password: pw.error.issues[0]?.message ?? 'Please choose a stronger password.' } }
 
-  const r = await completeJourney(p.id, { passwordHash: await hashJourneyPassword(pw.data) })
+  const passwordHash = await hashJourneyPassword(pw.data)
+  const r = await completeJourney(p.id, { passwordHash })
+  if (!r.ok && r.code === 'NEEDS_COACH') {
+    // Keep this password for when an admin places them with a coach.
+    await prisma.prospect.updateMany({ where: { id: p.id, userId: null }, data: { pendingPasswordHash: passwordHash } })
+    return { ok: true, next: 'coach' }
+  }
   if (!r.ok) return { ok: false, error: r.error }
   await afterLoginExtras(p.id)
   return { ok: true, next: 'welcome' }

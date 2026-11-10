@@ -4,6 +4,7 @@ import { billingLabel, formatDollars, isPaidRole, journeyPosition, priceLabel, s
 import { journeyFactsFor, journeyLinkUsable, prospectForJourney } from '@/lib/get-involved/journey'
 import { getLiveTerms, prospectRoleConfig } from '@/lib/get-involved/roles'
 import { userDisplayName } from '@/lib/get-involved/server'
+import { needsCoachMatch } from '@/lib/get-involved/login'
 import { onlinePaymentAvailableFor } from '@/lib/payments'
 import { JoinShell, journeyBtn, journeyCard } from '@/components/get-involved/join-shell'
 import { JourneyExpired } from '@/components/get-involved/journey-expired'
@@ -67,6 +68,9 @@ export default async function JoinPage({ params, searchParams }: { params: { tok
       failed: p.payment?.status === 'FAILED',
       notice: returnedPaid ? 'paid' : returnedCancelled ? 'cancelled' : null,
     }
+  } else if (await needsCoachMatch(p.id)) {
+    // An ambassador whose inviter has no coach: the login waits until an admin places them.
+    view = { kind: 'coach', ...base, passwordSaved: !!p.pendingPasswordHash, paymentReceived: p.payment?.status === 'COMPLETED' }
   } else {
     view = { kind: 'login', ...base, paymentReceived: p.payment?.status === 'COMPLETED' }
   }

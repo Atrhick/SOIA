@@ -23,7 +23,7 @@ export async function afterLoginExtras(prospectId: string) {
     }
     const parentEmail = p.parentEmail?.trim().toLowerCase()
     if (p.ageRange !== 'UNDER_18' || !parentEmail || amb.parentUserId) return
-    const existing = await prisma.user.findUnique({ where: { email: parentEmail }, select: { id: true, role: true, parentOfAmbassador: { select: { id: true } } } })
+    const existing = await prisma.user.findFirst({ where: { email: { equals: parentEmail, mode: 'insensitive' } }, select: { id: true, role: true, parentOfAmbassador: { select: { id: true } } } })
     if (existing) {
       if (existing.role === 'PARENT' && !existing.parentOfAmbassador) await prisma.ambassador.update({ where: { id: amb.id }, data: { parentUserId: existing.id } })
       return

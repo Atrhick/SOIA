@@ -631,3 +631,51 @@ export function railSteps(opts: { role: string | null; ageRange: string | null; 
   const idx = cur ? keys.indexOf(cur) : -1
   return keys.map((key, i) => ({ key, label: RAIL_LABELS[key], state: idx < 0 ? 'todo' : i < idx ? 'done' : i === idx ? 'current' : 'todo' }))
 }
+
+// ---------- guarded status moves (used by transitionStatus in server.ts) ----------
+
+/** Phase 1 moves (consent, booking, cancel) that JOURNEY_TRANSITIONS does not list. */
+export const PHASE1_TRANSITIONS: Record<string, readonly string[]> = {
+  AWAITING_PARENT_CONSENT: ['FORM_SUBMITTED'],
+  FORM_SUBMITTED: ['DISCOVERY_BOOKED'],
+  DISCOVERY_BOOKED: ['FORM_SUBMITTED'],
+}
+
+/**
+ * Whether a Get Involved status move is allowed: the journey moves (canTransition), the Phase 1
+ * moves, or staying put (a role change while ASSESSMENT_PENDING, a new reminder time).
+ */
+export function canMoveStatus(from: string, to: string): boolean {
+  if (from === to) return true
+  return canTransition(from, to) || (PHASE1_TRANSITIONS[from]?.includes(to) ?? false)
+}
+
+/**
+ * The terms a prospect read (submittedVersion, from the Join page) are still the ones being bound.
+ * Version 0 is the unsaved default text: it only matches a version 1 created from that same text.
+ */
+export function termsStillMatch(submittedVersion: number, bound: { version: number; body: string }, defaultBody: string): boolean {
+  if (bound.version === submittedVersion) return true
+  return submittedVersion === 0 && bound.version === 1 && bound.body === defaultBody
+}
+
+/** User roles that get an invite link (/join/[slug]) and One-A-Day / My Team pages. */
+export const INVITER_ROLES: readonly string[] = ['COACH', 'AMBASSADOR']
+export function canInvite(userRole: string | null | undefined): boolean {
+  return !!userRole && INVITER_ROLES.includes(userRole)
+}
+
+/** Statuses where a fresh link may be emailed on request (booking or a later step still to do). */
+export function canResendLink(status: string): boolean {
+  return journeyOpen(status) || laterJourneyOpen(status)
+}
+
+/**
+ * The assessment form was shown for this role choice. A role change (chooseRole) sets a new
+ * journeyRoleChosenAt, so answers typed for the old questions are refused.
+ */
+export function assessmentMarkerMatches(p: { journeyRole: string | null; journeyRoleChosenAt: Date | null }, marker: { role: string; chosenAt: string | null }): boolean {
+  if (p.journeyRole !== marker.role) return false
+  const at = p.journeyRoleChosenAt ? p.journeyRoleChosenAt.toISOString() : null
+  return at === marker.chosenAt
+}

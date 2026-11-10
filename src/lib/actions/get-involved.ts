@@ -17,10 +17,11 @@ import {
 } from '@/lib/get-involved/core'
 import * as mail from '@/lib/get-involved/emails'
 import {
-  afterCancelEmails, busyBlocks, clientIp, consentUrl, emailInviter, emailInviterNewLead, eligibleHosts, inviterBySlug,
-  journeyUrl, journeyUsable, newToken, notifyAdmins, prospectByJourneyToken, rateLimited, setStatus,
-  upcomingCounts, userDisplayName,
+  afterCancelEmails, busyBlocks, clientIp, consentUrl, emailEquals, emailInviter, emailInviterNewLead, eligibleHosts, inviterBySlug,
+  isStatusConflict, journeyUrl, journeyUsable, mustTransition, newToken, notifyAdmins, prospectByJourneyToken, rateLimited,
+  transitionStatus, upcomingCounts, userDisplayName,
 } from '@/lib/get-involved/server'
+import { sendFreshJourneyLink } from '@/lib/get-involved/journey'
 
 type Result = { success: true; message?: string } | { error: string }
 
@@ -55,24 +56,25 @@ function formObject(fd: FormData) {
   return o
 }
 
+type IntakeOutcome = 'created' | 'exists-mine' | 'exists' | 'limited'
+
 /**
  * Shared by the public form and an inviter's "Add someone I talked to".
- * Returns 'created' or 'exists'. Emails are sent after the database write.
+ * Returns 'created', 'exists-mine' (already invited by this inviter), 'exists' (anyone else's, or not
+ * a Get Involved prospect) or 'limited' (too many emails to that address). Emails are sent after the
+ * database write.
  */
-async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: string | null, source: 'INVITE_LINK' | 'INVITER_ADDED'): Promise<'created' | 'exists'> {
-  // Cap emails per address so the public form can't be used to flood an inbox.
-  if (source === 'INVITE_LINK') {
-    const flood = rateLimited(`gi-to:${data.email}`, 3, 60 * 60_000) || (data.parentEmail ? rateLimited(`gi-to:${data.parentEmail}`, 3, 60 * 60_000) : false)
-    if (flood) return 'exists'
-  }
-  const existing = await prisma.prospect.findUnique({ where: { email: data.email }, select: { id: true, firstName: true, journeyToken: true } })
+async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: string | null, source: 'INVITE_LINK' | 'INVITER_ADDED'): Promise<IntakeOutcome> {
+  // Cap emails per address, whatever the source, so neither path can be used to flood an inbox.
+  const flood = rateLimited(`gi-to:${data.email}`, 3, 60 * 60_000) || (data.parentEmail ? rateLimited(`gi-to:${data.parentEmail}`, 3, 60 * 60_000) : false)
+  if (flood) return 'limited'
+  // Case-insensitive: older paths stored emails as typed, and the unique index is case-sensitive.
+  const existing = await prisma.prospect.findFirst({ where: { email: emailEquals(data.email) }, select: { id: true, invitedById: true } })
   if (existing) {
-    // Don't reveal it; send the person their own continue link if they have one.
-    if (existing.journeyToken && source === 'INVITE_LINK') {
-      await prisma.prospect.update({ where: { id: existing.id }, data: { journeyTokenIssuedAt: new Date() } })
-      await sendEmail({ to: data.email, ...mail.continueLinkEmail({ firstName: existing.firstName, url: journeyUrl(existing.journeyToken) }) })
-    }
-    return 'exists'
+    // Don't reveal it. On the public form, send the person a fresh link to their current step, but
+    // only while their journey is open (never after Not a fit, a pause or once they have a login).
+    if (source === 'INVITE_LINK') await sendFreshJourneyLink(data.email)
+    return inviterId && existing.invitedById === inviterId ? 'exists-mine' : 'exists'
   }
 
   const minor = data.ageRange === 'UNDER_18'
@@ -146,6 +148,8 @@ export async function submitGetInvolved(slug: string, formData: FormData): Promi
   }
 }
 
+const ADD_PER_DAY = 20
+
 /** A coach or ambassador adds someone they talked to. */
 export async function addPersonAsInviter(formData: FormData): Promise<Result> {
   const session = await auth()
@@ -154,13 +158,19 @@ export async function addPersonAsInviter(formData: FormData): Promise<Result> {
 
   const parsed = intakeSchema.safeParse(formObject(formData))
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form' }
+  // Per inviter: keeps the leaderboard honest and stops this from emailing arbitrary addresses at volume.
+  if (rateLimited(`gi-add:${session.user.id}`, ADD_PER_DAY, 24 * 60 * 60_000)) {
+    return { error: `You can add up to ${ADD_PER_DAY} people a day here. Please try again tomorrow, or share your invite link.` }
+  }
 
   try {
     const r = await createIntake(parsed.data, session.user.id, 'INVITER_ADDED')
-    if (r === 'exists') return { error: `${parsed.data.firstName} is already signed up. No duplicate was created.` }
+    if (r === 'exists-mine') return { error: `${parsed.data.firstName} is already on your list. No duplicate was created.` }
     revalidatePath('/coach/one-a-day')
     revalidatePath('/ambassador/one-a-day')
-    return { success: true, message: parsed.data.ageRange === 'UNDER_18' ? 'Added. We emailed their parent for consent.' : 'Added. We sent them the welcome email.' }
+    // Same answer whether the person was new or already known to someone else, so this can't be used
+    // to look up who is in the system.
+    return { success: true, message: parsed.data.ageRange === 'UNDER_18' ? 'Thanks. Our team will follow up with their parent first.' : 'Thanks. Our team will follow up with them.' }
   } catch (e) {
     console.error('[GET-INVOLVED] add person failed', e)
     return { error: 'Something went wrong. Please try again.' }
@@ -180,16 +190,26 @@ export async function giveParentConsent(token: string, formData: FormData): Prom
   const parsed = consentSchema.safeParse(formObject(formData))
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form' }
 
+  const INVALID = 'This consent link is no longer valid.'
   const p = await prisma.prospect.findUnique({ where: { parentConsentToken: String(token ?? '') } })
-  if (!p || p.parentConsentDeclinedAt) return { error: 'This consent link is no longer valid.' }
+  if (!p || p.parentConsentDeclinedAt) return { error: INVALID }
   if (p.parentConsentAt) return { success: true }
+  // Only while the young person is still waiting for consent: never reopens someone staff closed.
+  if (p.status !== 'AWAITING_PARENT_CONSENT') return { error: INVALID }
   const now = new Date()
   if (!linkStillValid(p.parentConsentRequestedAt, now)) return { error: 'This consent link has expired. Please ask for a new invite.' }
-  await prisma.$transaction(async (tx) => {
-    await tx.prospect.update({ where: { id: p.id }, data: { parentConsentAt: now, parentConsentSignature: parsed.data.signature, parentRelationship: parsed.data.relationship, journeyTokenIssuedAt: now } })
-    await setStatus(tx, p.id, p.status, 'FORM_SUBMITTED', null, `Consent given by ${parsed.data.signature} (${parsed.data.relationship})`)
-  })
-  const url = journeyUrl(p.journeyToken!)
+  // Guarded write: a Not a fit, a decline or a second click committed meanwhile makes this a no-op.
+  // A fresh journey token is issued with the booking email below.
+  const journeyToken = newToken()
+  const given = await prisma.$transaction((tx) => transitionStatus(tx, p.id, 'AWAITING_PARENT_CONSENT', 'FORM_SUBMITTED', null, `Consent given by ${parsed.data.signature} (${parsed.data.relationship})`, {
+    where: { parentConsentAt: null, parentConsentDeclinedAt: null, parentConsentToken: p.parentConsentToken },
+    data: { parentConsentAt: now, parentConsentSignature: parsed.data.signature, parentRelationship: parsed.data.relationship, journeyToken, journeyTokenIssuedAt: now },
+  }))
+  if (!given) {
+    const again = await prisma.prospect.findUnique({ where: { id: p.id }, select: { parentConsentAt: true } })
+    return again?.parentConsentAt ? { success: true } : { error: INVALID }
+  }
+  const url = journeyUrl(journeyToken)
   await sendEmail({ to: p.email, ...mail.thanksAfterConsentEmail({ firstName: p.firstName, bookUrl: url }) })
   await emailInviter(p.invitedById, `${p.firstName} ${p.lastName}`, "has their parent's consent and can now book a call")
   return { success: true }
@@ -262,10 +282,12 @@ export async function bookDiscoveryCall(token: string, input: { startsAt: string
       const c = existing
         ? await tx.discoveryCall.update({ where: { id: existing.id }, data: { ...data, rescheduleCount: { increment: 1 } } })
         : await tx.discoveryCall.create({ data: { ...data, prospectId: p.id } })
-      if (!existing) await setStatus(tx, p.id, p.status, 'DISCOVERY_BOOKED', null, 'Discovery call booked')
+      // Guarded on the status read before the lock: a Not a fit or pause recorded meanwhile wins.
+      if (!existing) await mustTransition(tx, p.id, p.status, 'DISCOVERY_BOOKED', null, 'Discovery call booked')
       return c
     })
   } catch (e) {
+    if (isStatusConflict(e)) return { error: 'Your booking just changed. Please reload this page.' }
     if (e instanceof Error && e.message === 'SLOT_TAKEN') return { error: 'Sorry, that time was just taken. Please pick another.' }
     if (e instanceof Error && e.message === 'CHANGED') return { error: 'Your booking just changed. Please reload this page.' }
     console.error('[GET-INVOLVED] booking failed', e)
@@ -329,13 +351,19 @@ export async function cancelDiscoveryCall(token: string, input: { reason?: strin
   if (!journeyOpen(p.status)) return { error: 'Please reply to your confirmation email to change this call.' }
   if (!canProspectChange(call.startsAt, now)) return { error: 'Your call is less than 2 hours away, so it can no longer be cancelled here. Please reply to your confirmation email.' }
 
-  const done = await prisma.$transaction(async (tx) => {
-    const r = await tx.discoveryCall.updateMany({ where: { id: call.id, status: 'BOOKED' }, data: { status: 'CANCELLED', cancelledAt: now, cancelledBy: 'PROSPECT', cancelReason: parsed.data.reason || null } })
-    if (r.count === 0) return false
-    await tx.prospect.update({ where: { id: p.id }, data: { journeyTokenIssuedAt: now } })
-    await setStatus(tx, p.id, p.status, 'FORM_SUBMITTED', null, `Prospect cancelled the call${parsed.data.reason ? `: ${parsed.data.reason}` : ''}`)
-    return true
-  })
+  let done: boolean
+  try {
+    done = await prisma.$transaction(async (tx) => {
+      const r = await tx.discoveryCall.updateMany({ where: { id: call.id, status: 'BOOKED' }, data: { status: 'CANCELLED', cancelledAt: now, cancelledBy: 'PROSPECT', cancelReason: parsed.data.reason || null } })
+      if (r.count === 0) return false
+      // Same token: the person is on this page now and the rebooking email links back to it.
+      await mustTransition(tx, p.id, p.status, 'FORM_SUBMITTED', null, `Prospect cancelled the call${parsed.data.reason ? `: ${parsed.data.reason}` : ''}`, { data: { journeyTokenIssuedAt: now } })
+      return true
+    })
+  } catch (e) {
+    if (isStatusConflict(e)) return { error: 'Your booking just changed. Please reload this page.' }
+    throw e
+  }
   if (!done) return { success: true }
   await afterCancelEmails(p, call, { byHost: false })
   revalidatePath('/admin/discovery-calls')
@@ -347,11 +375,12 @@ export async function requestNewLink(formData: FormData): Promise<Result> {
   if (rateLimited(`relink:${await clientIp()}`, 5, 10 * 60_000)) return { error: 'Too many attempts. Please wait a few minutes.' }
   const email = z.string().trim().toLowerCase().email().safeParse(formData.get('email'))
   if (!email.success) return { error: 'Please enter a valid email' }
-  const p = await prisma.prospect.findUnique({ where: { email: email.data }, select: { id: true, firstName: true, journeyToken: true, status: true } })
   if (rateLimited(`relink-to:${email.data}`, 3, 60 * 60_000)) return { success: true }
-  if (p?.journeyToken && journeyOpen(p.status)) {
-    await prisma.prospect.update({ where: { id: p.id }, data: { journeyTokenIssuedAt: new Date() } })
-    await sendEmail({ to: email.data, ...mail.continueLinkEmail({ firstName: p.firstName, url: journeyUrl(p.journeyToken) }) })
+  try {
+    // New token (old links stop working), link to the current step, only while the journey is open.
+    await sendFreshJourneyLink(email.data)
+  } catch (e) {
+    console.error('[GET-INVOLVED] relink failed', e)
   }
   return { success: true }
 }

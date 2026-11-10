@@ -9,7 +9,7 @@ import { Prisma, ProspectStatus } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import {
-  AgeRangeValue, BusyBlock, HostForSlots, Slot, ageRangeLabel, computeStreak, generateSlots,
+  AgeRangeValue, BusyBlock, HostForSlots, Slot, ageRangeLabel, canInvite, canMoveStatus, computeStreak, generateSlots,
   linkStillValid, slugifyName,
 } from './core'
 import * as mail from './emails'
@@ -58,8 +58,10 @@ export async function ensureInviteSlug(userId: string): Promise<string> {
 }
 
 export async function inviterBySlug(slug: string) {
+  if (!slug) return null
   const u = await prisma.user.findUnique({ where: { inviteSlug: slug }, select: { id: true, status: true, role: true } })
-  if (!u || u.status !== 'ACTIVE') return null
+  // Only coaches and ambassadors have a One-A-Day page, leaderboard place and My Team to receive invites.
+  if (!u || u.status !== 'ACTIVE' || !canInvite(u.role)) return null
   return u
 }
 
@@ -85,10 +87,54 @@ export async function clientIp(): Promise<string> {
 
 // ---------- status ----------
 
+/**
+ * Unconditional status write + history. Kept for older callers; Get Involved journey moves use
+ * transitionStatus() so two actions at once can't overwrite each other.
+ */
 export async function setStatus(tx: Prisma.TransactionClient, prospectId: string, from: ProspectStatus | null, to: ProspectStatus, changedBy: string | null, notes?: string) {
   await tx.prospect.update({ where: { id: prospectId }, data: { status: to } })
   if (from !== to) await tx.prospectStatusHistory.create({ data: { prospectId, fromStatus: from, toStatus: to, changedBy, notes } })
 }
+
+/** Thrown (to roll the transaction back) when a guarded status move finds the status already changed. */
+export class StatusConflictError extends Error {
+  constructor(public from: string, public to: string) {
+    super('STATUS_CONFLICT')
+    this.name = 'StatusConflictError'
+  }
+}
+export const isStatusConflict = (e: unknown): e is StatusConflictError => e instanceof StatusConflictError
+
+/**
+ * Guarded status move: one conditional UPDATE ... WHERE id AND status = from (plus `where`), with
+ * `data` written in the same statement. Postgres locks the row and re-checks the WHERE, so of two
+ * concurrent moves from the same status only one succeeds. Returns false (nothing written) when the
+ * status (or `where`) no longer matches or canMoveStatus() refuses the move; writes history otherwise.
+ * Callers that already wrote something in the transaction should throw StatusConflictError on false.
+ */
+export async function transitionStatus(
+  tx: Prisma.TransactionClient,
+  prospectId: string,
+  from: ProspectStatus,
+  to: ProspectStatus,
+  changedBy: string | null,
+  notes?: string,
+  opts: { data?: Prisma.ProspectUpdateManyMutationInput; where?: Prisma.ProspectWhereInput } = {},
+): Promise<boolean> {
+  if (!canMoveStatus(from, to)) return false
+  const r = await tx.prospect.updateMany({ where: { ...opts.where, id: prospectId, status: from }, data: { ...opts.data, status: to } })
+  if (r.count === 0) return false
+  if (from !== to) await tx.prospectStatusHistory.create({ data: { prospectId, fromStatus: from, toStatus: to, changedBy, notes } })
+  return true
+}
+
+/** transitionStatus that throws StatusConflictError instead of returning false. */
+export async function mustTransition(...args: Parameters<typeof transitionStatus>): Promise<void> {
+  if (!(await transitionStatus(...args))) throw new StatusConflictError(args[2], args[3])
+}
+
+/** Case-insensitive email match (older paths stored emails as typed). */
+export const emailEquals = (email: string) => ({ equals: email.trim(), mode: 'insensitive' as const })
 
 // ---------- slots ----------
 
