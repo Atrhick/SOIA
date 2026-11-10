@@ -42,6 +42,7 @@ export function JourneyExpired() {
           <button className={primaryBtn} disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Send me a new link</button>
         </form>
       )}
+      <p className="text-sm text-gray-500">Need help? Reply to any NowTransformed email or contact the person who invited you.</p>
     </div>
   )
 }
