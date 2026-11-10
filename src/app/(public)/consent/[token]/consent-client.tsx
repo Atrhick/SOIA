@@ -8,7 +8,9 @@ import { declineParentConsent, giveParentConsent } from '@/lib/actions/get-invol
 const input = 'w-full h-11 rounded-lg border border-gray-300 px-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-primary-500'
 
 export function ConsentClient(props: { token: string; childFirst: string; parentName: string; inviterName: string | null; alreadyGiven: boolean; bookPath: string | null }) {
-  const { token, childFirst, parentName, inviterName, bookPath } = props
+  const { token, childFirst, parentName, inviterName } = props
+  // Giving consent issues a new booking link, so use the one the action returns.
+  const [bookPath, setBookPath] = useState<string | null>(props.bookPath)
   const [state, setState] = useState<'form' | 'given' | 'declined'>(props.alreadyGiven ? 'given' : 'form')
   const [busy, setBusy] = useState<'yes' | 'no' | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +22,10 @@ export function ConsentClient(props: { token: string; childFirst: string; parent
     const r = await giveParentConsent(token, new FormData(e.currentTarget))
     setBusy(null)
     if ('error' in r) setError(r.error)
-    else setState('given')
+    else {
+      if (r.bookPath !== undefined) setBookPath(r.bookPath)
+      setState('given')
+    }
   }
 
   async function onDecline() {

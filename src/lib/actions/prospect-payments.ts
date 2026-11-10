@@ -130,6 +130,10 @@ export async function approveManualPayment(prospectId: string) {
       return { error: 'Only manual payments can be approved this way' }
     }
 
+    if (payment.journeyRole || payment.prospect.journeyToken) {
+      return { error: 'This is a Get Involved payment. Mark it received on the Journey Payments page.' }
+    }
+
     // Update payment status
     await prisma.prospectPayment.update({
       where: { id: payment.id },

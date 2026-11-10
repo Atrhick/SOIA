@@ -661,7 +661,7 @@ export function railSteps(opts: { role: string | null; ageRange: string | null; 
 export const PHASE1_TRANSITIONS: Record<string, readonly string[]> = {
   AWAITING_PARENT_CONSENT: ['FORM_SUBMITTED'],
   FORM_SUBMITTED: ['DISCOVERY_BOOKED'],
-  DISCOVERY_BOOKED: ['FORM_SUBMITTED'],
+  DISCOVERY_BOOKED: ['FORM_SUBMITTED', 'PAUSED'],
 }
 
 /**

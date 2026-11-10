@@ -1,5 +1,7 @@
 'use server'
 
+import { blockedDaysByUser, hostsForSlots } from '@/lib/get-involved/discovery-slots'
+
 /**
  * Get Involved journey: public form, parent consent, discovery-call booking,
  * reschedule and cancel. These are called by people without a login, so every
@@ -185,7 +187,8 @@ const consentSchema = z.object({
   confirm: z.literal('on', { message: 'Please confirm you are the parent or legal guardian' }),
 })
 
-export async function giveParentConsent(token: string, formData: FormData): Promise<Result> {
+/** On success, bookPath is the booking page for the CURRENT journey token (consent issues a new one). */
+export async function giveParentConsent(token: string, formData: FormData): Promise<Result & { bookPath?: string | null }> {
   if (rateLimited(`consent:${await clientIp()}`, 20, 10 * 60_000)) return { error: 'Too many attempts. Please wait a few minutes.' }
   const parsed = consentSchema.safeParse(formObject(formData))
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form' }
@@ -193,7 +196,7 @@ export async function giveParentConsent(token: string, formData: FormData): Prom
   const INVALID = 'This consent link is no longer valid.'
   const p = await prisma.prospect.findUnique({ where: { parentConsentToken: String(token ?? '') } })
   if (!p || p.parentConsentDeclinedAt) return { error: INVALID }
-  if (p.parentConsentAt) return { success: true }
+  if (p.parentConsentAt) return { success: true, bookPath: p.journeyToken ? `/discovery/${p.journeyToken}` : null }
   // Only while the young person is still waiting for consent: never reopens someone staff closed.
   if (p.status !== 'AWAITING_PARENT_CONSENT') return { error: INVALID }
   const now = new Date()
@@ -206,13 +209,13 @@ export async function giveParentConsent(token: string, formData: FormData): Prom
     data: { parentConsentAt: now, parentConsentSignature: parsed.data.signature, parentRelationship: parsed.data.relationship, journeyToken, journeyTokenIssuedAt: now },
   }))
   if (!given) {
-    const again = await prisma.prospect.findUnique({ where: { id: p.id }, select: { parentConsentAt: true } })
-    return again?.parentConsentAt ? { success: true } : { error: INVALID }
+    const again = await prisma.prospect.findUnique({ where: { id: p.id }, select: { parentConsentAt: true, journeyToken: true } })
+    return again?.parentConsentAt ? { success: true, bookPath: again.journeyToken ? `/discovery/${again.journeyToken}` : null } : { error: INVALID }
   }
   const url = journeyUrl(journeyToken)
   await sendEmail({ to: p.email, ...mail.thanksAfterConsentEmail({ firstName: p.firstName, bookUrl: url }) })
   await emailInviter(p.invitedById, `${p.firstName} ${p.lastName}`, "has their parent's consent and can now book a call")
-  return { success: true }
+  return { success: true, bookPath: `/discovery/${journeyToken}` }
 }
 
 export async function declineParentConsent(token: string): Promise<Result> {
@@ -272,7 +275,8 @@ export async function bookDiscoveryCall(token: string, input: { startsAt: string
       const current = await tx.discoveryCall.findFirst({ where: { prospectId: p.id, status: 'BOOKED' }, select: { id: true } })
       if ((current?.id ?? null) !== (existing?.id ?? null)) throw new Error('CHANGED')
       const busy = await busyBlocks(hosts.map((h) => h.userId), now, existing?.id, tx)
-      const slots = generateSlots(hosts.map((h) => ({ id: h.userId, timezone: h.timezone, availability: h.availability })), busy, now)
+      const blocked = await blockedDaysByUser(hosts, now, tx)
+      const slots = generateSlots(hostsForSlots(hosts, blocked), busy, now)
       const slot = slots.find((s) => s.startsAt.getTime() === startsAt.getTime())
       if (!slot) throw new Error('SLOT_TAKEN')
       // Keep the same host when moving a call, if they're free at the new time.

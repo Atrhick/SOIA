@@ -13,7 +13,7 @@ import { sendAssessmentInviteAfterCall, sendGiveLinkAfterCall, tellInviterRoleCh
 import * as mail from '@/lib/get-involved/emails'
 import { afterNotAFitEmails, chooseRole, markNotAFit } from '@/lib/get-involved/journey'
 import { listRoleConfigs } from '@/lib/get-involved/roles'
-import { afterCancelEmails, busyBlocks, eligibleHosts, emailInviter, journeyUrl, setStatus, upcomingCounts } from '@/lib/get-involved/server'
+import { afterCancelEmails, busyBlocks, eligibleHosts, emailInviter, isStatusConflict, journeyUrl, mustTransition, upcomingCounts } from '@/lib/get-involved/server'
 import { afterStaffMoveEmails, blockedDaysByUser, bookedCallsOnDays, hostsForSlots, lockBookings, notifyWaitingProspects, openSlotsWithBlocks } from '@/lib/get-involved/discovery-slots'
 
 type Result = { success: true } | { error: string }
@@ -175,14 +175,20 @@ export async function saveCallRecord(callId: string, input: CallRecordPayload): 
   }
 
   if (d.outcome === 'NO_SHOW') {
-    const res = await prisma.$transaction(async (tx) => {
+    let res: { paused: boolean } | null
+    try {
+    res = await prisma.$transaction(async (tx) => {
       const r = await tx.discoveryCall.updateMany({ where: { id: call.id, status: 'BOOKED' }, data: { status: 'NO_SHOW', outcomeAt: now, outcomeById: by, notes: d.notes || null } })
       if (r.count === 0) return null
       const up = await tx.prospect.update({ where: { id: p.id }, data: { noShowCount: { increment: 1 }, journeyTokenIssuedAt: now }, select: { noShowCount: true, status: true } })
       const paused = up.noShowCount >= MAX_NO_SHOWS
-      await setStatus(tx, p.id, up.status, paused ? 'PAUSED' : 'FORM_SUBMITTED', by, `Missed call (${up.noShowCount})`)
+      await mustTransition(tx, p.id, up.status, paused ? 'PAUSED' : 'FORM_SUBMITTED', by, `Missed call (${up.noShowCount})`)
       return { paused }
     })
+    } catch (e) {
+      if (isStatusConflict(e)) return { error: 'This prospect was just changed by someone else. Reload and try again.' }
+      throw e
+    }
     if (!res) return { error: 'Someone already recorded this call.' }
     if (!res.paused && p.journeyToken) {
       const m = mail.noShowEmail({ firstName: p.firstName, bookUrl: journeyUrl(p.journeyToken) })
@@ -225,11 +231,12 @@ export async function saveCallRecord(callId: string, input: CallRecordPayload): 
         if (!c.ok) throw new Error(`ROLE:${c.error}`)
         return c
       }
-      await setStatus(tx, p.id, p.status, 'DISCOVERY_COMPLETED', by, 'Discovery call kept')
+      await mustTransition(tx, p.id, p.status, 'DISCOVERY_COMPLETED', by, 'Discovery call kept')
       return null
     })
   } catch (e) {
     if (e instanceof Error && e.message === 'STALE') return { error: 'Someone already recorded this call.' }
+    if (isStatusConflict(e)) return { error: 'This prospect was just changed by someone else. Reload and try again.' }
     if (e instanceof Error && e.message.startsWith('ROLE:')) return { error: e.message.slice(5), fieldErrors: { role: e.message.slice(5) } }
     throw e
   }
@@ -296,13 +303,19 @@ export async function staffCancelCall(callId: string, input: z.input<typeof staf
   const call = await prisma.discoveryCall.findUnique({ where: { id: callId }, include: { prospect: true } })
   if (!call || call.status !== 'BOOKED') return { error: 'This call is not booked.' }
   const now = new Date()
-  const ok = await prisma.$transaction(async (tx) => {
+  let ok: boolean
+  try {
+  ok = await prisma.$transaction(async (tx) => {
     const r = await tx.discoveryCall.updateMany({ where: { id: call.id, status: 'BOOKED' }, data: { status: 'CANCELLED', cancelledAt: now, cancelledBy: 'HOST', cancelReason: parsed.data.noParent ? 'No parent or guardian on the call' : parsed.data.reason || null } })
     if (r.count === 0) return false
     await tx.prospect.update({ where: { id: call.prospectId }, data: { journeyTokenIssuedAt: now } })
-    await setStatus(tx, call.prospectId, call.prospect.status, 'FORM_SUBMITTED', g.session.user.id, parsed.data.noParent ? 'Rescheduling: no parent on the call' : 'Call cancelled by staff')
+    await mustTransition(tx, call.prospectId, call.prospect.status, 'FORM_SUBMITTED', g.session.user.id, parsed.data.noParent ? 'Rescheduling: no parent on the call' : 'Call cancelled by staff')
     return true
   })
+  } catch (e) {
+    if (isStatusConflict(e)) return { error: 'This prospect was just changed by someone else. Reload and try again.' }
+    throw e
+  }
   if (!ok) return { error: 'This call was already changed.' }
   await afterCancelEmails(call.prospect, call, { byHost: true, noParent: parsed.data.noParent })
   refresh()
