@@ -42,6 +42,8 @@ import {
   Sparkles,
   PhoneCall,
   Trophy,
+  UsersRound,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { ASSOCIATE_LABELS, isAssociateRole, type AssociateRole } from '@/lib/roles'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
@@ -70,6 +72,7 @@ const ambassadorNavSections: NavSection[] = [
     icon: Sparkles,
     items: [
       { href: '/ambassador/one-a-day', label: 'One-A-Day', icon: Sparkles },
+      { href: '/ambassador/my-team', label: 'My Team', icon: UsersRound },
     ],
   },
   {
@@ -120,6 +123,7 @@ const coachNavSections: NavSection[] = [
     icon: Users,
     items: [
       { href: '/coach/one-a-day', label: 'One-A-Day', icon: Sparkles },
+      { href: '/coach/my-team', label: 'My Team', icon: UsersRound },
       { href: '/coach/ambassadors', label: 'Ambassadors', icon: Users },
     ],
   },
@@ -195,6 +199,7 @@ const adminNavSections: NavSection[] = [
       { href: '/admin/coaches', label: 'Coaches', icon: Users },
       { href: '/admin/ambassadors', label: 'Ambassadors', icon: Users },
       { href: '/admin/associates', label: 'Associates', icon: Handshake },
+      { href: '/admin/role-settings', label: 'Role Settings', icon: SlidersHorizontal },
     ],
   },
   {

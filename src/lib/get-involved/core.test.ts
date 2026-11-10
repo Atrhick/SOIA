@@ -3,6 +3,12 @@ import {
   generateSlots, pickHost, computeStreak, rankLeaderboard, linkStillValid,
   canProspectChange, slugifyName, businessDay, formatCallTime, journeyOpen,
 } from './core'
+import {
+  DEFAULT_ROLE_CONFIGS, GET_INVOLVED_ROLES, JourneyFacts, canAcceptTerms, canAnswerAssessment, canChooseRole, canCreateLogin,
+  canDoOrientation, canMarkNotAFit, canTransition, isPaidRole, journeyPosition, journeyStages, laterJourneyOpen,
+  parseQuestions, priceLabel, railSteps, roleConfigFromRow, roleConfigSnapshot, rolesForAge, stagePath, statusAfterRoleChosen,
+  userRoleFor, validateAnswers,
+} from './core'
 
 const CT = 'America/Chicago'
 // Monday 2026-11-09 08:00 Central (14:00 UTC; CST = UTC-6)
@@ -102,5 +108,155 @@ describe('journeyOpen', () => {
     for (const s of ['AWAITING_PARENT_CONSENT', 'DISCOVERY_COMPLETED', 'ACCOUNT_CREATED', 'PAUSED', 'NOT_A_FIT', 'ORIENTATION_SCHEDULED']) {
       expect(journeyOpen(s)).toBe(false)
     }
+  })
+})
+
+// ---------- phase 2/3 ----------
+
+const base: JourneyFacts = { status: 'ASSESSMENT_PENDING', journeyRole: 'COACH', assessmentSubmittedAt: null, orientationWatchedAt: null, roleTermsAcceptedAt: null, userId: null, paymentStatus: null, paid: true }
+const d = new Date('2026-11-09T14:00:00Z')
+
+describe('role defaults', () => {
+  it('has all nine roles with the mockup prices', () => {
+    expect(GET_INVOLVED_ROLES).toHaveLength(9)
+    expect(priceLabel(DEFAULT_ROLE_CONFIGS.COACH)).toBe('$99 once')
+    expect(priceLabel(DEFAULT_ROLE_CONFIGS.SERVICE_PROVIDER)).toBe('$29–399/mo')
+    expect(priceLabel(DEFAULT_ROLE_CONFIGS.BUSINESS_AFFILIATE)).toBe('$250/yr')
+    expect(priceLabel(DEFAULT_ROLE_CONFIGS.RESOURCE_CENTER_OWNER)).toBe('$250 once')
+    expect(priceLabel(DEFAULT_ROLE_CONFIGS.VOLUNTEER)).toBe('Free')
+    expect(priceLabel(DEFAULT_ROLE_CONFIGS.SPONSOR)).toBe('Gift')
+    for (const r of GET_INVOLVED_ROLES) expect(DEFAULT_ROLE_CONFIGS[r].questions).toHaveLength(3)
+  })
+  it('knows paid and free roles', () => {
+    expect(isPaidRole(DEFAULT_ROLE_CONFIGS.COACH)).toBe(true)
+    expect(isPaidRole(DEFAULT_ROLE_CONFIGS.AMBASSADOR)).toBe(false)
+    expect(isPaidRole(DEFAULT_ROLE_CONFIGS.SPONSOR)).toBe(false)
+    expect(isPaidRole({ billing: 'MONTHLY', priceCents: 0 })).toBe(false)
+  })
+  it('offers 17 and under only free roles open to them', () => {
+    const all = GET_INVOLVED_ROLES.map((r) => DEFAULT_ROLE_CONFIGS[r])
+    expect(rolesForAge(all, 'UNDER_18').map((c) => c.role)).toEqual(['YOUTH_AMBASSADOR', 'VOLUNTEER'])
+    expect(rolesForAge(all, 'AGE_25_55').map((c) => c.role)).not.toContain('YOUTH_AMBASSADOR')
+    const paidForKids = { ...DEFAULT_ROLE_CONFIGS.COACH, ageRanges: ['UNDER_18' as const] }
+    expect(rolesForAge([paidForKids], 'UNDER_18')).toEqual([])
+    expect(rolesForAge([{ ...DEFAULT_ROLE_CONFIGS.VOLUNTEER, active: false }], 'AGE_25_55')).toEqual([])
+  })
+  it('maps roles to logins', () => {
+    expect(userRoleFor('COACH_SERVICE_PROVIDER')).toBe('COACH')
+    expect(userRoleFor('YOUTH_AMBASSADOR')).toBe('AMBASSADOR')
+    expect(userRoleFor('VOLUNTEER')).toBe('VOLUNTEER')
+    expect(userRoleFor('SPONSOR')).toBeNull()
+  })
+})
+
+describe('stored settings', () => {
+  it('merges a row over the defaults and always gives 3 questions', () => {
+    const cfg = roleConfigFromRow('COACH', { label: 'Coach', priceCents: 12000, billing: 'ONE_TIME', priceNote: null, questions: [{ text: 'Why?', type: 'CHOICE', choices: ['a'] }], ageRanges: ['AGE_25_55', 'BAD'] })
+    expect(cfg.priceCents).toBe(12000)
+    expect(cfg.ageRanges).toEqual(['AGE_25_55'])
+    expect(cfg.questions).toHaveLength(3)
+    expect(cfg.questions[0]).toEqual({ text: 'Why?', type: 'SHORT_TEXT', choices: [] }) // one option is not enough for a choice
+    expect(cfg.questions[1].text).toContain('being rewritten')
+    expect(cfg.saved).toBe(true)
+    expect(roleConfigFromRow('COACH', null).saved).toBe(false)
+  })
+  it('round-trips through a snapshot', () => {
+    const snap = roleConfigSnapshot(DEFAULT_ROLE_CONFIGS.BUSINESS_AFFILIATE)
+    expect(snap).not.toHaveProperty('saved')
+    const back = roleConfigFromRow('BUSINESS_AFFILIATE', snap)
+    expect({ ...back, saved: false }).toEqual(DEFAULT_ROLE_CONFIGS.BUSINESS_AFFILIATE)
+  })
+  it('parses choice questions', () => {
+    expect(parseQuestions([{ text: 'Pick', type: 'CHOICE', choices: ['x', ' y ', ''] }], [])[0]).toEqual({ text: 'Pick', type: 'CHOICE', choices: ['x', 'y'] })
+  })
+  it('validates answers per type', () => {
+    const qs = [{ text: 'A', type: 'SHORT_TEXT' as const, choices: [] }, { text: 'B', type: 'CHOICE' as const, choices: ['x', 'y'] }, { text: 'C', type: 'SCALE_1_5' as const, choices: [] }]
+    expect(validateAnswers(qs, ['hi', 'x', 3])).toEqual({ ok: true, answers: [{ question: 'A', type: 'SHORT_TEXT', answer: 'hi' }, { question: 'B', type: 'CHOICE', answer: 'x' }, { question: 'C', type: 'SCALE_1_5', answer: '3' }] })
+    const bad = validateAnswers(qs, ['  ', 'z', '6'])
+    expect(bad.ok).toBe(false)
+    if (!bad.ok) expect(Object.keys(bad.errors)).toEqual(['0', '1', '2'])
+  })
+})
+
+describe('journey stages', () => {
+  it('lists stages per role', () => {
+    expect(journeyStages('COACH', { minor: false, paid: true })).toEqual(['FORM', 'BOOK_CALL', 'DISCOVERY_CALL', 'ASSESSMENT', 'ORIENTATION', 'TERMS', 'PAYMENT', 'LOGIN'])
+    expect(journeyStages('VOLUNTEER', { minor: true, paid: false })).toEqual(['FORM', 'PARENT_CONSENT', 'BOOK_CALL', 'DISCOVERY_CALL', 'ASSESSMENT', 'ORIENTATION', 'TERMS', 'LOGIN'])
+    expect(journeyStages('SPONSOR', { minor: false, paid: false })).toEqual(['FORM', 'BOOK_CALL', 'DISCOVERY_CALL', 'DONATION'])
+  })
+  it('finds the current stage from the fields', () => {
+    expect(journeyPosition({ ...base, status: 'FORM_SUBMITTED', journeyRole: null }).stage).toBe('BOOK_CALL')
+    expect(journeyPosition({ ...base, status: 'AWAITING_PARENT_CONSENT', journeyRole: null }).waitingOn).toBe('PARENT')
+    expect(journeyPosition({ ...base, status: 'DISCOVERY_COMPLETED', journeyRole: null })).toMatchObject({ stage: 'DISCOVERY_CALL', waitingOn: 'STAFF' })
+    expect(journeyPosition(base).stage).toBe('ASSESSMENT')
+    expect(journeyPosition({ ...base, assessmentSubmittedAt: d }).stage).toBe('ORIENTATION')
+    expect(journeyPosition({ ...base, assessmentSubmittedAt: d, orientationWatchedAt: d }).stage).toBe('TERMS')
+    expect(journeyPosition({ ...base, assessmentSubmittedAt: d, orientationWatchedAt: d, roleTermsAcceptedAt: d, paymentStatus: 'PENDING' }).stage).toBe('PAYMENT')
+    expect(journeyPosition({ ...base, assessmentSubmittedAt: d, orientationWatchedAt: d, roleTermsAcceptedAt: d, paymentStatus: 'COMPLETED' }).stage).toBe('LOGIN')
+    expect(journeyPosition({ ...base, paid: false, assessmentSubmittedAt: d, orientationWatchedAt: d, roleTermsAcceptedAt: d }).stage).toBe('LOGIN')
+    expect(journeyPosition({ ...base, status: 'ACCOUNT_CREATED', userId: 'u' }).stage).toBe('DONE')
+    expect(journeyPosition({ ...base, status: 'NOT_A_FIT' }).stage).toBe('CLOSED')
+    expect(journeyPosition({ ...base, status: 'DONATION_HANDOFF', journeyRole: 'SPONSOR' }).stage).toBe('DONATION')
+  })
+  it('points each stage at its page', () => {
+    expect(stagePath('BOOK_CALL', 'tok')).toBe('/discovery/tok')
+    expect(stagePath('ASSESSMENT', 'tok')).toBe('/journey/tok/assessment')
+    expect(stagePath('PAYMENT', 'tok')).toBe('/journey/tok/join')
+    expect(stagePath('CLOSED', 'tok')).toBeNull()
+  })
+})
+
+describe('what each status may do', () => {
+  it('keeps phase 1 booking limited to new and booked prospects', () => {
+    for (const s of ['ASSESSMENT_PENDING', 'ORIENTATION_COMPLETED', 'PAYMENT_PENDING', 'DONATION_HANDOFF']) expect(journeyOpen(s)).toBe(false)
+  })
+  it('gates each later step on one status', () => {
+    expect(canAnswerAssessment('ASSESSMENT_PENDING')).toBe(true)
+    expect(canAnswerAssessment('ASSESSMENT_COMPLETED')).toBe(false)
+    expect(canDoOrientation('ORIENTATION_SCHEDULED')).toBe(true)
+    expect(canDoOrientation('ASSESSMENT_PENDING')).toBe(false)
+    expect(canAcceptTerms('ORIENTATION_COMPLETED')).toBe(true)
+    expect(canAcceptTerms('PAYMENT_PENDING')).toBe(false)
+    expect(laterJourneyOpen('PAYMENT_PENDING')).toBe(true)
+    expect(laterJourneyOpen('FORM_SUBMITTED')).toBe(false)
+  })
+  it('lets staff change the role only before the terms', () => {
+    expect(canChooseRole('DISCOVERY_BOOKED', false)).toBe(true)
+    expect(canChooseRole('ORIENTATION_COMPLETED', false)).toBe(true)
+    expect(canChooseRole('ORIENTATION_COMPLETED', true)).toBe(false)
+    expect(canChooseRole('FORM_SUBMITTED', false)).toBe(false)
+    expect(statusAfterRoleChosen('SPONSOR')).toBe('DONATION_HANDOFF')
+    expect(statusAfterRoleChosen('VOLUNTEER')).toBe('ASSESSMENT_PENDING')
+  })
+  it('creates logins at the right moment', () => {
+    expect(canCreateLogin({ status: 'ORIENTATION_COMPLETED', paid: false, userId: null, journeyRole: 'VOLUNTEER' })).toBe(true)
+    expect(canCreateLogin({ status: 'ORIENTATION_COMPLETED', paid: true, userId: null, journeyRole: 'COACH' })).toBe(false)
+    expect(canCreateLogin({ status: 'PAYMENT_COMPLETED', paid: true, userId: null, journeyRole: 'COACH' })).toBe(true)
+    expect(canCreateLogin({ status: 'PAYMENT_COMPLETED', paid: true, userId: 'u', journeyRole: 'COACH' })).toBe(false)
+    expect(canCreateLogin({ status: 'ORIENTATION_COMPLETED', paid: false, userId: null, journeyRole: 'SPONSOR' })).toBe(false)
+  })
+  it('allows not a fit until money or a login exists', () => {
+    expect(canMarkNotAFit('DISCOVERY_BOOKED')).toBe(true)
+    expect(canMarkNotAFit('PAYMENT_PENDING')).toBe(true)
+    expect(canMarkNotAFit('PAYMENT_COMPLETED')).toBe(false)
+    expect(canMarkNotAFit('ACCOUNT_CREATED')).toBe(false)
+    expect(canTransition('ASSESSMENT_PENDING', 'NOT_A_FIT')).toBe(true)
+    expect(canTransition('ASSESSMENT_PENDING', 'ORIENTATION_COMPLETED')).toBe(false)
+    expect(canTransition('PAYMENT_PENDING', 'PAYMENT_COMPLETED')).toBe(true)
+  })
+})
+
+describe('railSteps', () => {
+  it('shows 7 steps, with Join covering terms, payment and login', () => {
+    const r = railSteps({ role: 'COACH', ageRange: 'AGE_25_55', stage: 'PAYMENT' })
+    expect(r.map((s) => s.label)).toEqual(['Your info', 'Book a call', 'Discovery call', 'Assessment', 'Orientation', 'Join', 'Welcome'])
+    expect(r.map((s) => s.state)).toEqual(['done', 'done', 'done', 'done', 'done', 'current', 'todo'])
+  })
+  it('adds the parent step for 17 and under and ends sponsors at Give', () => {
+    expect(railSteps({ role: null, ageRange: 'UNDER_18', stage: 'PARENT_CONSENT' })[1]).toEqual({ key: 'PARENT', label: "Parent's okay", state: 'current' })
+    expect(railSteps({ role: 'SPONSOR', ageRange: 'AGE_25_55', stage: 'DONATION' }).map((s) => s.label)).toEqual(['Your info', 'Book a call', 'Discovery call', 'Give'])
+    expect(railSteps({ role: 'COACH', ageRange: null, stage: 'CLOSED' }).every((s) => s.state === 'todo')).toBe(true)
+    const done = railSteps({ role: 'COACH', ageRange: null, stage: 'DONE' })
+    expect(done[done.length - 1].state).toBe('current')
   })
 })

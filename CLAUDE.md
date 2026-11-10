@@ -19,7 +19,7 @@ This is a **Next.js 14** web application for managing coaches and ambassadors in
 - **User Management**: Admins can create user accounts and configure per-user feature permissions (grant/deny access)
 - **Coach Program Pages**: Public landing page per program at `/p/[slug]` with a two-step signup — interest form, then a Zoom link plus a coach-customizable qualification form. Leads flow into the coach's Business Excellence area for classification. Admin-approved before publishing
 - **Associate Roles**: SERVICE_PROVIDER, BUSINESS_AFFILIATE and VOLUNTEER logins sharing one `/associate` dashboard, managed at `/admin/associates`
-- **Get Involved / One-A-Day** (phase 1): coaches and ambassadors share `/join/[slug]` invite links, prospects book discovery calls with admin hosts; see the Get Involved section below
+- **Get Involved / One-A-Day** (phase 1, phase 2/3 foundation): coaches and ambassadors share `/join/[slug]` invite links, prospects book discovery calls with admin hosts; see the Get Involved section below
 
 
 ## Tech Stack
@@ -704,7 +704,7 @@ const handleSendEmail = (link: string, type: 'business-form' | 'orientation' | '
 
 ## Get Involved / One-A-Day (phase 1)
 
-Invite-link funnel from first contact to a kept discovery call. Phase 2 (role choice, assessments, orientation, logins) and phase 3 (payments) are not built.
+Invite-link funnel from first contact to a kept discovery call. Phase 2 (role choice, assessments, orientation, logins) and phase 3 (payments) are described in the subsection below.
 
 **Flow:** `/join/[slug]` form (or the inviter adds someone on their One-A-Day page) → welcome email with a `/discovery/[token]` link → prospect books, moves or cancels a 30-minute call → admin records Kept or No-show.
 **17 and under:** `/consent/[token]` email to the parent first (status `AWAITING_PARENT_CONSENT`; declining deletes the prospect). The prospect must tick that the parent will attend, and an admin cannot mark the call Kept unless the parent attended.
@@ -720,6 +720,25 @@ Invite-link funnel from first contact to a kept discovery call. Phase 2 (role ch
 
 **Rules:** calls 30 min; bookable 12h to 21 days ahead; prospect changes allowed until 2h before; email links valid 14 days; 2 no-shows → `PAUSED`; streak = at least one invite per Central-time day; the first inviter keeps the credit; leaderboard ranks by joined, then forms.
 **Hosts:** only ADMIN users (sub-admins can't open the calls page, so they can't host). A prospect sees only times from active hosts who cover their age range and have weekly availability; the Hosts tab warns when an age range has no one. Bookings take a Postgres advisory lock so two people can't take the same slot.
+
+### Phase 2/3: role journey (foundation laid; pages in progress)
+
+**Flow after the call:** the host records the call Kept and picks a role → `ASSESSMENT_PENDING` + email with 3 questions (`/journey/[token]/assessment`) → `ASSESSMENT_COMPLETED` → orientation recording (`/journey/[token]/orientation`; "remind me later" = `ORIENTATION_SCHEDULED` + `orientationRemindAt`) → `ORIENTATION_COMPLETED` → `/journey/[token]/join`: accept the role's terms, choose a password; free roles get their login at once (`ACCOUNT_CREATED`), paid roles go `PAYMENT_PENDING` → `PAYMENT_COMPLETED` → `ACCOUNT_CREATED`. SPONSOR has no login: role chosen → `DONATION_HANDOFF` (`/journey/[token]/give`). Not a fit at any point before payment → `NOT_A_FIT` + a kind email. 17 and under only see free roles (Youth ambassador, Volunteer); their emails are copied to the parent.
+
+**Data model (all additive):**
+- `enum GetInvolvedRole` (COACH, SERVICE_PROVIDER, COACH_SERVICE_PROVIDER, BUSINESS_AFFILIATE, RESOURCE_CENTER_OWNER, AMBASSADOR, YOUTH_AMBASSADOR, VOLUNTEER, SPONSOR), `enum RoleBilling` (ONE_TIME, MONTHLY, YEARLY, FREE, GIFT), new `ProspectStatus.DONATION_HANDOFF`.
+- `GetInvolvedRoleConfig` (one row per role, edited at `/admin/role-settings`). **No row = defaults** from `DEFAULT_ROLE_CONFIGS` in `core.ts`, so nothing is seeded. Always read through `getRoleConfig()` / `listRoleConfigs()` (`roles.ts`), never the table directly. Questions are JSON, exactly 3, `{ text, type: SHORT_TEXT|CHOICE|SCALE_1_5, choices }`.
+- `GetInvolvedRoleTerms`: append-only versions per role; live = highest version. A prospect is bound to `Prospect.acceptedTermsId` (onDelete Restrict). `getLiveTerms()` returns version 0 (id null) when none saved; `ensureLiveTerms(tx)` creates v1 when a prospect accepts.
+- `Prospect` journey fields: `journeyRole`, `journeyRoleChosenAt/ById`, `roleConfigSnapshot` (copy of the settings when the role was chosen, so edits only affect new prospects; read with `prospectRoleConfig()`), `assessmentAnswers` (JSON `StoredAnswer[]`), `assessmentSentAt/SubmittedAt/ReminderSentAt`, `orientationWatchedAt/RemindAt/ReminderSentAt/CheckAnswer`, `roleTermsAcceptedAt`, `acceptedTermsId`, `pendingPasswordHash` (paid roles, cleared when the login is made), `userId` (unique, the login made at the end), `joinedAt`, `notAFitAt`, `notes` (`ProspectNote`).
+- `ProspectPayment` reused (one per prospect) with new `journeyRole`, `billing`, `checkoutUrl`, `stripeSubscriptionId`; old-pipeline rows have `journeyRole` null.
+- `DiscoveryCall`: `topicsCovered String[]`, `parentAttendeeName`, `parentAttendeeRelationship`.
+- A Get Involved prospect is one with a `journeyToken`; the old coach pipeline (`prospects.ts`) uses the same statuses for prospects without one and is unchanged.
+
+**Rules (`core.ts`, tested in `core.test.ts`):** `journeyOpen()` is still the Phase 1 booking rule (FORM_SUBMITTED, DISCOVERY_BOOKED only). Later steps each have one predicate: `canChooseRole` (until terms accepted), `canAnswerAssessment`, `canDoOrientation`, `canAcceptTerms`, `canPay`, `canCreateLogin`, `canMarkNotAFit` (not after PAYMENT_COMPLETED/ACCOUNT_CREATED), `laterJourneyOpen` (may ask for a fresh link). `journeyPosition()` gives the stage and next step from the fields; `stagePath()` the page; `railSteps()` the prospect's progress rail (Your info, [Parent's okay], Book a call, Discovery call, Assessment, Orientation, Join, Welcome; sponsors end at Give). Links under `/journey/[token]` work 14 days from `journeyTokenIssuedAt`; every email with a link refreshes it (`refreshJourneyToken`).
+
+**Shared helpers (server only, not `'use server'`):** `roles.ts` (configs, terms, `saveRoleConfig`), `journey.ts` (`chooseRole`, `markNotAFit` + `afterNotAFitEmails`, `prospectForJourney`, `journeyLink`), `login.ts` (`completeJourney` creates User + profile, sets `ACCOUNT_CREATED` with history so the leaderboard's "joined" counts, sends E11 and "joined your team"), `payment.ts` (`openJourneyPayment`, `markJourneyPaid`). UI: `src/components/get-involved/journey-rail.tsx`. New email templates go in their own file under `src/lib/get-involved/emails/` (see its `index.ts`); `emails.ts` exports `layout`, `esc`, `P`, `SMALL`, `callBox`, `parentNote`, `notAFitEmail`.
+**Env:** `COMMUNITY_EVENTS_URL` (optional) adds the "See upcoming community events" button to the Not a fit email.
+**Routes added to the sidebar:** `/admin/role-settings` (People), `/coach/my-team`, `/ambassador/my-team`.
 
 ## Surveys & Quizzes
 

@@ -19,10 +19,15 @@ export function esc(v: string | null | undefined): string {
     .replace(/'/g, '&#39;')
 }
 
-const P = 'color:#374151;font-size:15px;line-height:1.55;margin:0 0 14px'
-const SMALL = 'color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 10px'
+/** Paragraph and small-print inline styles; use them in new templates so every email matches. */
+export const P = 'color:#374151;font-size:15px;line-height:1.55;margin:0 0 14px'
+export const SMALL = 'color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 10px'
 
-function layout(body: string, cta?: { label: string; url: string }, after = ''): string {
+/**
+ * The NowTransformed email frame: logo, card, optional button, sign-off and footer.
+ * `body` is raw HTML: escape every user value in it with esc(). `cta` and `after` are escaped/raw the same way.
+ */
+export function layout(body: string, cta?: { label: string; url: string }, after = ''): string {
   return `
 <div style="background:#f3f4f6;padding:24px 12px;font-family:Inter,Segoe UI,Arial,sans-serif">
   <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:28px">
@@ -39,14 +44,14 @@ function layout(body: string, cta?: { label: string; url: string }, after = ''):
 </div>`
 }
 
-function callBox(when: Date, tz: string, withWhom: string, meetingUrl?: string | null): string {
+export function callBox(when: Date, tz: string, withWhom: string, meetingUrl?: string | null): string {
   return `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin:0 0 14px">
     <div style="font-weight:700;color:#111827;font-size:15px">${esc(formatCallTime(when, tz))}</div>
     <div style="${SMALL};margin:4px 0 0">Discovery call with ${esc(withWhom)} · 30 minutes${meetingUrl ? ` · <a href="${esc(meetingUrl)}" style="color:#0369a1">Join link</a>` : ''}</div>
   </div>`
 }
 
-const parentNote = (parentFirst: string, childFirst: string) =>
+export const parentNote = (parentFirst: string, childFirst: string) =>
   `<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:12px 14px;margin:0 0 14px;color:#7c2d12;font-size:14px;line-height:1.5"><strong>${esc(parentFirst)}, please join ${esc(childFirst)} on this call.</strong> A parent or guardian must be there, so we can't hold the call without you.</div>`
 
 export interface Mail { subject: string; html: string }
@@ -217,6 +222,20 @@ export function hostCallEmail(p: {
        <p style="${SMALL}">Age range: <strong>${esc(p.ageLabel)}</strong>${p.inviterName ? ` · Invited by <strong>${esc(p.inviterName)}</strong>` : ''}${p.phone ? ` · Phone ${esc(p.phone)}` : ''}</p>
        ${p.parent ? `<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:12px 14px;margin:0 0 14px;color:#7c2d12;font-size:14px;line-height:1.5"><strong>Parent must be on the call. Don't start without them.</strong><br>${esc(p.parent.name)} · ${esc(p.parent.email)}${p.parent.phone ? ` · ${esc(p.parent.phone)}` : ''}</div>` : ''}`,
       { label: 'Open Discovery Calls', url: p.callsUrl },
+    ),
+  }
+}
+
+// ---- phase 2/3 (more templates live in ./emails/) ----
+
+/** E9: the interviewer marked "Not a fit". `eventsUrl` null = no button. */
+export function notAFitEmail(p: { firstName: string; eventsUrl: string | null }): Mail {
+  return {
+    subject: 'Thank you for talking with us',
+    html: layout(
+      `<p style="${P}">Hi ${esc(p.firstName)}, thank you for taking the time to talk with us. After our conversation, we don't think any of our roles is the right fit right now.</p>
+       <p style="${P}">That can change. You're always welcome at our free community events, and you can reach out any time if your situation changes.</p>`,
+      p.eventsUrl ? { label: 'See upcoming community events', url: p.eventsUrl } : undefined,
     ),
   }
 }

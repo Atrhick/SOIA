@@ -90,6 +90,7 @@ const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string; icon
   DISCOVERY_COMPLETED: { label: 'Discovery Call Kept', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
   NOT_A_FIT: { label: 'Not a Fit', color: 'bg-gray-100 text-gray-700', icon: XCircle },
   PAUSED: { label: 'Paused', color: 'bg-red-100 text-red-800', icon: AlertCircle },
+  DONATION_HANDOFF: { label: 'Sent to donate', color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle },
 }
 
 const PIPELINE_STAGES: ProspectStatus[] = [

@@ -193,6 +193,7 @@ const STATUS_LABELS: Record<ProspectStatus, string> = {
   DISCOVERY_COMPLETED: 'Discovery Call Kept',
   NOT_A_FIT: 'Not a Fit',
   PAUSED: 'Paused',
+  DONATION_HANDOFF: 'Sent to donate',
 }
 
 interface OrientationSlot {

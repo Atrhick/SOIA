@@ -55,6 +55,8 @@ model User {
   invitedProspects    Prospect[]      @relation("ProspectInviter")
   discoveryHost       DiscoveryHost?
   hostedDiscoveryCalls DiscoveryCall[] @relation("DiscoveryCallHost")
+  // Get Involved phase 2/3: the prospect record this login was created from.
+  journeyProspect     Prospect?       @relation("ProspectUser")
 
   @@index([role, status])
   @@map("users")
@@ -2021,6 +2023,8 @@ enum ProspectStatus {
   DISCOVERY_COMPLETED
   NOT_A_FIT
   PAUSED
+  // Get Involved phase 2/3: a sponsor was sent to the donation page (no login).
+  DONATION_HANDOFF
 }
 
 enum AgeRange {
@@ -2177,6 +2181,32 @@ model Prospect {
   statusHistory         ProspectStatusHistory[]
   calendarBookings      CalendarBooking[]
 
+  // Get Involved phase 2/3 (role journey). All optional. A Get Involved prospect is one with a journeyToken.
+  journeyRole              GetInvolvedRole?
+  journeyRoleChosenAt      DateTime?
+  journeyRoleChosenById    String?
+  // Copy of the role's settings (price, billing, questions, orientation) taken when the role was chosen,
+  // so later edits in Role Settings only affect new prospects. Read it with prospectRoleConfig().
+  roleConfigSnapshot       Json?
+  assessmentAnswers        Json?               // [{ question, type, answer }] in question order
+  assessmentSentAt         DateTime?
+  assessmentSubmittedAt    DateTime?
+  assessmentReminderSentAt DateTime?
+  orientationWatchedAt     DateTime?
+  orientationRemindAt      DateTime?           // "remind me later" date they picked
+  orientationReminderSentAt DateTime?
+  orientationCheckAnswer   String?             @db.Text
+  roleTermsAcceptedAt      DateTime?
+  acceptedTermsId          String?
+  acceptedTerms            GetInvolvedRoleTerms? @relation(fields: [acceptedTermsId], references: [id], onDelete: Restrict)
+  // bcrypt hash of the password chosen on the Join page, kept only until the login is created (paid roles).
+  pendingPasswordHash      String?
+  userId                   String?             @unique
+  user                     User?               @relation("ProspectUser", fields: [userId], references: [id], onDelete: SetNull)
+  joinedAt                 DateTime?
+  notAFitAt                DateTime?
+  notes                    ProspectNote[]
+
   @@index([email])
   @@index([status])
   @@index([assessmentSurveyId])
@@ -2242,6 +2272,10 @@ model DiscoveryCall {
   notes             String?             @db.Text
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  // Get Involved phase 2: what the call covered, and the adult who attended a minor's call.
+  topicsCovered     String[]            @default([])
+  parentAttendeeName String?
+  parentAttendeeRelationship String?
 
   @@index([hostId, startsAt])
   @@index([prospectId])
@@ -2291,6 +2325,12 @@ model ProspectPayment {
 
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
+
+  // Get Involved phase 3: what this payment is for (null for the old coach pipeline).
+  journeyRole     GetInvolvedRole?
+  billing         RoleBilling?
+  checkoutUrl     String?
+  stripeSubscriptionId String?
 
   @@map("prospect_payments")
 }
@@ -2808,4 +2848,82 @@ model CustomMigration {
   appliedAt DateTime? @default(now()) @map("applied_at") @db.Timestamp(6)
 
   @@map("_custom_migrations")
+}
+
+// ============================================
+// GET INVOLVED: ROLES (phase 2/3)
+// ============================================
+
+enum GetInvolvedRole {
+  COACH
+  SERVICE_PROVIDER
+  COACH_SERVICE_PROVIDER
+  BUSINESS_AFFILIATE
+  RESOURCE_CENTER_OWNER
+  AMBASSADOR
+  YOUTH_AMBASSADOR
+  VOLUNTEER
+  SPONSOR
+}
+
+enum RoleBilling {
+  ONE_TIME
+  MONTHLY
+  YEARLY
+  FREE
+  GIFT
+}
+
+// Admin-edited settings for one role. No row = defaults from DEFAULT_ROLE_CONFIGS in
+// src/lib/get-involved/core.ts, so nothing has to be seeded. Read with getRoleConfig().
+model GetInvolvedRoleConfig {
+  id                    String          @id @default(cuid())
+  role                  GetInvolvedRole @unique
+  label                 String
+  whoFor                String?         @db.Text
+  ageRanges             AgeRange[]
+  active                Boolean         @default(true)
+  priceCents            Int             @default(0)
+  priceNote             String?         // optional display override, e.g. "$29-399/mo"
+  billing               RoleBilling     @default(FREE)
+  questions             Json            // exactly 3: [{ text, type: SHORT_TEXT|CHOICE|SCALE_1_5, choices: string[] }]
+  orientationUrl        String?
+  orientationMinutes    Int?
+  orientationPoints     String[]        @default([])
+  comprehensionCheck    Boolean         @default(false)
+  comprehensionQuestion String?         @db.Text
+  handoffUrl            String?         // SPONSOR: the donation page
+  updatedById           String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@map("get_involved_role_configs")
+}
+
+// Every saved version of a role's terms. Never edited or deleted: a prospect is bound
+// to the version that was live when they accepted. Live = highest version for the role.
+model GetInvolvedRoleTerms {
+  id          String          @id @default(cuid())
+  role        GetInvolvedRole
+  version     Int
+  body        String          @db.Text
+  createdById String?
+  createdAt   DateTime        @default(now())
+  acceptedBy  Prospect[]
+
+  @@unique([role, version])
+  @@map("get_involved_role_terms")
+}
+
+// Staff notes on a prospect record.
+model ProspectNote {
+  id         String   @id @default(cuid())
+  prospectId String
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  authorId   String?
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([prospectId, createdAt])
+  @@map("prospect_notes")
 }
