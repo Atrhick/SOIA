@@ -26,13 +26,23 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
       ) : (
         <>
           {hosts.length > 1 && (
-            <nav aria-label="Choose host" className="flex flex-wrap gap-2">
-              {hosts.map((h) => (
-                <Link key={h.userId} href={`/admin/discovery-calls/availability?host=${h.userId}`} aria-current={h.userId === chosen.userId ? 'true' : undefined}
-                  className={`h-9 px-4 rounded-full text-sm font-semibold border inline-flex items-center ${h.userId === chosen.userId ? 'bg-primary-700 border-primary-700 text-white' : 'border-gray-300 text-gray-700'}`}>
-                  {h.displayName}{h.userId === session.user.id ? ' (you)' : h.user.role === 'COACH' ? ' (coach)' : ''}
-                </Link>
-              ))}
+            <nav aria-label="Choose host" className="space-y-2">
+              <p className="text-sm font-semibold text-gray-700">Host</p>
+              <div className="flex flex-wrap gap-2">
+                {hosts.map((h) => {
+                  const current = h.userId === chosen.userId
+                  const empty = h.availability.length === 0
+                  return (
+                    <Link key={h.userId} href={`/admin/discovery-calls/availability?host=${h.userId}`} aria-current={current ? 'page' : undefined}
+                      className={`h-11 px-4 rounded-full text-sm font-semibold border inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2 ${current ? 'bg-primary-700 border-primary-700 text-white' : 'bg-white border-gray-300 text-gray-800 hover:border-gray-400'}`}>
+                      {empty && <span className={`h-2 w-2 rounded-full ${current ? 'bg-amber-300' : 'bg-amber-500'}`} aria-hidden />}
+                      {h.displayName}{h.userId === session.user.id ? ' (you)' : h.user.role === 'COACH' ? ' (coach)' : ''}
+                      {empty && <span className="sr-only">, no weekly times yet</span>}
+                    </Link>
+                  )
+                })}
+              </div>
+              {hosts.some((h) => h.availability.length === 0) && <p className="text-xs text-gray-600 flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden />No weekly times yet</p>}
             </nav>
           )}
           <AvailabilityClient

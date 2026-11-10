@@ -52,22 +52,22 @@ export function BlockedDatesClient({ hostUserId, hostName, timezone, today, bloc
     <section aria-labelledby="blocked-h" className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
       <div>
         <h2 id="blocked-h" className="font-bold text-gray-900">Days off</h2>
-        <p className="text-sm text-gray-600">Block off a date and no one can book {hostName} that day. Calls already booked stay on the calendar and are listed here so you can move them.</p>
+        <p className="text-sm text-gray-600">Whole days {hostName} is away. No one can book them on these dates. Calls already booked stay on the calendar and are listed here so you can move them.</p>
       </div>
       <form onSubmit={block} className="flex flex-wrap items-end gap-3">
         <div className="min-w-0">
           <label htmlFor="block-day" className="block text-sm font-semibold text-gray-700 mb-1">Date</label>
-          <input id="block-day" type="date" min={today} value={day} onChange={(e) => setDay(e.target.value)} className={`h-10 rounded-lg border border-gray-300 px-2 text-sm ${ring}`} />
+          <input id="block-day" type="date" min={today} value={day} onChange={(e) => setDay(e.target.value)} className={`h-11 rounded-lg border border-gray-300 px-2 text-sm ${ring}`} />
         </div>
         <div className="min-w-0 flex-1 basis-48">
           <label htmlFor="block-note" className="block text-sm font-semibold text-gray-700 mb-1">Note (optional, staff only)</label>
-          <input id="block-note" type="text" maxLength={120} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Away at a conference" className={`w-full h-10 rounded-lg border border-gray-300 px-2 text-sm ${ring}`} />
+          <input id="block-note" type="text" maxLength={120} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Away at a conference" className={`w-full h-11 rounded-lg border border-gray-300 px-3 text-sm ${ring}`} />
         </div>
-        <button type="submit" disabled={busy !== null} className={`h-10 px-4 rounded-lg border border-primary-700 text-primary-800 bg-white hover:bg-primary-50 text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 ${ring}`}>{busy === 'add' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Block off a date</button>
+        <button type="submit" disabled={busy !== null} className={`h-11 px-4 rounded-lg border border-primary-700 text-primary-800 bg-white hover:bg-primary-50 text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 ${ring}`}>{busy === 'add' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Block off a date</button>
       </form>
       {msg && <p role={msg.ok ? 'status' : 'alert'} className={`text-sm ${msg.ok ? 'text-green-700' : 'text-red-700'}`}>{msg.text}</p>}
 
-      {blocked.length === 0 ? <p className="text-sm text-gray-600">No days off coming up.</p> : (
+      {blocked.length === 0 ? <p className="text-sm text-gray-500">No days off coming up.</p> : (
         <ul className="divide-y divide-gray-100">
           {blocked.map((b) => (
             <li key={b.day} className="py-3 space-y-2">
