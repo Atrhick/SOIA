@@ -187,6 +187,12 @@ const STATUS_LABELS: Record<ProspectStatus, string> = {
   PAYMENT_PENDING: 'Payment Pending',
   PAYMENT_COMPLETED: 'Payment Completed',
   ACCOUNT_CREATED: 'Account Created',
+  FORM_SUBMITTED: 'Get Involved Form Submitted',
+  AWAITING_PARENT_CONSENT: 'Waiting on Parent Consent',
+  DISCOVERY_BOOKED: 'Discovery Call Booked',
+  DISCOVERY_COMPLETED: 'Discovery Call Kept',
+  NOT_A_FIT: 'Not a Fit',
+  PAUSED: 'Paused',
 }
 
 interface OrientationSlot {

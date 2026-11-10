@@ -425,6 +425,13 @@ export async function getAllProspects(filters?: {
         payment: {
           select: { status: true, amount: true, method: true },
         },
+        invitedBy: {
+          select: {
+            email: true,
+            coachProfile: { select: { firstName: true, lastName: true } },
+            ambassadorProfile: { select: { firstName: true, lastName: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 200,
@@ -444,6 +451,11 @@ export async function getAllProspects(filters?: {
         assessmentCompletedAt: p.assessmentCompletedAt?.toISOString() || null,
         interviewCompletedAt: p.interviewCompletedAt?.toISOString() || null,
         paymentStatus: p.payment?.status || null,
+        ageRange: p.ageRange,
+        invitedByName: (() => {
+          const ip = p.invitedBy?.coachProfile ?? p.invitedBy?.ambassadorProfile
+          return ip ? `${ip.firstName} ${ip.lastName}` : p.invitedBy?.email ?? null
+        })(),
       })),
     }
   } catch (error) {

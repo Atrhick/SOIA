@@ -19,6 +19,7 @@ This is a **Next.js 14** web application for managing coaches and ambassadors in
 - **User Management**: Admins can create user accounts and configure per-user feature permissions (grant/deny access)
 - **Coach Program Pages**: Public landing page per program at `/p/[slug]` with a two-step signup — interest form, then a Zoom link plus a coach-customizable qualification form. Leads flow into the coach's Business Excellence area for classification. Admin-approved before publishing
 - **Associate Roles**: SERVICE_PROVIDER, BUSINESS_AFFILIATE and VOLUNTEER logins sharing one `/associate` dashboard, managed at `/admin/associates`
+- **Get Involved / One-A-Day** (phase 1): coaches and ambassadors share `/join/[slug]` invite links, prospects book discovery calls with admin hosts; see the Get Involved section below
 
 
 ## Tech Stack
@@ -701,6 +702,25 @@ const handleSendEmail = (link: string, type: 'business-form' | 'orientation' | '
 - Default value: `1500` USD
 - Used in acceptance page and payment processing
 
+## Get Involved / One-A-Day (phase 1)
+
+Invite-link funnel from first contact to a kept discovery call. Phase 2 (role choice, assessments, orientation, logins) and phase 3 (payments) are not built.
+
+**Flow:** `/join/[slug]` form (or the inviter adds someone on their One-A-Day page) → welcome email with a `/discovery/[token]` link → prospect books, moves or cancels a 30-minute call → admin records Kept or No-show.
+**17 and under:** `/consent/[token]` email to the parent first (status `AWAITING_PARENT_CONSENT`; declining deletes the prospect). The prospect must tick that the parent will attend, and an admin cannot mark the call Kept unless the parent attended.
+
+**Key files:**
+- `src/lib/get-involved/core.ts` - pure rules and constants (slots, streaks, leaderboard ranking, cutoffs). Tested in `core.test.ts` (`npm test`)
+- `src/lib/get-involved/server.ts` - server-only helpers (tokens, host matching, emails to inviters). Not `'use server'`, so nothing here is a public endpoint
+- `src/lib/get-involved/emails.ts` - all email templates; every user value goes through `esc()`
+- `src/lib/actions/get-involved.ts` - public actions (submit, consent, book, cancel, new link) plus `addPersonAsInviter`
+- `src/lib/actions/discovery-admin.ts` - hosts, availability, outcomes, staff cancel (ADMIN only, not while impersonating)
+- `src/app/api/cron/discovery-reminders/route.ts` - 24h and 1h reminders; needs header `x-cron-secret` = env `CRON_SECRET`
+- Admin: `/admin/discovery-calls` (Calls, Availability, Hosts tabs), `/admin/one-a-day`. Coach/ambassador: `/coach/one-a-day`, `/ambassador/one-a-day`
+
+**Rules:** calls 30 min; bookable 12h to 21 days ahead; prospect changes allowed until 2h before; email links valid 14 days; 2 no-shows → `PAUSED`; streak = at least one invite per Central-time day; the first inviter keeps the credit; leaderboard ranks by joined, then forms.
+**Hosts:** only ADMIN users (sub-admins can't open the calls page, so they can't host). A prospect sees only times from active hosts who cover their age range and have weekly availability; the Hosts tab warns when an age range has no one. Bookings take a Postgres advisory lock so two people can't take the same slot.
+
 ## Surveys & Quizzes
 
 Unified survey builder for creating quizzes and surveys with multi-question page support:
@@ -1199,3 +1219,5 @@ Key environment variables for the application:
 | `MIGRATION_SECRET` | Secret for migration API authentication — generate with `openssl rand -hex 32` | - |
 | `EMAIL_FROM` | Sender address for password reset emails (production only) | - |
 | `RESEND_API_KEY` | Resend API key (or use another provider; see `src/lib/email.ts`) | - |
+| `CRON_SECRET` | Shared secret for `/api/cron/discovery-reminders` (16+ chars), sent as header `x-cron-secret` | - |
+| `APP_URL` | Base URL used in email links; falls back to `NEXTAUTH_URL` | - |

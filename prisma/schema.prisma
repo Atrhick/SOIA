@@ -50,6 +50,12 @@ model User {
   timeEntries        TimeEntry[]
   timeEntryEdits     TimeEntryChange[] @relation("TimeEntryEditor")
 
+  // Get Involved / One-A-Day
+  inviteSlug          String?         @unique
+  invitedProspects    Prospect[]      @relation("ProspectInviter")
+  discoveryHost       DiscoveryHost?
+  hostedDiscoveryCalls DiscoveryCall[] @relation("DiscoveryCallHost")
+
   @@index([role, status])
   @@map("users")
 }
@@ -2008,6 +2014,32 @@ enum ProspectStatus {
   PAYMENT_PENDING
   PAYMENT_COMPLETED
   ACCOUNT_CREATED
+  // Get Involved journey (2026-11)
+  FORM_SUBMITTED
+  AWAITING_PARENT_CONSENT
+  DISCOVERY_BOOKED
+  DISCOVERY_COMPLETED
+  NOT_A_FIT
+  PAUSED
+}
+
+enum AgeRange {
+  UNDER_18
+  AGE_18_24
+  AGE_25_55
+  AGE_56_PLUS
+}
+
+enum ProspectSource {
+  INVITE_LINK
+  INVITER_ADDED
+}
+
+enum DiscoveryCallStatus {
+  BOOKED
+  CANCELLED
+  KEPT
+  NO_SHOW
 }
 
 enum PaymentMethod {
@@ -2117,6 +2149,28 @@ model Prospect {
   // Admin tracking
   assignedAdminId       String?
 
+  // Get Involved intake (One-A-Day). All optional so older prospects are untouched.
+  ageRange              AgeRange?
+  city                  String?
+  contactConsentAt      DateTime?
+  invitedById           String?
+  invitedBy             User?               @relation("ProspectInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  inviteSource          ProspectSource?
+  inviterNote           String?             @db.Text
+  journeyToken          String?             @unique
+  journeyTokenIssuedAt  DateTime?
+  parentName            String?
+  parentEmail           String?
+  parentPhone           String?
+  parentConsentToken    String?             @unique
+  parentConsentRequestedAt DateTime?
+  parentConsentAt       DateTime?
+  parentConsentSignature String?
+  parentRelationship    String?
+  parentConsentDeclinedAt DateTime?
+  noShowCount           Int                 @default(0)
+  discoveryCalls        DiscoveryCall[]
+
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
@@ -2126,7 +2180,73 @@ model Prospect {
   @@index([email])
   @@index([status])
   @@index([assessmentSurveyId])
+  @@index([invitedById, createdAt])
   @@map("prospects")
+}
+
+// ============================================
+// DISCOVERY CALLS (Get Involved)
+// ============================================
+
+// An admin who can host discovery calls, and which age ranges they take.
+model DiscoveryHost {
+  id           String                  @id @default(cuid())
+  userId       String                  @unique
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName  String
+  active       Boolean                 @default(true)
+  ageRanges    AgeRange[]
+  meetingUrl   String?
+  timezone     String                  @default("America/Chicago")
+  availability DiscoveryAvailability[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@map("discovery_hosts")
+}
+
+// Weekly recurring windows, in the host's own timezone. Minutes from midnight.
+model DiscoveryAvailability {
+  id          String        @id @default(cuid())
+  hostId      String
+  host        DiscoveryHost @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int           // 0 = Sunday
+  startMinute Int
+  endMinute   Int
+
+  @@index([hostId])
+  @@map("discovery_availability")
+}
+
+model DiscoveryCall {
+  id                String              @id @default(cuid())
+  prospectId        String
+  prospect          Prospect            @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  hostId            String?
+  host              User?               @relation("DiscoveryCallHost", fields: [hostId], references: [id], onDelete: SetNull)
+  startsAt          DateTime
+  endsAt            DateTime
+  timezone          String              // the booker's timezone, for emails
+  status            DiscoveryCallStatus @default(BOOKED)
+  meetingUrl        String?
+  parentWillAttend  Boolean             @default(false)
+  parentAttended    Boolean?
+  rescheduleCount   Int                 @default(0)
+  cancelledAt       DateTime?
+  cancelledBy       String?             // PROSPECT | HOST | ADMIN
+  cancelReason      String?
+  reminder24hSentAt DateTime?
+  reminder1hSentAt  DateTime?
+  outcomeAt         DateTime?
+  outcomeById       String?
+  notes             String?             @db.Text
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([hostId, startsAt])
+  @@index([prospectId])
+  @@index([status, startsAt])
+  @@map("discovery_calls")
 }
 
 model ProspectStatusHistory {

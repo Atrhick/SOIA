@@ -31,6 +31,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { ProspectStatus } from '@prisma/client'
+import { ageRangeLabel } from '@/lib/get-involved/core'
 import { createManualProspect } from '@/lib/actions/prospects'
 import { getCoachAssessmentLink } from '@/lib/actions/surveys'
 
@@ -47,6 +48,8 @@ interface Prospect {
   assessmentCompletedAt: string | null
   interviewCompletedAt: string | null
   paymentStatus: string | null
+  ageRange?: string | null
+  invitedByName?: string | null
 }
 
 interface Stats {
@@ -81,6 +84,12 @@ const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string; icon
   PAYMENT_PENDING: { label: 'Payment Pending', color: 'bg-amber-100 text-amber-800', icon: DollarSign },
   PAYMENT_COMPLETED: { label: 'Payment Completed', color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle },
   ACCOUNT_CREATED: { label: 'Account Created', color: 'bg-teal-100 text-teal-800', icon: UserPlus },
+  FORM_SUBMITTED: { label: 'Form Submitted', color: 'bg-sky-100 text-sky-800', icon: FileText },
+  AWAITING_PARENT_CONSENT: { label: 'Waiting on Parent', color: 'bg-amber-100 text-amber-800', icon: Clock },
+  DISCOVERY_BOOKED: { label: 'Discovery Call Booked', color: 'bg-sky-100 text-sky-800', icon: Calendar },
+  DISCOVERY_COMPLETED: { label: 'Discovery Call Kept', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
+  NOT_A_FIT: { label: 'Not a Fit', color: 'bg-gray-100 text-gray-700', icon: XCircle },
+  PAUSED: { label: 'Paused', color: 'bg-red-100 text-red-800', icon: AlertCircle },
 }
 
 const PIPELINE_STAGES: ProspectStatus[] = [
@@ -379,10 +388,13 @@ export function ProspectsClient({ prospects, stats }: ProspectsClientProps) {
                               <div className="text-sm font-medium text-gray-900">
                                 {prospect.firstName} {prospect.lastName}
                               </div>
-                              {prospect.referrerName && (
+                              {(prospect.invitedByName || prospect.referrerName) && (
                                 <div className="text-sm text-gray-500">
-                                  Referred by: {prospect.referrerName}
+                                  {prospect.invitedByName ? `Invited by: ${prospect.invitedByName}` : `Referred by: ${prospect.referrerName}`}
                                 </div>
+                              )}
+                              {prospect.ageRange && (
+                                <div className="text-xs text-gray-500">Age range: {ageRangeLabel(prospect.ageRange)}</div>
                               )}
                             </div>
                           </div>

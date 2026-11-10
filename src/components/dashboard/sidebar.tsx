@@ -39,6 +39,9 @@ import {
   Handshake,
   X,
   type LucideIcon,
+  Sparkles,
+  PhoneCall,
+  Trophy,
 } from 'lucide-react'
 import { ASSOCIATE_LABELS, isAssociateRole, type AssociateRole } from '@/lib/roles'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
@@ -62,6 +65,13 @@ interface NavSection {
 
 // Ambassador navigation - organized into sections
 const ambassadorNavSections: NavSection[] = [
+  {
+    title: 'Community',
+    icon: Sparkles,
+    items: [
+      { href: '/ambassador/one-a-day', label: 'One-A-Day', icon: Sparkles },
+    ],
+  },
   {
     title: 'Assessments',
     icon: FileQuestion,
@@ -109,6 +119,7 @@ const coachNavSections: NavSection[] = [
     title: 'People',
     icon: Users,
     items: [
+      { href: '/coach/one-a-day', label: 'One-A-Day', icon: Sparkles },
       { href: '/coach/ambassadors', label: 'Ambassadors', icon: Users },
     ],
   },
@@ -178,6 +189,8 @@ const adminNavSections: NavSection[] = [
     icon: Users,
     items: [
       { href: '/admin/prospects', label: 'Prospects', icon: UserPlus },
+      { href: '/admin/discovery-calls', label: 'Discovery Calls', icon: PhoneCall },
+      { href: '/admin/one-a-day', label: 'One-A-Day Leaderboard', icon: Trophy },
       { href: '/admin/users', label: 'User Management', icon: UserCog },
       { href: '/admin/coaches', label: 'Coaches', icon: Users },
       { href: '/admin/ambassadors', label: 'Ambassadors', icon: Users },
