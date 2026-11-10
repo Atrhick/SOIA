@@ -23,6 +23,8 @@ const STATUS_STYLE: Record<HostStatus, string> = {
   PAUSED: 'bg-gray-100 text-gray-700',
 }
 const ageLabel = (v: string) => AGE_RANGES.find((a) => a.value === v)?.label ?? v
+const ageOrder = (v: string) => AGE_RANGES.findIndex((a) => a.value === v)
+const andList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`)
 const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((x) => (x?.[0] || '?').toUpperCase()).join('') || '?'
 
 export function HostsClient({ people }: { people: Person[] }) {
@@ -56,7 +58,7 @@ export function HostsClient({ people }: { people: Person[] }) {
               {hosts.length === 0
                 ? 'Add a host, choose the age ranges they take, then set their weekly times.'
                 : needTimes.length > 0
-                  ? `${needTimes.map((h) => h.host!.displayName).join(', ')} ${needTimes.length === 1 ? 'has' : 'have'} no weekly times yet, so prospects can’t see ${needTimes.length === 1 ? 'them' : 'them'}.`
+                  ? `${andList(needTimes.map((h) => h.host!.displayName))} ${needTimes.length === 1 ? 'has' : 'have'} no weekly times yet, so prospects can’t see them.`
                   : gaps.length > 0 ? 'No bookable host takes these age ranges. Edit a host to add them.' : 'Prospects see times from bookable hosts who take their age range.'}
             </p>
             {needTimes.length > 0 && (
@@ -127,7 +129,7 @@ function HostRow({ person, open, onToggle, onClose }: { person: Person; open: bo
           </p>
           <p className="text-xs text-gray-600 break-all">{person.email}</p>
           <p className="text-sm text-gray-700 mt-1">
-            {h.ageRanges.length ? h.ageRanges.map(ageLabel).join(', ') : 'No age ranges'}
+            {h.ageRanges.length ? [...h.ageRanges].sort((a, b) => ageOrder(a) - ageOrder(b)).map(ageLabel).join(', ') : 'No age ranges'}
             <span className="text-gray-400"> · </span>{zoneLabel(h.timezone)}
             <span className="text-gray-400"> · </span>{h.blocks} weekly time block{h.blocks === 1 ? '' : 's'}
             {h.upcoming > 0 && <><span className="text-gray-400"> · </span>{h.upcoming} upcoming call{h.upcoming === 1 ? '' : 's'}</>}
