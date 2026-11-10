@@ -10,7 +10,9 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -39,7 +41,7 @@ import {
 } from 'lucide-react'
 import {
   approveProgram,
-  assignProgramToCoach,
+  assignProgramOwner,
   adminUnpublishProgram,
   createProgram,
   deleteProgram,
@@ -47,6 +49,11 @@ import {
   setProgramNtVideo,
 } from '@/lib/actions/program-pages'
 import { toVideoEmbedUrl, VIDEO_LINK_HINT } from '@/lib/video-embed'
+import {
+  UNASSIGNED_OWNER,
+  encodeOwnerChoice,
+  type ProgramOwnerRole,
+} from '@/lib/program-owner'
 
 interface ProgramRow {
   id: string
@@ -55,7 +62,9 @@ interface ProgramRow {
   organization: string
   status: string
   coachId: string | null
-  coachName: string | null
+  ambassadorId: string | null
+  ownerRole: ProgramOwnerRole | null
+  ownerName: string | null
   isLive: boolean
   leadCount: number
   submittedAt: string | null
@@ -71,9 +80,38 @@ interface ProgramRow {
   extraQuestionCount: number
 }
 
-interface CoachOption {
+interface OwnerOption {
   id: string
   name: string
+}
+
+const ROLE_TAG: Record<ProgramOwnerRole, { label: string; className: string }> = {
+  COACH: { label: 'Coach', className: 'bg-blue-100 text-blue-800' },
+  AMBASSADOR: { label: 'Ambassador', className: 'bg-amber-100 text-amber-800' },
+}
+
+function RoleTag({ role }: { role: ProgramOwnerRole }) {
+  const tag = ROLE_TAG[role]
+  return (
+    <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium ${tag.className}`}>
+      {tag.label}
+    </span>
+  )
+}
+
+function OwnerLabel({ program }: { program: ProgramRow }) {
+  if (!program.ownerRole || !program.ownerName) return <>Unassigned</>
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {program.ownerName}
+      <RoleTag role={program.ownerRole} />
+    </span>
+  )
+}
+
+/** "coach" / "ambassador", for review wording. */
+function ownerNoun(program: ProgramRow | null): 'coach' | 'ambassador' {
+  return program?.ownerRole === 'AMBASSADOR' ? 'ambassador' : 'coach'
 }
 
 const STATUS_META: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'destructive' | 'outline' }> = {
@@ -83,16 +121,16 @@ const STATUS_META: Record<string, { label: string; variant: 'default' | 'success
   REJECTED: { label: 'Sent back', variant: 'destructive' },
 }
 
-const UNASSIGNED = '__unassigned__'
-
 export function ProgramsAdminClient({
   programs,
   coaches,
+  ambassadors,
   coreQuestions,
   standardQuestionsEnabled,
 }: {
   programs: ProgramRow[]
-  coaches: CoachOption[]
+  coaches: OwnerOption[]
+  ambassadors: OwnerOption[]
   coreQuestions: CoreQuestionRow[]
   standardQuestionsEnabled: boolean
 }) {
@@ -153,7 +191,8 @@ export function ProgramsAdminClient({
           Program Pages
         </h1>
         <p className="text-gray-500 mt-1">
-          Assign each program to its owning coach, then review and publish their public page.
+          Assign each program to its owning coach or ambassador, then review and publish their
+          public page.
         </p>
       </div>
 
@@ -210,7 +249,7 @@ export function ProgramsAdminClient({
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900 truncate">{p.name}</p>
                   <p className="text-sm text-gray-500 truncate">
-                    {p.coachName ?? 'Unassigned'} · submitted{' '}
+                    <OwnerLabel program={p} /> · submitted{' '}
                     {p.submittedAt ? new Date(p.submittedAt).toLocaleDateString() : '-'}
                   </p>
                 </div>
@@ -233,7 +272,7 @@ export function ProgramsAdminClient({
               <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-4 py-3">Program</th>
-                  <th className="px-4 py-3">Owning coach</th>
+                  <th className="px-4 py-3">Owner</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Leads</th>
                   <th className="px-4 py-3">Public link</th>
@@ -251,31 +290,51 @@ export function ProgramsAdminClient({
                       </td>
                       <td className="px-4 py-3">
                         <Select
-                          value={p.coachId ?? UNASSIGNED}
+                          value={encodeOwnerChoice(p)}
                           onValueChange={(value) =>
                             run(
-                              () =>
-                                assignProgramToCoach(
-                                  p.id,
-                                  value === UNASSIGNED ? null : value
-                                ),
-                              value === UNASSIGNED ? 'Program unassigned' : 'Coach assigned'
+                              () => assignProgramOwner(p.id, value),
+                              value === UNASSIGNED_OWNER
+                                ? 'Program unassigned'
+                                : value.startsWith('AMBASSADOR:')
+                                  ? 'Ambassador assigned'
+                                  : 'Coach assigned'
                             )
                           }
                           disabled={isPending}
                         >
-                          <SelectTrigger className="w-[190px]">
-                            <SelectValue placeholder="Assign a coach" />
+                          <SelectTrigger className="w-[220px]" aria-label={`Owner of ${p.name}`}>
+                            <SelectValue placeholder="Assign an owner" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                            {coaches.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value={UNASSIGNED_OWNER}>Unassigned</SelectItem>
+                            {coaches.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Coaches</SelectLabel>
+                                {coaches.map((c) => (
+                                  <SelectItem key={c.id} value={`COACH:${c.id}`}>
+                                    {c.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                            {ambassadors.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Ambassadors</SelectLabel>
+                                {ambassadors.map((a) => (
+                                  <SelectItem key={a.id} value={`AMBASSADOR:${a.id}`}>
+                                    {a.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
                           </SelectContent>
                         </Select>
+                        {p.ownerRole && (
+                          <div className="mt-1">
+                            <RoleTag role={p.ownerRole} />
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={meta.variant}>{meta.label}</Badge>
@@ -418,14 +477,28 @@ export function ProgramsAdminClient({
           <DialogHeader>
             <DialogTitle>{reviewTarget?.name}</DialogTitle>
             <DialogDescription>
-              Submitted by {reviewTarget?.coachName ?? 'an unassigned program'}. Approving publishes
+              Submitted by{' '}
+              {reviewTarget?.ownerName
+                ? `${reviewTarget.ownerName} (${ownerNoun(reviewTarget)})`
+                : 'an unassigned program'}
+              . Approving publishes
               a snapshot of the current content to /p/{reviewTarget?.slug}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-[50vh] overflow-y-auto text-sm">
-            <ReviewField label="About the coach" value={reviewTarget?.coachBio} />
+            <ReviewField
+              label={`About the ${ownerNoun(reviewTarget)}`}
+              value={reviewTarget?.coachBio}
+            />
             <ReviewField label="Program description" value={reviewTarget?.programDescription} />
-            <ReviewVideo label="Coach's program video" url={reviewTarget?.coachVideoUrl} />
+            <ReviewVideo
+              label={
+                ownerNoun(reviewTarget) === 'ambassador'
+                  ? "Ambassador's program video"
+                  : "Coach's program video"
+              }
+              url={reviewTarget?.coachVideoUrl}
+            />
             <ReviewVideo
               label="NowTransformed and sponsorship video"
               url={reviewTarget?.ntVideoUrl}
@@ -438,11 +511,11 @@ export function ProgramsAdminClient({
               </>
             ) : (
               <p className="text-gray-500">
-                Live meeting switched off: the coach&apos;s video replaces it.
+                Live meeting switched off: the {ownerNoun(reviewTarget)}&apos;s video replaces it.
               </p>
             )}
             <p className="text-gray-500">
-              {reviewTarget?.extraQuestionCount ?? 0} coach question
+              {reviewTarget?.extraQuestionCount ?? 0} {ownerNoun(reviewTarget)} question
               {reviewTarget?.extraQuestionCount === 1 ? '' : 's'} in addition to the core set.
             </p>
           </div>
@@ -497,7 +570,8 @@ export function ProgramsAdminClient({
               {rejectTarget?.status === 'PUBLISHED' ? 'Take down' : 'Send back'} {rejectTarget?.name}
             </DialogTitle>
             <DialogDescription>
-              The coach sees this reason on their program. A reason is required.
+              The {ownerNoun(rejectTarget)} sees this reason on their program. A reason is
+              required.
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -522,7 +596,7 @@ export function ProgramsAdminClient({
                       : await rejectProgram(target.id, rejectReason)
                   if (!result?.error) setRejectTarget(null)
                   return result
-                }, 'Sent back to the coach')
+                }, `Sent back to the ${ownerNoun(rejectTarget)}`)
               }
             >
               {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

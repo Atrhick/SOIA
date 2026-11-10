@@ -96,6 +96,9 @@ const ambassadorNavSections: NavSection[] = [
     icon: Lightbulb,
     items: [
       { href: '/ambassador/business-idea', label: 'Business Idea', icon: Lightbulb },
+      // Shown to every ambassador like the coach entry; the page itself says
+      // when Program Pages is not enabled for them.
+      { href: '/ambassador/programs', label: 'Program Pages', icon: Megaphone },
     ],
   },
   {

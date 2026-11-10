@@ -96,9 +96,15 @@ export function ProgramEditorClient({
   program,
   readOnly,
   standardQuestions,
+  basePath = '/coach/programs',
+  ownerNoun = 'coach',
 }: {
   program: EditableProgram
   readOnly: boolean
+  /** The owner's programs list, for the back link. */
+  basePath?: string
+  /** Who owns the page, for the impersonation banner. */
+  ownerNoun?: 'coach' | 'ambassador'
   /** Admin-managed questions asked ahead of the coach's own. Empty when an
    *  admin has switched the standard questions off. */
   standardQuestions: ProgramQuestion[]
@@ -188,7 +194,7 @@ export function ProgramEditorClient({
     <div className="space-y-6">
       <div>
         <Link
-          href="/coach/programs"
+          href={basePath}
           className="text-sm text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -248,7 +254,7 @@ export function ProgramEditorClient({
       {readOnly && (
         <AlertBanner
           variant="warning"
-          title="Viewing as this coach"
+          title={`Viewing as this ${ownerNoun}`}
           message="You can see everything on this page, but editing is turned off while impersonating. Switch back to your admin account to make changes."
         />
       )}

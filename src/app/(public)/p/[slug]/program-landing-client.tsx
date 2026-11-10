@@ -40,6 +40,8 @@ interface PublicProgram {
   servicesDescription: string
   eventDatesText: string | null
   showMeetingDetails: boolean
+  /** Who runs the program. First name only - the owner may be a youth ambassador. */
+  owner?: { term: 'coach' | 'ambassador'; firstName: string | null }
 }
 
 interface ChildRow {
@@ -61,6 +63,8 @@ export function ProgramLandingClient({
   previewJourney?: JourneyData
 }) {
   const previewMode = previewJourney !== undefined
+  const term = program.owner?.term ?? 'coach'
+  const ownerFirstName = program.owner?.firstName?.trim() || null
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -166,6 +170,12 @@ export function ProgramLandingClient({
         <h1 className="text-3xl font-bold text-gray-900 mt-2">
           {program.pageTitle || program.name}
         </h1>
+        {ownerFirstName && (
+          <p className="text-sm text-gray-500 mt-2">
+            Hosted by {ownerFirstName}, NowTransformed{' '}
+            {term === 'ambassador' ? 'Ambassador' : 'Coach'}
+          </p>
+        )}
         {program.headline && (
           <p className="text-lg text-gray-600 mt-3 max-w-2xl mx-auto">{program.headline}</p>
         )}
@@ -189,7 +199,10 @@ export function ProgramLandingClient({
       {program.coachBio && (
         <Card>
           <CardContent className="pt-6">
-            <h2 className="font-semibold text-gray-900 mb-2">About your coach</h2>
+            <h2 className="font-semibold text-gray-900 mb-2">
+              About your {term}
+              {ownerFirstName ? `, ${ownerFirstName}` : ''}
+            </h2>
             <p className="whitespace-pre-wrap text-gray-700">{program.coachBio}</p>
           </CardContent>
         </Card>
@@ -218,7 +231,7 @@ export function ProgramLandingClient({
         <CardContent className="pt-6">
           <h2 className="font-semibold text-gray-900">Get started</h2>
           <p className="text-sm text-gray-500 mt-1 mb-4">
-            Tell us who you are and we will take you to a short video from your coach.
+            Tell us who you are and we will take you to a short video from your {term}.
           </p>
 
           {error && <AlertBanner variant="error" message={error} className="mb-4" />}
@@ -227,7 +240,7 @@ export function ProgramLandingClient({
             <AlertBanner
               variant="info"
               title="You are already registered"
-              message="Open the link from when you first signed up — it is still valid. If you no longer have it, contact your coach and they can resend it."
+              message={`Open the link from when you first signed up — it is still valid. If you no longer have it, contact your ${term} and they can resend it.`}
               className="mb-4"
             />
           )}
@@ -361,7 +374,7 @@ export function ProgramLandingClient({
                 <div>
                   <Label htmlFor="phone">Your phone number (optional)</Label>
                   <p className="text-xs text-gray-500 mb-1">
-                    So your coach can call you to talk it through.
+                    So your {term} can call you to talk it through.
                   </p>
                   <Input
                     id="phone"
@@ -381,7 +394,7 @@ export function ProgramLandingClient({
                   />
                   <span>
                     I am the parent or legal guardian of the children above, and I am happy for
-                    the coach to contact me about the program.
+                    the {term} to contact me about the program.
                   </span>
                 </label>
               </div>

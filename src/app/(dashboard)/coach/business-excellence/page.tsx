@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { flattenProgramLeads } from '@/lib/program-leads'
 import { BusinessExcellenceClient } from './business-excellence-client'
 
 async function getBusinessExcellenceData(userId: string) {
@@ -86,29 +87,8 @@ export default async function BusinessExcellencePage() {
     notes: l.notes,
   }))
 
-  // Serialize program leads (flattened across all of this coach's programs)
-  const programLeads = data.programs.flatMap((program) =>
-    program.leads.map((lead) => ({
-      id: lead.id,
-      programName: program.name,
-      fullName: lead.fullName,
-      email: lead.email,
-      profession: lead.profession,
-      registeredAt: lead.registeredAt.toISOString(),
-      qualifiedAt: lead.qualifiedAt?.toISOString() || null,
-      interestedAt: lead.interestedAt?.toISOString() || null,
-      association: lead.association,
-      audience: lead.audience,
-      children: (lead.children as { firstName: string; ageBand: string }[] | null) ?? [],
-      phone: lead.phone,
-      familyStage: lead.familyStage,
-      // The coach is the only route back to a lost joining link: the public
-      // form deliberately will not re-issue it, and the app sends no email.
-      joiningPath: `/p/${program.slug}/r/${lead.token}`,
-      answers: (lead.answers as { label: string; value: string | number }[] | null) ?? [],
-    }))
-  )
-  programLeads.sort((a, b) => b.registeredAt.localeCompare(a.registeredAt))
+  // Program leads, flattened across all of this coach's programs, newest first
+  const programLeads = flattenProgramLeads(data.programs)
 
   return (
     <BusinessExcellenceClient
