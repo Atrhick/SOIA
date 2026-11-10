@@ -170,6 +170,8 @@ interface AssessmentResults {
 
 interface ProspectDetailClientProps {
   prospect: Prospect
+  /** Get Involved prospects: show the data only. Their steps are on the Get Involved record. */
+  readOnly?: boolean
 }
 
 const STATUS_LABELS: Record<ProspectStatus, string> = {
@@ -207,7 +209,7 @@ interface OrientationSlot {
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
+export function ProspectDetailClient({ prospect, readOnly = false }: ProspectDetailClientProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -879,6 +881,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             <p className="text-gray-500">{prospect.email}</p>
           </div>
         </div>
+        {!readOnly && (
         <div className="flex items-center gap-4">
           {getNextActions()}
 
@@ -893,6 +896,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             </button>
           )}
         </div>
+        )}
       </div>
 
       {/* Alerts */}
@@ -951,13 +955,15 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
         </div>
       )}
 
-      {/* Prospect Journey Progress */}
-      <ProspectJourney
-        preOnboardingSteps={preOnboardingSteps}
-        onboardingSteps={onboardingSteps}
-        coachProfileId={prospect.coachProfileId}
-        isRejected={prospect.status === 'REJECTED'}
-      />
+      {/* Prospect Journey Progress (older coach steps; a Get Involved prospect's progress is on its record) */}
+      {!readOnly && (
+        <ProspectJourney
+          preOnboardingSteps={preOnboardingSteps}
+          onboardingSteps={onboardingSteps}
+          coachProfileId={prospect.coachProfileId}
+          isRejected={prospect.status === 'REJECTED'}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
@@ -965,12 +971,12 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
           {/* Contact Information */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="min-w-0">
                 <label className="text-sm text-gray-500">Email</label>
-                <div className="flex items-center text-gray-900">
-                  <Mail className="h-4 w-4 mr-2 text-gray-400" />
-                  {prospect.email}
+                <div className="flex items-center text-gray-900 min-w-0">
+                  <Mail className="h-4 w-4 mr-2 text-gray-400 shrink-0" />
+                  <span className="break-all">{prospect.email}</span>
                 </div>
               </div>
               <div>
@@ -1593,7 +1599,8 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             )}
           </div>
 
-          {/* Prospect Links - Action Panel */}
+          {/* Prospect Links - Action Panel (hidden when read-only: these generate older-pipeline links) */}
+          {!readOnly && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Prospect Links</h2>
             <p className="text-xs text-gray-500 mb-4">
@@ -1736,6 +1743,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
               )}
             </div>
           </div>
+          )}
 
           {/* Timeline */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -1763,7 +1771,8 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
             </div>
           </div>
 
-          {/* Notes */}
+          {/* Notes (only feeds the orientation step; Get Involved notes live on the record) */}
+          {!readOnly && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Notes</h2>
             <textarea
@@ -1774,6 +1783,7 @@ export function ProspectDetailClient({ prospect }: ProspectDetailClientProps) {
               placeholder="Enter notes for the next action..."
             />
           </div>
+          )}
         </div>
       </div>
 

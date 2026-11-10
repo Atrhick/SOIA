@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { sendWelcomeInvite } from '@/lib/welcome-invite'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
+import { upcomingHostCallsError, upcomingHostedCallsWhere } from '@/lib/prospect-pipeline'
 
 const createUserSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -170,6 +171,14 @@ export async function updateUserRole(userId: string, newRole: string) {
   }
 
   try {
+    // Only ADMIN users host discovery calls. Moving a host to another role would let the
+    // coach/ambassador delete screens remove them with calls still booked.
+    if (newRole !== 'ADMIN') {
+      const upcoming = await prisma.discoveryCall.count({ where: upcomingHostedCallsWhere(userId, new Date()) })
+      const blocked = upcomingHostCallsError(upcoming)
+      if (blocked) return { error: blocked }
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
       data: { role: newRole as typeof validRoles[number] },
@@ -213,10 +222,18 @@ export async function deleteUser(userId: string) {
       return { error: 'User not found' }
     }
 
-    // Delete user (cascading deletes should handle related records)
-    await prisma.user.delete({
-      where: { id: userId },
+    // A discovery-call host's delete would cascade their DiscoveryHost row and set hostId to
+    // null on their booked calls, leaving prospects booked with nobody to attend. Refuse, as
+    // removeHost does. Counted inside the transaction so the check and the delete go together.
+    const refused = await prisma.$transaction(async (tx) => {
+      const upcoming = await tx.discoveryCall.count({ where: upcomingHostedCallsWhere(userId, new Date()) })
+      const blocked = upcomingHostCallsError(upcoming)
+      if (blocked) return blocked
+      // Delete user (cascading deletes should handle related records)
+      await tx.user.delete({ where: { id: userId } })
+      return null
     })
+    if (refused) return { error: refused }
 
     await prisma.auditLog.create({
       data: {

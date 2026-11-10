@@ -10,6 +10,7 @@ import {
 import { journeyFactsFor, journeyLinkUsable } from '@/lib/get-involved/journey'
 import { listRoleConfigs, prospectRoleConfig } from '@/lib/get-involved/roles'
 import { userDisplayName } from '@/lib/get-involved/server'
+import { adminCallWhen } from './admin-time'
 import { appUrl } from '@/lib/get-involved/emails'
 import { listStageFor, stageBadgeClass, stageBadgeLabel } from '../journey-list'
 
@@ -81,9 +82,6 @@ const USER_ROLE_LABEL: Record<string, string> = {
   ADMIN: 'Admin', SUB_ADMIN: 'Sub-admin', COACH: 'Coach', AMBASSADOR: 'Ambassador', PARENT: 'Parent',
   SERVICE_PROVIDER: 'Service provider', BUSINESS_AFFILIATE: 'Business affiliate', VOLUNTEER: 'Volunteer',
 }
-
-const callWhen = (d: Date, tz: string) =>
-  new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: tz }).format(d)
 
 /** null = not a Get Involved prospect (no journeyToken) or not found. */
 export async function loadRecord(id: string): Promise<RecordData | null> {
@@ -166,7 +164,7 @@ export async function loadRecord(id: string): Promise<RecordData | null> {
   if (!p.statusHistory.some((h) => !h.fromStatus)) activity.push({ at: p.createdAt.toISOString(), text: 'Get Involved form submitted.', by: null, kind: 'status' })
   for (const c of p.discoveryCalls) {
     const host = nameOf(c.hostId)
-    activity.push({ at: c.createdAt.toISOString(), text: `Call booked for ${callWhen(c.startsAt, c.timezone)}${host ? ` with ${host}` : ''}${c.rescheduleCount ? ` (moved ${c.rescheduleCount}×)` : ''}.`, by: null, kind: 'call' })
+    activity.push({ at: c.createdAt.toISOString(), text: `Call booked for ${adminCallWhen(c.startsAt)}${host ? ` with ${host}` : ''}${c.rescheduleCount ? ` (moved ${c.rescheduleCount}×)` : ''}.`, by: null, kind: 'call' })
     if (c.reminder24hSentAt) activity.push({ at: c.reminder24hSentAt.toISOString(), text: 'Reminder sent (24 hours).', by: 'automatic', kind: 'email' })
     if (c.reminder1hSentAt) activity.push({ at: c.reminder1hSentAt.toISOString(), text: 'Reminder sent (1 hour).', by: 'automatic', kind: 'email' })
     if (c.cancelledAt) activity.push({ at: c.cancelledAt.toISOString(), text: `Call cancelled${c.cancelledBy === 'PROSPECT' ? ' by the prospect' : c.cancelledBy ? ' by staff' : ''}${c.cancelReason ? `: ${c.cancelReason}` : ''}.`, by: null, kind: 'call' })

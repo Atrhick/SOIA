@@ -8,6 +8,18 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { ProspectStatus } from '@prisma/client'
 import crypto from 'crypto'
+import { isJourneyProspect, JOURNEY_PROSPECT_ERROR, PIPELINE_ONLY } from '@/lib/prospect-pipeline'
+
+// The actions in this file are the older coach pipeline. Get Involved prospects (journeyToken
+// set) move only through the journey actions (journey-admin.ts, journey-join.ts, payment.ts),
+// so every pipeline write below refuses them. Not exported, so not an endpoint.
+async function journeyGuard(prospectId: string): Promise<string | null> {
+  const p = await prisma.prospect.findUnique({
+    where: { id: prospectId },
+    select: { journeyToken: true, journeyRole: true, userId: true, payment: { select: { journeyRole: true } } },
+  })
+  return isJourneyProspect(p) ? JOURNEY_PROSPECT_ERROR : null
+}
 
 // ============================================
 // SCHEMAS
@@ -404,7 +416,8 @@ export async function getAllProspects(filters?: {
   }
 
   try {
-    const where: Record<string, unknown> = {}
+    // Older coach pipeline only: Get Involved prospects live on the Get Involved tab.
+    const where: Record<string, unknown> = { ...PIPELINE_ONLY }
 
     if (filters?.status) {
       where.status = filters.status
@@ -479,6 +492,9 @@ export async function updateProspectStatus(
   }
 
   try {
+    const blocked = await journeyGuard(id)
+    if (blocked) return { error: blocked }
+
     const prospect = await prisma.prospect.findUnique({
       where: { id },
       select: { status: true },
@@ -593,6 +609,9 @@ export async function generateOrientationToken(prospectId: string) {
   }
 
   try {
+    const blocked = await journeyGuard(prospectId)
+    if (blocked) return { error: blocked }
+
     // Check if prospect already has a token
     const existingProspect = await prisma.prospect.findUnique({
       where: { id: prospectId },
@@ -627,6 +646,9 @@ export async function generateBizDevInterviewToken(prospectId: string) {
   }
 
   try {
+    const blocked = await journeyGuard(prospectId)
+    if (blocked) return { error: blocked }
+
     // Check if prospect already has a token
     const existingProspect = await prisma.prospect.findUnique({
       where: { id: prospectId },
@@ -722,6 +744,9 @@ export async function generateBusinessFormToken(prospectId: string) {
   }
 
   try {
+    const blocked = await journeyGuard(prospectId)
+    if (blocked) return { error: blocked }
+
     const token = `bf_${crypto.randomBytes(24).toString('hex')}`
 
     await prisma.prospect.update({
@@ -759,7 +784,7 @@ export async function saveBusinessFormDraft(
     }
 
     const prospect = await prisma.prospect.findFirst({
-      where: { businessFormToken: token },
+      where: { businessFormToken: token, ...PIPELINE_ONLY },
     })
 
     if (!prospect) {
@@ -875,7 +900,7 @@ export async function submitBusinessForm(
     }
 
     const prospect = await prisma.prospect.findFirst({
-      where: { businessFormToken: token },
+      where: { businessFormToken: token, ...PIPELINE_ONLY },
     })
 
     if (!prospect) {
@@ -1110,6 +1135,9 @@ export async function revertInterviewDecision(prospectId: string, restorePriorBo
   }
 
   try {
+    const blocked = await journeyGuard(prospectId)
+    if (blocked) return { error: blocked }
+
     const prospect = await prisma.prospect.findUnique({
       where: { id: prospectId },
     })
@@ -1209,6 +1237,9 @@ export async function cancelInterviewBooking(prospectId: string, reason?: string
   }
 
   try {
+    const blocked = await journeyGuard(prospectId)
+    if (blocked) return { error: blocked }
+
     const prospect = await prisma.prospect.findUnique({
       where: { id: prospectId },
       include: {
@@ -1288,6 +1319,9 @@ export async function generateAcceptanceToken(prospectId: string) {
   }
 
   try {
+    const blocked = await journeyGuard(prospectId)
+    if (blocked) return { error: blocked }
+
     const token = `ac_${crypto.randomBytes(24).toString('hex')}`
 
     await prisma.prospect.update({
@@ -1325,7 +1359,7 @@ export async function acceptTerms(
     }
 
     const prospect = await prisma.prospect.findFirst({
-      where: { acceptanceToken: token },
+      where: { acceptanceToken: token, ...PIPELINE_ONLY },
     })
 
     if (!prospect) {
@@ -1372,6 +1406,9 @@ export async function createCoachFromProspect(
   }
 
   try {
+    const blocked = await journeyGuard(prospectId)
+    if (blocked) return { error: blocked }
+
     const prospect = await prisma.prospect.findUnique({
       where: { id: prospectId },
       include: { payment: true },
@@ -1508,6 +1545,9 @@ export async function deleteProspect(id: string) {
   }
 
   try {
+    const blocked = await journeyGuard(id)
+    if (blocked) return { error: blocked }
+
     const prospect = await prisma.prospect.findUnique({
       where: { id },
       select: {
@@ -1702,15 +1742,15 @@ export async function getProspectStats() {
       accountCreated,
       rejected,
     ] = await Promise.all([
-      prisma.prospect.count(),
-      prisma.prospect.count({ where: { status: 'ASSESSMENT_COMPLETED' } }),
-      prisma.prospect.count({ where: { status: { in: ['ORIENTATION_SCHEDULED', 'ORIENTATION_COMPLETED'] } } }),
-      prisma.prospect.count({ where: { status: { in: ['BUSINESS_FORM_PENDING', 'BUSINESS_FORM_SUBMITTED'] } } }),
-      prisma.prospect.count({ where: { status: { in: ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED'] } } }),
-      prisma.prospect.count({ where: { status: 'APPROVED' } }),
-      prisma.prospect.count({ where: { status: { in: ['ACCEPTANCE_PENDING', 'PAYMENT_PENDING'] } } }),
-      prisma.prospect.count({ where: { status: 'ACCOUNT_CREATED' } }),
-      prisma.prospect.count({ where: { status: 'REJECTED' } }),
+      prisma.prospect.count({ where: PIPELINE_ONLY }),
+      prisma.prospect.count({ where: { ...PIPELINE_ONLY, status: 'ASSESSMENT_COMPLETED' } }),
+      prisma.prospect.count({ where: { ...PIPELINE_ONLY, status: { in: ['ORIENTATION_SCHEDULED', 'ORIENTATION_COMPLETED'] } } }),
+      prisma.prospect.count({ where: { ...PIPELINE_ONLY, status: { in: ['BUSINESS_FORM_PENDING', 'BUSINESS_FORM_SUBMITTED'] } } }),
+      prisma.prospect.count({ where: { ...PIPELINE_ONLY, status: { in: ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED'] } } }),
+      prisma.prospect.count({ where: { ...PIPELINE_ONLY, status: 'APPROVED' } }),
+      prisma.prospect.count({ where: { ...PIPELINE_ONLY, status: { in: ['ACCEPTANCE_PENDING', 'PAYMENT_PENDING'] } } }),
+      prisma.prospect.count({ where: { ...PIPELINE_ONLY, status: 'ACCOUNT_CREATED' } }),
+      prisma.prospect.count({ where: { ...PIPELINE_ONLY, status: 'REJECTED' } }),
     ])
 
     return {
