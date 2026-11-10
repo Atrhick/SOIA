@@ -1,4 +1,5 @@
 /** Read-only queries for the One-A-Day dashboards and leaderboard. Server only. */
+import { invitePrograms } from './program-welcome-server'
 import { TZDate } from '@date-fns/tz'
 import prisma from '@/lib/prisma'
 import { BUSINESS_TZ, computeStreak, isGetInvolvedRole, rankLeaderboard, roleConfigFromRow, roleLabel } from './core'
@@ -58,7 +59,7 @@ export async function inviterDashboard(userId: string, role: 'COACH' | 'AMBASSAD
   const now = new Date()
   const since = monthStart(now)
   const slug = await ensureInviteSlug(userId)
-  const [people, recent, board, overall] = await Promise.all([
+  const [people, recent, board, overall, programs] = await Promise.all([
     prisma.prospect.findMany({
       where: { invitedById: userId },
       orderBy: { createdAt: 'desc' },
@@ -71,11 +72,14 @@ export async function inviterDashboard(userId: string, role: 'COACH' | 'AMBASSAD
     prisma.prospect.findMany({ where: { invitedById: userId, createdAt: { gte: new Date(now.getTime() - 400 * 86400_000) } }, select: { createdAt: true } }),
     leaderboard({ since, role }),
     leaderboard({ since, role: 'ALL' }),
+    invitePrograms(userId),
   ])
   const { streak, doneToday } = computeStreak(recent.map((r) => r.createdAt), now)
   const me = overall.find((r) => r.userId === userId)
   return {
     shareUrl: appUrl(`/join/${slug}`),
+    // One link per live program page; its welcome email is about that program once the note is approved.
+    programLinks: programs.map((pr) => ({ name: pr.name, url: appUrl(`/join/${slug}/${pr.slug}`), emailReady: !!pr.note })),
     streak,
     doneToday,
     formsThisMonth: me?.forms ?? recent.filter((r) => r.createdAt >= since).length,

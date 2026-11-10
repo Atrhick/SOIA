@@ -23,6 +23,7 @@ import {
   isStatusConflict, journeyUrl, journeyUsable, mustTransition, newToken, notifyAdmins, prospectByJourneyToken, rateLimited,
   transitionStatus, upcomingCounts, userDisplayName,
 } from '@/lib/get-involved/server'
+import { programForSignup } from '@/lib/get-involved/program-welcome-server'
 import { sendFreshJourneyLink } from '@/lib/get-involved/journey'
 
 type Result = { success: true; message?: string } | { error: string }
@@ -66,7 +67,7 @@ type IntakeOutcome = 'created' | 'exists-mine' | 'exists' | 'limited'
  * a Get Involved prospect) or 'limited' (too many emails to that address). Emails are sent after the
  * database write.
  */
-async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: string | null, source: 'INVITE_LINK' | 'INVITER_ADDED'): Promise<IntakeOutcome> {
+async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: string | null, source: 'INVITE_LINK' | 'INVITER_ADDED', programSlug: string | null = null): Promise<IntakeOutcome> {
   // Cap emails per address, whatever the source, so neither path can be used to flood an inbox.
   const flood = rateLimited(`gi-to:${data.email}`, 3, 60 * 60_000) || (data.parentEmail ? rateLimited(`gi-to:${data.parentEmail}`, 3, 60 * 60_000) : false)
   if (flood) return 'limited'
@@ -81,6 +82,8 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
 
   const minor = data.ageRange === 'UNDER_18'
   const now = new Date()
+  // The inviter's program page this came through (its link, or their latest with an approved note).
+  const program = await programForSignup(inviterId, programSlug).catch(() => null)
   const journeyToken = newToken()
   const parentConsentToken = minor ? newToken() : null
   let prospectId: string
@@ -96,6 +99,7 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
           ageRange: data.ageRange,
           contactConsentAt: now,
           invitedById: inviterId,
+          programId: program?.id ?? null,
           inviteSource: source,
           inviterNote: data.note || null,
           journeyToken,
@@ -118,10 +122,11 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
   }
 
   const inviter = inviterId ? await userDisplayName(inviterId) : null
+  const programMail = program?.note ? { name: program.name, note: program.note } : null
   if (minor) {
-    await sendEmail({ to: data.parentEmail, ...mail.parentConsentEmail({ parentName: data.parentName, childFirst: data.firstName, inviterName: inviter?.full ?? null, consentUrl: consentUrl(parentConsentToken!) }) })
+    await sendEmail({ to: data.parentEmail, ...mail.parentConsentEmail({ parentName: data.parentName, childFirst: data.firstName, inviterName: inviter?.full ?? null, consentUrl: consentUrl(parentConsentToken!), program: programMail }) })
   } else {
-    await sendEmail({ to: data.email, ...mail.welcomeEmail({ firstName: data.firstName, inviterName: inviter?.full ?? null, bookUrl: journeyUrl(journeyToken) }) })
+    await sendEmail({ to: data.email, ...mail.welcomeEmail({ firstName: data.firstName, inviterName: inviter?.full ?? null, bookUrl: journeyUrl(journeyToken), program: programMail }) })
   }
   if (inviterId && source === 'INVITE_LINK') await emailInviterNewLead(inviterId, { name: `${data.firstName} ${data.lastName}`, ageRange: data.ageRange, city: data.city || null })
   await notifyAdmins('New Get Involved form', `${data.firstName} ${data.lastName} (${ageRangeLabel(data.ageRange)})${inviter ? ` was invited by ${inviter.full}` : ''}.`, prospectId).catch(() => {})
@@ -141,7 +146,8 @@ export async function submitGetInvolved(slug: string, formData: FormData): Promi
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form' }
 
   try {
-    await createIntake({ ...parsed.data, note: '' }, inviter.id, 'INVITE_LINK')
+    const programSlug = String(formData.get('program') ?? '').trim().slice(0, 120) || null
+    await createIntake({ ...parsed.data, note: '' }, inviter.id, 'INVITE_LINK', programSlug)
     // Same answer whether the email was new or not, so nobody can probe for members.
     return { success: true }
   } catch (e) {

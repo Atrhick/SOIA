@@ -12,6 +12,7 @@ interface Person { id: string; name: string; ageRange: string | null; status: st
 interface Row { userId: string; name: string; role: string; forms: number; joined: number; streak: number; rank: number }
 export interface OneADayData {
   shareUrl: string
+  programLinks?: { name: string; url: string; emailReady: boolean }[]
   streak: number
   doneToday: boolean
   formsThisMonth: number
@@ -84,6 +85,15 @@ export function OneADayClient({ data, roleLabel, firstName, meId }: { data: OneA
               <button onClick={copy} className="h-11 px-4 rounded-lg border border-sky-300 text-primary-700 font-semibold text-sm inline-flex items-center gap-2">{copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}{copied ? 'Copied' : 'Copy'}</button>
               <button onClick={share} className="h-11 px-4 rounded-lg bg-primary-700 hover:bg-primary-800 text-white font-semibold text-sm inline-flex items-center gap-2"><Share2 className="h-4 w-4" aria-hidden />Share</button>
             </div>
+            {(data.programLinks?.length ?? 0) > 0 && (
+              <div className="border-t border-gray-100 pt-3 space-y-2">
+                <p className="text-sm font-semibold text-gray-800">Links for your program pages</p>
+                <p className="text-xs text-gray-600">Same credit as your main link. People who use one get a welcome email about that program.</p>
+                <ul className="space-y-2">
+                  {data.programLinks!.map((l) => <ProgramLink key={l.url} {...l} />)}
+                </ul>
+              </div>
+            )}
             <button onClick={() => { setAdding((a) => !a); setMsg(null) }} aria-expanded={adding} className="h-11 px-4 rounded-lg border border-gray-300 text-gray-800 font-semibold text-sm inline-flex items-center gap-2">
               {adding ? <X className="h-4 w-4" aria-hidden /> : <UserPlus className="h-4 w-4" aria-hidden />}{adding ? 'Close' : 'Add someone I talked to'}
             </button>
@@ -144,5 +154,24 @@ export function OneADayClient({ data, roleLabel, firstName, meId }: { data: OneA
         </section>
       </div>
     </div>
+  )
+}
+
+function ProgramLink({ name, url, emailReady }: { name: string; url: string; emailReady: boolean }) {
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { /* clipboard blocked */ }
+  }
+  return (
+    <li className="rounded-lg border border-gray-200 p-3 space-y-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-900 min-w-0 break-words">{name}</p>
+        <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${emailReady ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{emailReady ? 'Program email ready' : 'Standard email until you approve one'}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <input readOnly value={url} aria-label={`Link for ${name}`} className="flex-1 min-w-0 h-10 rounded-lg border border-gray-300 px-3 text-sm bg-gray-50" onFocus={(e) => e.currentTarget.select()} />
+        <button type="button" onClick={copy} className="h-10 px-3 rounded-lg border border-sky-300 text-primary-700 font-semibold text-sm inline-flex items-center gap-1.5">{copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}{copied ? 'Copied' : 'Copy'}<span className="sr-only"> link for {name}</span></button>
+      </div>
+    </li>
   )
 }
