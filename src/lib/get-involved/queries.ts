@@ -1,7 +1,7 @@
 /** Read-only queries for the One-A-Day dashboards and leaderboard. Server only. */
 import { TZDate } from '@date-fns/tz'
 import prisma from '@/lib/prisma'
-import { BUSINESS_TZ, computeStreak, rankLeaderboard } from './core'
+import { BUSINESS_TZ, computeStreak, isGetInvolvedRole, rankLeaderboard, roleConfigFromRow, roleLabel } from './core'
 import { ensureInviteSlug, userDisplayName } from './server'
 import { appUrl } from './emails'
 
@@ -94,3 +94,63 @@ export async function inviterDashboard(userId: string, role: 'COACH' | 'AMBASSAD
     overallBoard: overall.slice(0, 10),
   }
 }
+
+export type TeamGroup = 'COACH' | 'AMBASSADOR' | 'OTHER'
+
+/**
+ * My Team: people who finished the journey through this inviter (ACCOUNT_CREATED with a login),
+ * with their own invites this month, streak and team size, plus the inviter's headline numbers.
+ */
+export async function myTeam(userId: string, role: 'COACH' | 'AMBASSADOR') {
+  const now = new Date()
+  const since = monthStart(now)
+  const rows = await prisma.prospect.findMany({
+    where: { invitedById: userId, status: 'ACCOUNT_CREATED', userId: { not: null } },
+    orderBy: [{ joinedAt: 'desc' }, { updatedAt: 'desc' }],
+    take: 500,
+    select: {
+      id: true, firstName: true, lastName: true, email: true, journeyRole: true, roleConfigSnapshot: true, joinedAt: true, updatedAt: true, userId: true,
+      user: { select: { role: true, email: true, status: true } },
+    },
+  })
+  const memberIds = rows.map((r) => r.userId!)
+  const [invites, board, joined, teamOf] = await Promise.all([
+    memberIds.length
+      ? prisma.prospect.findMany({ where: { invitedById: { in: memberIds }, createdAt: { gte: new Date(now.getTime() - 400 * 86400_000) } }, select: { invitedById: true, createdAt: true } })
+      : Promise.resolve([] as { invitedById: string | null; createdAt: Date }[]),
+    leaderboard({ since, role }),
+    joinedByInviter(since),
+    memberIds.length ? joinedByInviter(null) : Promise.resolve(new Map<string, number>()),
+  ])
+  const byMember = new Map<string, Date[]>()
+  for (const i of invites) { const list = byMember.get(i.invitedById!) ?? []; list.push(i.createdAt); byMember.set(i.invitedById!, list) }
+
+  const members = rows.map((r) => {
+    const dates = byMember.get(r.userId!) ?? []
+    const userRole = r.user?.role ?? 'VOLUNTEER'
+    const label = isGetInvolvedRole(r.journeyRole) ? roleConfigFromRow(r.journeyRole, r.roleConfigSnapshot as Record<string, unknown> | null).label : roleLabel(null)
+    const group: TeamGroup = userRole === 'COACH' ? 'COACH' : userRole === 'AMBASSADOR' ? 'AMBASSADOR' : 'OTHER'
+    return {
+      id: r.id,
+      name: `${r.firstName} ${r.lastName}`.trim(),
+      firstName: r.firstName,
+      email: r.user?.email ?? r.email,
+      roleLabel: label,
+      group,
+      joinedAt: (r.joinedAt ?? r.updatedAt).toISOString(),
+      invitesThisMonth: dates.filter((d) => d >= since).length,
+      streak: computeStreak(dates, now).streak,
+      theirTeam: teamOf.get(r.userId!) ?? 0,
+    }
+  })
+  return {
+    onTeam: members.length,
+    joinedThisMonth: joined.get(userId) ?? 0,
+    invitedByTeamThisMonth: members.reduce((n, m) => n + m.invitesThisMonth, 0),
+    rank: board.find((b) => b.userId === userId)?.rank ?? null,
+    members,
+    now: now.toISOString(),
+  }
+}
+export type MyTeamData = Awaited<ReturnType<typeof myTeam>>
+export type TeamMember = MyTeamData['members'][number]
