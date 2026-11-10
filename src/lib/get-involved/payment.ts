@@ -1,7 +1,7 @@
 /**
  * Payment hand-off for paid roles. Server only, not 'use server'. Reuses the ProspectPayment row
  * (one per prospect) with journeyRole/billing set, so the old coach pipeline's rows (journeyRole null)
- * are untouched. The payment provider integration itself belongs to the payment builder.
+ * are untouched. Provider seam: src/lib/payments.ts (Invo); webhook: src/app/api/webhooks/invo.
  */
 import { PaymentMethod, Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
@@ -18,7 +18,7 @@ export async function openJourneyPayment(tx: Prisma.TransactionClient, prospectI
   if (!isPaidRole(cfg)) throw new Error('openJourneyPayment called for a free role')
   const p = await tx.prospect.findUnique({ where: { id: prospectId }, select: { status: true } })
   if (!p) throw new Error('Prospect not found')
-  const data = { method, status: 'PENDING' as const, amount: new Prisma.Decimal(cfg.priceCents).div(100), currency: 'USD', journeyRole: cfg.role, billing: cfg.billing, failedAt: null, failureReason: null }
+  const data = { method, status: 'PENDING' as const, amount: new Prisma.Decimal(cfg.priceCents).div(100), currency: 'USD', journeyRole: cfg.role, billing: cfg.billing, failedAt: null, failureReason: null, checkoutUrl: null, invoSessionId: null, invoClientRequestId: null }
   const payment = await tx.prospectPayment.upsert({ where: { prospectId }, create: { prospectId, ...data }, update: data })
   if (p.status !== 'PAYMENT_PENDING') await setStatus(tx, prospectId, p.status, 'PAYMENT_PENDING', changedBy, 'Terms accepted: waiting for payment')
   return payment
@@ -29,7 +29,7 @@ export async function openJourneyPayment(tx: Prisma.TransactionClient, prospectI
  * call for an already-completed payment does nothing. Moves PAYMENT_PENDING -> PAYMENT_COMPLETED, then
  * completeJourney() creates the login and sends the welcome emails.
  */
-export async function markJourneyPaid(prospectId: string, opts: { method?: PaymentMethod; reference?: string | null; stripePaymentIntentId?: string | null; stripeSessionId?: string | null; stripeSubscriptionId?: string | null; byUserId?: string | null } = {}) {
+export async function markJourneyPaid(prospectId: string, opts: { method?: PaymentMethod; reference?: string | null; stripePaymentIntentId?: string | null; stripeSessionId?: string | null; stripeSubscriptionId?: string | null; invoOrderId?: string | null; invoSessionId?: string | null; byUserId?: string | null } = {}) {
   const changed = await prisma.$transaction(async (tx) => {
     const p = await tx.prospect.findUnique({ where: { id: prospectId }, select: { status: true, payment: { select: { status: true } } } })
     if (!p || !p.payment || p.payment.status === 'COMPLETED' || p.status !== 'PAYMENT_PENDING') return false
@@ -42,6 +42,8 @@ export async function markJourneyPaid(prospectId: string, opts: { method?: Payme
         ...(opts.stripePaymentIntentId ? { stripePaymentIntentId: opts.stripePaymentIntentId } : {}),
         ...(opts.stripeSessionId ? { stripeSessionId: opts.stripeSessionId } : {}),
         ...(opts.stripeSubscriptionId ? { stripeSubscriptionId: opts.stripeSubscriptionId } : {}),
+        ...(opts.invoOrderId ? { invoOrderId: opts.invoOrderId } : {}),
+        ...(opts.invoSessionId ? { invoSessionId: opts.invoSessionId } : {}),
       },
     })
     await setStatus(tx, prospectId, p.status, 'PAYMENT_COMPLETED', opts.byUserId ?? null, 'Payment received')

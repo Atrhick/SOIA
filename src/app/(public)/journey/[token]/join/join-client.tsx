@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Eye, EyeOff, Loader2, Mail } from 'lucide-react'
-import { acceptTermsAndJoin, createMyLogin } from '@/lib/actions/journey-join'
+import { Check, CreditCard, Eye, EyeOff, Loader2, Mail } from 'lucide-react'
+import { acceptTermsAndJoin, createMyLogin, startJourneyCheckout } from '@/lib/actions/journey-join'
 import { journeyBtn, journeyCard } from '@/components/get-involved/join-shell'
 
 interface Base { firstName: string; inviterName: string | null; roleLabel: string; email: string }
@@ -15,16 +15,16 @@ export type JoinView =
       minor: boolean
       parentConsent: boolean
       terms: { version: number; body: string; title: string }
-      price: { amount: string; billing: string; label: string } | null
+      price: { amount: string; billing: string; label: string; online: boolean } | null
     })
-  | (Base & { kind: 'payment'; amount: string; billing: string; termsVersion: number | null; acceptedAt: string | null; checkoutUrl: string | null; failed: boolean })
+  | (Base & { kind: 'payment'; amount: string; billing: string; termsVersion: number | null; acceptedAt: string | null; online: boolean; failed: boolean; notice: 'paid' | 'cancelled' | null })
   | (Base & { kind: 'login'; paymentReceived: boolean })
 
 const asA = (label: string) => `${/^[aeiou]/i.test(label) ? 'an' : 'a'} ${label}`
 const PW_HINT = 'At least 8 characters, with an upper-case letter, a lower-case letter and a number.'
 
 export function JoinClient({ token, view }: { token: string; view: JoinView }) {
-  if (view.kind === 'payment') return <Payment v={view} />
+  if (view.kind === 'payment') return <Payment token={token} v={view} />
   if (view.kind === 'login') return <Login token={token} v={view} />
   return <Terms token={token} v={view} />
 }
@@ -66,7 +66,7 @@ function Terms({ token, v }: { token: string; v: Extract<JoinView, { kind: 'term
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Join as {asA(v.roleLabel)}</h1>
       <p className="text-gray-700">
         {v.paid
-          ? `Read and accept the ${v.terms.title.toLowerCase()} and choose a password. Then we'll arrange payment and create your login.`
+          ? `Read and accept the ${v.terms.title.toLowerCase()} and choose a password. ${v.price?.online ? 'Then pay online and we\'ll create your login.' : 'Then we\'ll arrange payment and create your login.'}`
           : `There's no fee for this role. Read and accept the ${v.terms.title.toLowerCase()}, then we'll create your login.`}
       </p>
       {v.minor && v.parentConsent && (
@@ -103,7 +103,11 @@ function Terms({ token, v }: { token: string; v: Extract<JoinView, { kind: 'term
             <span className="text-sm text-gray-700">{v.roleLabel} fee · {v.price.billing}</span>
             <span className="text-2xl font-bold text-gray-900">{v.price.amount}</span>
           </div>
-          <p className="text-sm text-gray-600">Online payment isn&apos;t available yet. After you accept, our team will contact you about payment. Your login is created as soon as it&apos;s recorded.</p>
+          <p className="text-sm text-gray-600">
+            {v.price.online
+              ? 'After you accept, you can pay securely by card on the next screen. Your login is created as soon as the payment goes through.'
+              : 'Online payment isn\'t available for this role yet. After you accept, our team will contact you about payment. Your login is created as soon as it\'s recorded.'}
+          </p>
         </section>
       )}
 
@@ -139,8 +143,52 @@ function PasswordField({ value, onChange, error }: { value: string; onChange: (v
   )
 }
 
-function Payment({ v }: { v: Extract<JoinView, { kind: 'payment' }> }) {
+/** How long the "we're setting up your login" screen keeps checking before suggesting email instead. */
+const PAID_POLL_MS = 4000
+const PAID_POLL_MAX = 30
+
+function Payment({ token, v }: { token: string; v: Extract<JoinView, { kind: 'payment' }> }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [polls, setPolls] = useState(0)
+  const waiting = v.notice === 'paid'
   const when = v.acceptedAt ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(v.acceptedAt)) : null
+
+  // Back from the payment page: the webhook does the work; refresh until the login exists
+  // (the server page then shows "Payment received" with the welcome link).
+  useEffect(() => {
+    if (!waiting || polls >= PAID_POLL_MAX) return
+    const id = setTimeout(() => { setPolls((n) => n + 1); router.refresh() }, PAID_POLL_MS)
+    return () => clearTimeout(id)
+  }, [waiting, polls, router])
+
+  async function pay() {
+    setBusy(true); setError(null)
+    try {
+      const r = await startJourneyCheckout(token)
+      if (r.ok) { window.location.assign(r.url); return }
+      setError(r.error)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    }
+    setBusy(false)
+  }
+
+  if (waiting) {
+    return (
+      <div className={journeyCard}>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Payment received</h1>
+        <p role="status" aria-live="polite" className="flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
+          {polls < PAID_POLL_MAX
+            ? <><Loader2 className="h-4 w-4 mt-0.5 flex-none animate-spin" aria-hidden /><span>Thank you, {v.firstName}. We&apos;re setting up your login. This page updates by itself.</span></>
+            : <><Check className="h-4 w-4 mt-0.5 flex-none" aria-hidden /><span>Thank you, {v.firstName}. This is taking longer than usual. We&apos;ll email <strong className="break-all">{v.email}</strong> as soon as your login is ready.</span></>}
+        </p>
+        <p className="text-sm text-gray-600">You can close this page. Your Join link will show where things stand.</p>
+      </div>
+    )
+  }
+
   return (
     <div className={journeyCard}>
       <InvitedBy name={v.inviterName} />
@@ -149,6 +197,9 @@ function Payment({ v }: { v: Extract<JoinView, { kind: 'payment' }> }) {
         <Check className="h-4 w-4 mt-0.5 flex-none" aria-hidden />
         <span>You accepted the {v.roleLabel} agreement{v.termsVersion ? ` (version ${v.termsVersion})` : ''}{when ? ` on ${when}` : ''}.</span>
       </p>
+      {v.notice === 'cancelled' && v.online && (
+        <p className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm text-gray-700">Payment was cancelled, and nothing was charged. You can try again whenever you&apos;re ready.</p>
+      )}
       <section aria-labelledby="pay-title" className="rounded-xl border border-gray-200 p-4 space-y-3">
         <h2 id="pay-title" className="font-bold text-gray-900">Payment</h2>
         <div className="flex items-baseline justify-between gap-3">
@@ -156,8 +207,15 @@ function Payment({ v }: { v: Extract<JoinView, { kind: 'payment' }> }) {
           <span className="text-2xl font-bold text-gray-900">{v.amount}</span>
         </div>
         {v.failed && <p role="alert" className="text-sm text-red-700">Your last payment didn&apos;t go through. Our team will be in touch.</p>}
-        {v.checkoutUrl ? (
-          <a href={v.checkoutUrl} className={`${journeyBtn} w-full`}>Pay {v.amount} and create my login</a>
+        {v.online ? (
+          <div className="space-y-2">
+            {error && <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+            <button type="button" onClick={pay} disabled={busy} className={`${journeyBtn} w-full`}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CreditCard className="h-4 w-4" aria-hidden />}
+              Pay {v.amount} and create my login
+            </button>
+            <p className="text-xs text-gray-500">You&apos;ll pay by card on our payment partner&apos;s secure page, then come back here.</p>
+          </div>
         ) : (
           <div className="flex gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-900">
             <Mail className="h-5 w-5 flex-none mt-0.5" aria-hidden />
@@ -168,7 +226,7 @@ function Payment({ v }: { v: Extract<JoinView, { kind: 'payment' }> }) {
           </div>
         )}
       </section>
-      <p className="text-sm text-gray-600">There&apos;s nothing else to do for now. You can come back to this link at any time to see where things stand.</p>
+      {!v.online && <p className="text-sm text-gray-600">There&apos;s nothing else to do for now. You can come back to this link at any time to see where things stand.</p>}
     </div>
   )
 }

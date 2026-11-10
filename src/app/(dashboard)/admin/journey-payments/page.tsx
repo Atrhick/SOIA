@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { billingLabel, formatDollars, roleLabel, type RoleBillingValue } from '@/lib/get-involved/core'
 import { userDisplayName } from '@/lib/get-involved/server'
-import { isOnlinePaymentEnabled } from '@/lib/payments'
+import { paymentProviderStatus } from '@/lib/payments'
 import { JourneyPaymentsClient, PaymentRow } from './journey-payments-client'
 
 export const dynamic = 'force-dynamic'
@@ -40,20 +40,44 @@ export default async function JourneyPaymentsPage() {
     loginCreated: !!x.prospect.userId,
     acceptedAt: x.prospect.roleTermsAcceptedAt?.toISOString() ?? null,
     paidAt: x.paidAt?.toISOString() ?? null,
-    reference: x.manualReference,
+    reference: x.manualReference ?? (x.invoOrderId ? `Invo order ${x.invoOrderId}` : null),
     failureReason: x.failureReason,
     inviter: x.prospect.invitedById ? names.get(x.prospect.invitedById) ?? null : null,
   }))
+  const ps = paymentProviderStatus()
+  const modeLabel = ps.mode === 'live' ? 'Live' : ps.mode === 'test' ? 'Test (sandbox)' : ps.keySet ? 'Key not recognised' : 'Off'
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Get Involved payments</h1>
         <p className="text-gray-600 mt-1">
-          {isOnlinePaymentEnabled()
-            ? 'Prospects pay online on their Join page. Use this list for anything paid another way.'
-            : 'Online payment is not connected yet. Contact each person below about payment, then mark it received: that creates their login and emails them.'}
+          {ps.enabled
+            ? 'One-time roles pay online by card (Invo) on their Join page, and their login is created when Invo confirms the payment. Monthly and yearly roles are still arranged by staff. Use Mark payment received for anything paid another way.'
+            : 'Online payment is off. Contact each person below about payment, then mark it received: that creates their login and emails them.'}
         </p>
       </div>
+      <section aria-labelledby="provider-title" className="bg-white border border-gray-200 rounded-xl p-5">
+        <h2 id="provider-title" className="font-bold text-gray-900">Online payment (Invo)</h2>
+        <dl className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+          <div>
+            <dt className="text-gray-600">Status</dt>
+            <dd className={`font-semibold ${ps.enabled ? (ps.mode === 'live' ? 'text-green-800' : 'text-amber-800') : 'text-gray-900'}`}>{ps.enabled ? `On: ${modeLabel}` : `Off${ps.keySet ? ` (${modeLabel.toLowerCase()})` : ''}`}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-600">Secret key (INVO_SECRET_KEY)</dt>
+            <dd className="font-semibold text-gray-900">{ps.keySet ? modeLabel : 'Not set'}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-600">Webhook secret (INVO_WEBHOOK_SECRET)</dt>
+            <dd className="font-semibold text-gray-900">{ps.webhookSecretSet ? 'Set' : 'Not set'}</dd>
+          </div>
+        </dl>
+        <p className="text-xs text-gray-600 mt-3">
+          Online payment needs both values. It covers one-time fees only; monthly and yearly roles always use Mark payment received.
+          {ps.mode === 'test' && ' Test mode: no real money moves (sandbox card 4242 4242 4242 4242).'}
+          {ps.baseOverride && ` API base overridden: ${ps.baseOverride}.`}
+        </p>
+      </section>
       <JourneyPaymentsClient rows={rows} />
     </div>
   )

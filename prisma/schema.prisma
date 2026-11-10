@@ -2050,6 +2050,7 @@ enum PaymentMethod {
   STRIPE
   PAYPAL
   MANUAL
+  INVO
 }
 
 enum ProspectPaymentStatus {
@@ -2331,6 +2332,11 @@ model ProspectPayment {
   billing         RoleBilling?
   checkoutUrl     String?
   stripeSubscriptionId String?
+
+  // Invo (card, one-time roles only). A new checkout session per Pay click; the webhook stores the order.
+  invoSessionId       String?
+  invoClientRequestId String?
+  invoOrderId         String? @unique
 
   @@map("prospect_payments")
 }
@@ -2926,4 +2932,17 @@ model ProspectNote {
 
   @@index([prospectId, createdAt])
   @@map("prospect_notes")
+}
+
+// Invo webhook deliveries, deduped on X-Invo-Idempotency-Key (Invo retries up to 6 times).
+model InvoWebhookEvent {
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique
+  eventType      String
+  eventId        String?
+  receivedAt     DateTime  @default(now())
+  processedAt    DateTime?
+  outcome        String?
+
+  @@map("invo_webhook_events")
 }

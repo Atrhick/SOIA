@@ -79,7 +79,7 @@ function WaitingCard({ r, onDone }: { r: PaymentRow; onDone: (msg: string) => vo
           <p className="text-xs text-gray-600 break-all">
             <a className="text-primary-700 hover:underline" href={`mailto:${r.email}`}>{r.email}</a>{r.phone && <> · <a className="text-primary-700 hover:underline" href={`tel:${r.phone}`}>{r.phone}</a></>}
           </p>
-          <p className="text-xs text-gray-600">Terms accepted {day(r.acceptedAt)}{r.inviter ? ` · Invited by ${r.inviter}` : ''}</p>
+          <p className="text-xs text-gray-600">Terms accepted {day(r.acceptedAt)}{r.inviter ? ` · Invited by ${r.inviter}` : ''}{r.method === 'INVO' ? ' · Paying online (Invo)' : ''}</p>
         </div>
         <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${BADGE[r.status]}`}>{LABEL[r.status]}</span>
       </div>

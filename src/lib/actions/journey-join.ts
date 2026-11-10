@@ -9,24 +9,24 @@
  * the step predicate, are rate limited, Zod-validate input and never reveal whether an email exists.
  * The admin action requires ADMIN and is blocked while impersonating.
  */
-import crypto from 'crypto'
-import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import {
-  billingLabel, canAcceptTerms, canCreateLogin, formatDollars, isPaidRole, journeyPosition, laterJourneyOpen, priceLabel, roleHasLogin,
+  billingLabel, canAcceptTerms, canCreateLogin, canPay, formatDollars, isPaidRole, priceLabel, roleHasLogin,
 } from '@/lib/get-involved/core'
 import * as mail from '@/lib/get-involved/emails'
 import { paymentArrangedEmail } from '@/lib/get-involved/emails/account'
-import { clientIp, emailInviter, rateLimited } from '@/lib/get-involved/server'
+import { clientIp, emailInviter, notifyAdmins, rateLimited } from '@/lib/get-involved/server'
 import { ensureLiveTerms, getLiveTerms, prospectRoleConfig } from '@/lib/get-involved/roles'
 import { journeyFactsFor, journeyLink, journeyLinkUsable, journeyStageUrl, prospectForJourney, refreshJourneyToken } from '@/lib/get-involved/journey'
 import { completeJourney, hashJourneyPassword } from '@/lib/get-involved/login'
 import { markJourneyPaid, openJourneyPayment } from '@/lib/get-involved/payment'
-import { getPaymentProvider, isOnlinePaymentEnabled } from '@/lib/payments'
+import { afterLoginExtras } from '@/lib/get-involved/after-login'
+import { CheckoutError, getPaymentProvider, onlinePaymentAvailableFor } from '@/lib/payments'
+import { newClientRequestId } from '@/lib/payments/invo'
 
 export type JoinResult =
   | { ok: true; next: 'welcome' | 'payment' }
@@ -57,8 +57,9 @@ function limited(token: string, ip: string) {
 /**
  * Accept the role's live terms and choose a password.
  * Free roles: the login is created straight away (completeJourney). Paid roles: the password is kept
- * as pendingPasswordHash, a PENDING payment is opened (MANUAL while no provider is connected) and
- * staff are told to arrange payment.
+ * as pendingPasswordHash and a PENDING payment is opened: INVO when online payment is on for the
+ * role's billing (ONE_TIME only; the Join page then shows the Pay button), otherwise MANUAL and staff
+ * are told to arrange payment.
  */
 export async function acceptTermsAndJoin(token: string, input: unknown): Promise<JoinResult> {
   const t = tokenSchema.safeParse(token)
@@ -88,7 +89,7 @@ export async function acceptTermsAndJoin(token: string, input: unknown): Promise
 
   const paid = isPaidRole(cfg)
   const passwordHash = await hashJourneyPassword(pw.data!)
-  const online = paid && isOnlinePaymentEnabled()
+  const online = paid && onlinePaymentAvailableFor(cfg.billing)
 
   let termsVersion = live.version
   const accepted = await prisma.$transaction(async (tx) => {
@@ -101,7 +102,7 @@ export async function acceptTermsAndJoin(token: string, input: unknown): Promise
     })
     if (r.count !== 1) return false
     if (paid) {
-      await openJourneyPayment(tx, p.id, cfg, online ? 'STRIPE' : 'MANUAL', null)
+      await openJourneyPayment(tx, p.id, cfg, online ? 'INVO' : 'MANUAL', null)
       await refreshJourneyToken(tx, p.id)
     }
     return true
@@ -117,8 +118,8 @@ export async function acceptTermsAndJoin(token: string, input: unknown): Promise
 
   // Paid role.
   const amountLabel = `${formatDollars(cfg.priceCents)} (${billingLabel(cfg.billing)})`
-  if (online) await startCheckout(p.id, p.email, cfg.label, cfg.priceCents, cfg.billing, t.data)
-  else {
+  // Online: nothing to send; the Join page shows the Pay button, which creates a fresh checkout per click.
+  if (!online) {
     await notifyPaymentToCollect(p.id, `${p.firstName} ${p.lastName}`, cfg.label, priceLabel(cfg))
     try {
       await sendEmail({ to: p.email, ...paymentArrangedEmail({ firstName: p.firstName, roleLabel: cfg.label, amountLabel, termsVersion, statusUrl: journeyLink(t.data, 'join') }) })
@@ -156,6 +157,63 @@ export async function createMyLogin(token: string, input: unknown): Promise<Join
   if (!r.ok) return { ok: false, error: r.error }
   await afterLoginExtras(p.id)
   return { ok: true, next: 'welcome' }
+}
+
+export type CheckoutResult = { ok: true; url: string } | { ok: false; error: string }
+
+/**
+ * The Join page's "Pay" button (online payment, ONE_TIME roles). Creates a FRESH Invo checkout on
+ * every click, because Invo checkout links are single use and expire in about 15 minutes. Validates the
+ * token, the link's 14 days, PAYMENT_PENDING and the amount from the prospect's snapshot config; rate
+ * limited. Saves the attempt's client_request_id before calling Invo (so a webhook can always be
+ * matched) and the session id after. The client then navigates to `url`.
+ */
+export async function startJourneyCheckout(token: string): Promise<CheckoutResult> {
+  const t = tokenSchema.safeParse(token)
+  if (!t.success) return { ok: false, error: GENERIC }
+  const ip = await clientIp()
+  if (rateLimited(`pay:${ip}`, 15, 15 * 60_000) || rateLimited(`pay-t:${t.data}`, 6, 15 * 60_000)) {
+    return { ok: false, error: 'Too many payment attempts. Please wait a few minutes and try again.' }
+  }
+
+  const p = await prospectForJourney(t.data)
+  if (!p || !journeyLinkUsable(p)) return { ok: false, error: GENERIC }
+  const cfg = await prospectRoleConfig(p)
+  if (!cfg || !isPaidRole(cfg) || !p.roleTermsAcceptedAt || p.userId) return { ok: false, error: 'This step is not open. Please reload the page.' }
+  const pay = p.payment
+  if (!canPay(p.status) || !pay || !pay.journeyRole) return { ok: false, error: 'This payment is not waiting to be made. Please reload the page.' }
+  if (pay.status === 'COMPLETED') return { ok: false, error: 'Your payment is already recorded. Please reload the page.' }
+  if (pay.status !== 'PENDING') return { ok: false, error: 'Our team will be in touch about your payment.' }
+
+  const provider = getPaymentProvider()
+  if (!provider || !provider.supports(cfg.billing)) return { ok: false, error: 'Online payment is not available for this role. Our team will contact you about payment.' }
+  // The amount charged is the snapshot price; it must match the payment row opened at terms acceptance.
+  const rowCents = Math.round(Number(pay.amount) * 100)
+  if (rowCents !== cfg.priceCents || pay.currency !== 'USD') {
+    console.error('[JOURNEY-PAY] amount mismatch', { prospectId: p.id, rowCents, priceCents: cfg.priceCents })
+    return { ok: false, error: 'We could not start the payment. Our team has been told and will contact you.' }
+  }
+
+  const clientRequestId = newClientRequestId(pay.id)
+  await prisma.prospectPayment.update({ where: { id: pay.id }, data: { invoClientRequestId: clientRequestId, method: 'INVO' } })
+  try {
+    const s = await provider.createCheckout({
+      paymentId: pay.id, prospectId: p.id, clientRequestId,
+      email: p.email, name: `${p.firstName} ${p.lastName}`.trim(),
+      description: `${cfg.label} program`, itemId: `get-involved-${cfg.role}`,
+      amountCents: cfg.priceCents, currency: 'USD', billing: cfg.billing,
+      successUrl: `${journeyLink(t.data, 'join')}?paid=1`, cancelUrl: `${journeyLink(t.data, 'join')}?cancelled=1`,
+    })
+    await prisma.prospectPayment.update({ where: { id: pay.id }, data: { invoSessionId: s.sessionId, checkoutUrl: null } })
+    return { ok: true, url: s.url }
+  } catch (e) {
+    console.error('[JOURNEY-PAY] checkout failed', { prospectId: p.id, error: e instanceof Error ? e.message : String(e) })
+    // A setup problem (bad key, account not platform-tagged, amount refused) needs staff: tell admins, at most hourly per prospect.
+    if (e instanceof CheckoutError && e.needsStaff && !rateLimited(`pay-alert:${p.id}`, 1, 60 * 60_000)) {
+      await notifyAdmins('Online payment failed', `${p.firstName} ${p.lastName} tried to pay ${formatDollars(cfg.priceCents)} for ${cfg.label} online, but Invo refused to start the checkout (${e.message.slice(0, 200)}). Check the Invo settings, or contact them about payment and mark it received.`, p.id).catch(() => {})
+    }
+    return { ok: false, error: e instanceof CheckoutError ? e.safeMessage : 'We could not start the payment. Please try again in a minute.' }
+  }
 }
 
 // ---------- admin ----------
@@ -214,53 +272,5 @@ async function notifyPaymentToCollect(prospectId: string, name: string, roleLabe
     })
   } catch (e) {
     console.error('[JOURNEY-JOIN] admin notification failed', e)
-  }
-}
-
-/** Online payment (only when a provider is connected; never today). Stores the checkout on the payment row. */
-async function startCheckout(prospectId: string, email: string, label: string, amountCents: number, billing: Parameters<typeof billingLabel>[0], token: string) {
-  const provider = getPaymentProvider()
-  if (!provider) return
-  try {
-    const s = await provider.createCheckout({
-      prospectId, email, description: `${label} program`, amountCents, currency: 'USD', billing,
-      successUrl: journeyLink(token, 'join'), cancelUrl: journeyLink(token, 'join'),
-    })
-    await prisma.prospectPayment.update({ where: { prospectId }, data: { checkoutUrl: s.url, stripeSessionId: s.sessionId } })
-  } catch (e) {
-    console.error('[JOURNEY-JOIN] checkout failed', e)
-  }
-}
-
-/**
- * After a login is created: ambassador onboarding tasks (as ambassador-auth.ts does), and for 17 and
- * under, a PARENT login linked to the ambassador (Ambassador.parentUserId), as the existing parental
- * consent flow does. Never throws; nothing here blocks the prospect.
- */
-async function afterLoginExtras(prospectId: string) {
-  try {
-    const p = await prisma.prospect.findUnique({ where: { id: prospectId }, select: { userId: true, ageRange: true, parentEmail: true } })
-    if (!p?.userId) return
-    const amb = await prisma.ambassador.findUnique({ where: { userId: p.userId }, select: { id: true, parentUserId: true } })
-    if (!amb) return
-    const tasks = await prisma.ambassadorOnboardingTask.findMany({ where: { isActive: true }, select: { id: true } })
-    if (tasks.length) {
-      await prisma.ambassadorOnboardingProgress.createMany({ data: tasks.map((t) => ({ ambassadorId: amb.id, taskId: t.id, status: 'NOT_STARTED' as const })), skipDuplicates: true })
-    }
-    const parentEmail = p.parentEmail?.trim().toLowerCase()
-    if (p.ageRange !== 'UNDER_18' || !parentEmail || amb.parentUserId) return
-    const existing = await prisma.user.findUnique({ where: { email: parentEmail }, select: { id: true, role: true, parentOfAmbassador: { select: { id: true } } } })
-    if (existing) {
-      if (existing.role === 'PARENT' && !existing.parentOfAmbassador) await prisma.ambassador.update({ where: { id: amb.id }, data: { parentUserId: existing.id } })
-      return
-    }
-    // Random password the parent never sees (same as ambassador-auth.ts); they can use "Forgot password".
-    const hash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 12)
-    await prisma.$transaction(async (tx) => {
-      const parent = await tx.user.create({ data: { email: parentEmail, password: hash, role: 'PARENT', status: 'ACTIVE' } })
-      await tx.ambassador.update({ where: { id: amb.id }, data: { parentUserId: parent.id } })
-    })
-  } catch (e) {
-    console.error('[JOURNEY-JOIN] after-login extras failed', e)
   }
 }
