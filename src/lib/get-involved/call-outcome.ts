@@ -6,30 +6,17 @@ import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import { journeyLink, refreshJourneyToken } from './journey'
 import { prospectRoleConfig } from './roles'
-import { emailInviter, userDisplayName } from './server'
-import { callAssessmentEmail, giveLinkEmail } from './emails/call-record'
+import { emailInviter } from './server'
+import { giveLinkEmail } from './emails/call-record'
+import { sendAssessmentInvite } from './journey-steps'
 
 /**
- * Email the assessment link (copying the parent for 17 and under), then set assessmentSentAt.
- * TODO(get-involved B3): replace the body with B3's sendAssessmentInvite(prospectId) from
- * src/lib/actions/journey-assessment.ts or emails/assessment.ts once that branch is merged, so there is
- * one E8 template. Never throws.
+ * Email the assessment link (parent copied for 17 and under) and set assessmentSentAt, using the one
+ * E8 template in journey-steps.ts. hostUserId is kept for the caller's signature. Never throws.
  */
-export async function sendAssessmentInviteAfterCall(prospectId: string, hostUserId: string | null): Promise<void> {
-  try {
-    const p = await prisma.prospect.findUnique({ where: { id: prospectId } })
-    if (!p || p.status !== 'ASSESSMENT_PENDING' || !p.journeyToken) return
-    const cfg = await prospectRoleConfig(p)
-    if (!cfg) return
-    const host = hostUserId ? await userDisplayName(hostUserId) : null
-    const minor = p.ageRange === 'UNDER_18'
-    const m = callAssessmentEmail({ firstName: p.firstName, roleLabel: cfg.label, questions: cfg.questions, url: journeyLink(p.journeyToken, 'assessment'), hostName: host?.full ?? null, minor })
-    await sendEmail({ to: p.email, ...m })
-    if (minor && p.parentEmail) await sendEmail({ to: p.parentEmail, ...m })
-    await prisma.prospect.update({ where: { id: p.id }, data: { assessmentSentAt: new Date() } })
-  } catch (e) {
-    console.error('[GET-INVOLVED] assessment invite failed', e)
-  }
+export async function sendAssessmentInviteAfterCall(prospectId: string, _hostUserId: string | null): Promise<void> {
+  const r = await sendAssessmentInvite(prospectId)
+  if (!r.ok) console.error('[GET-INVOLVED] assessment invite after call not sent:', r.error)
 }
 
 /** Sponsor / donor: send the giving page (the role's handoffUrl, else /journey/[token]/give). Never throws. */

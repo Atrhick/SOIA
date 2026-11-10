@@ -10,11 +10,12 @@ import { revalidatePath } from 'next/cache'
 import type { Session } from 'next-auth'
 import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
-import { sendEmail } from '@/lib/email'
 import { GET_INVOLVED_ROLES, canAnswerAssessment, canChooseRole, canMarkNotAFit, isGetInvolvedRole } from '@/lib/get-involved/core'
-import { afterNotAFitEmails, chooseRole, journeyLink, markNotAFit, refreshJourneyToken } from '@/lib/get-involved/journey'
+import { afterNotAFitEmails, chooseRole, markNotAFit } from '@/lib/get-involved/journey'
 import { prospectRoleConfig } from '@/lib/get-involved/roles'
-import { assessmentLinkEmail, giveLinkEmail } from '@/lib/get-involved/emails/prospect-admin'
+import { sendAssessmentInvite } from '@/lib/get-involved/journey-steps'
+import { sendGiveLinkAfterCall } from '@/lib/get-involved/call-outcome'
+import { completeJourney } from '@/lib/get-involved/login'
 
 type Result = { success: true; message?: string } | { error: string }
 type Guard = { error: string; session?: never } | { session: Session; error?: never }
@@ -43,18 +44,6 @@ async function journeyProspect(id: string) {
   })
 }
 
-/** Same mail to the prospect and, for 17 and under, the parent. Never throws. */
-async function mailProspect(p: { email: string; ageRange: string | null; parentEmail: string | null }, m: { subject: string; html: string }) {
-  try {
-    await sendEmail({ to: p.email, ...m })
-    if (p.ageRange === 'UNDER_18' && p.parentEmail) await sendEmail({ to: p.parentEmail, ...m })
-    return true
-  } catch (e) {
-    console.error('[JOURNEY-ADMIN] email failed', e)
-    return false
-  }
-}
-
 /** Email the role's 3 questions again with a fresh 14-day link. Only while the answers are still due. */
 export async function resendAssessmentQuestions(prospectId: string): Promise<Result> {
   const g = await requireAdmin()
@@ -72,16 +61,10 @@ export async function resendAssessmentQuestions(prospectId: string): Promise<Res
   const cfg = await prospectRoleConfig(p)
   if (!cfg) return { error: 'Choose a role first.' }
 
-  const token = await prisma.$transaction(async (tx) => {
-    const t = await refreshJourneyToken(tx, p.id)
-    await tx.auditLog.create({ data: { userId: g.session.user.id, action: 'RESEND_ASSESSMENT', entityType: 'Prospect', entityId: p.id, details: JSON.stringify({ role: p.journeyRole }) } })
-    return t
-  })
-  const sent = await mailProspect(p, assessmentLinkEmail({
-    firstName: p.firstName, roleLabel: cfg.label, url: journeyLink(token, 'assessment'), questions: cfg.questions.map((q) => q.text), reason: 'resend',
-  }))
-  if (!sent) return { error: 'The link was refreshed but the email could not be sent. Please try again.' }
-  await prisma.prospect.update({ where: { id: p.id }, data: { assessmentSentAt: new Date() } })
+  await prisma.auditLog.create({ data: { userId: g.session.user.id, action: 'RESEND_ASSESSMENT', entityType: 'Prospect', entityId: p.id, details: JSON.stringify({ role: p.journeyRole }) } })
+  // Same E8 email as after the call; it refreshes the 14-day link and sets assessmentSentAt.
+  const sent = await sendAssessmentInvite(p.id)
+  if (!sent.ok) return { error: `${sent.error} Please try again.` }
   refresh(p.id)
   return { success: true, message: `Questions sent to ${p.email}${p.ageRange === 'UNDER_18' && p.parentEmail ? ' and their parent' : ''}.` }
 }
@@ -122,12 +105,10 @@ export async function changeProspectRole(prospectId: string, input: z.input<type
 
   let sent: boolean
   if (r.status === 'DONATION_HANDOFF') {
-    sent = await mailProspect(p, giveLinkEmail({ firstName: p.firstName, roleLabel: r.config.label, url: journeyLink(r.token, 'give') }))
+    await sendGiveLinkAfterCall(p.id)
+    sent = true
   } else {
-    sent = await mailProspect(p, assessmentLinkEmail({
-      firstName: p.firstName, roleLabel: r.config.label, url: journeyLink(r.token, 'assessment'), questions: r.config.questions.map((q) => q.text), reason: 'role-changed',
-    }))
-    if (sent) await prisma.prospect.update({ where: { id: p.id }, data: { assessmentSentAt: new Date() } })
+    sent = (await sendAssessmentInvite(p.id)).ok
   }
   refresh(p.id)
   if (!sent) return { success: true, message: `Role ${p.journeyRole ? 'changed' : 'set'} to ${r.config.label}, but the email could not be sent. Use "Resend questions" to try again.` }
@@ -177,4 +158,29 @@ export async function addProspectNote(prospectId: string, input: z.input<typeof 
   await prisma.prospectNote.create({ data: { prospectId: id.data, authorId: g.session.user.id, body: parsed.data.body } })
   refresh(id.data)
   return { success: true, message: 'Note saved.' }
+}
+
+const assignCoachSchema = z.object({ coachProfileId: z.string().min(1).max(64) })
+
+/**
+ * An ambassador's login needs a coach. When the inviter has none, the journey stops after the terms
+ * and admins are notified; this picks the coach and creates the login (same emails as the Join page).
+ */
+export async function assignCoachAndCreateLogin(prospectId: string, input: z.input<typeof assignCoachSchema>): Promise<Result> {
+  const g = await requireAdmin()
+  if (!g.session) return { error: g.error }
+  const id = idSchema.safeParse(prospectId)
+  const parsed = assignCoachSchema.safeParse(input)
+  if (!id.success || !parsed.success) return { error: 'Choose a coach.' }
+  const coach = await prisma.coachProfile.findUnique({ where: { id: parsed.data.coachProfileId }, select: { id: true, firstName: true, lastName: true, user: { select: { status: true } } } })
+  if (!coach || coach.user.status !== 'ACTIVE') return { error: 'That coach was not found or is not active.' }
+  const p = await prisma.prospect.findUnique({ where: { id: id.data }, select: { id: true, journeyRole: true, userId: true, roleTermsAcceptedAt: true } })
+  if (!p || (p.journeyRole !== 'AMBASSADOR' && p.journeyRole !== 'YOUTH_AMBASSADOR')) return { error: 'Only ambassadors need a coach to finish.' }
+  if (p.userId) return { error: 'Their login already exists.' }
+  if (!p.roleTermsAcceptedAt) return { error: 'They have not accepted the terms yet.' }
+  const r = await completeJourney(p.id, { byUserId: g.session.user.id, coachProfileId: coach.id })
+  if (!r.ok) return { error: r.error }
+  await prisma.auditLog.create({ data: { userId: g.session.user.id, action: 'ASSIGN_COACH_CREATE_LOGIN', entityType: 'Prospect', entityId: p.id, details: JSON.stringify({ coachProfileId: coach.id }) } })
+  refresh(p.id)
+  return { success: true, message: `Login created and placed with ${coach.firstName} ${coach.lastName}. We emailed them a link to set their password.` }
 }

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, Copy, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { addProspectNote, changeProspectRole, markProspectNotAFit, resendAssessmentQuestions } from '@/lib/actions/journey-admin'
+import { addProspectNote, assignCoachAndCreateLogin, changeProspectRole, markProspectNotAFit, resendAssessmentQuestions } from '@/lib/actions/journey-admin'
 import type { ActivityItem, RecordData, StepItem } from './record-data'
 
 const FOCUS = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'
@@ -91,6 +91,7 @@ export function JourneyRecordClient({ record: r, readOnly }: { record: RecordDat
         <Activity items={r.activity} nextStep={r.closedNote ? null : r.nextStep} waitingOn={r.waitingOn} />
 
         <div className="space-y-5 min-w-0">
+          {!readOnly && r.can.assignCoach && <AssignCoach r={r} onDone={(m) => setFlash(m ?? 'Saved.')} />}
           <InvitedBy r={r} />
           <CallNotes r={r} />
           <Answers r={r} />
@@ -171,6 +172,51 @@ function Activity({ items, nextStep, waitingOn }: { items: ActivityItem[]; nextS
 }
 
 // ---------- side cards ----------
+
+function AssignCoach({ r, onDone }: { r: RecordData; onDone: (msg?: string) => void }) {
+  const router = useRouter()
+  const [coach, setCoach] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const id = useId()
+  async function go(e: React.FormEvent) {
+    e.preventDefault()
+    if (!coach) { setErr('Choose a coach.'); return }
+    setBusy(true); setErr(null)
+    try {
+      const x = await assignCoachAndCreateLogin(r.id, { coachProfileId: coach })
+      if ('error' in x) { setErr(x.error); return }
+      onDone(x.message)
+      router.refresh()
+    } catch {
+      setErr('Something went wrong. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section aria-labelledby={`${id}-t`} className={`${CARD} border-orange-300 bg-orange-50`}>
+      <h2 id={`${id}-t`} className={CARD_TITLE}>Needs a coach</h2>
+      <p className="text-sm text-gray-800 mt-2">{r.name} accepted the terms, but whoever invited them has no coach to place them with. Pick a coach to create their login.</p>
+      {r.coachOptions.length === 0 ? (
+        <p className="text-sm text-gray-700 mt-3">There are no active coaches yet. Add a coach first.</p>
+      ) : (
+        <form onSubmit={go} className="mt-3 space-y-2" noValidate>
+          <label htmlFor={`${id}-c`} className="block text-sm font-semibold text-gray-800">Coach</label>
+          <select id={`${id}-c`} value={coach} onChange={(e) => setCoach(e.target.value)} aria-invalid={!!err} aria-describedby={err ? `${id}-e` : undefined}
+            className="w-full h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option value="">Choose a coach</option>
+            {r.coachOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {err && <p id={`${id}-e`} role="alert" className="text-sm text-red-700">{err}</p>}
+          <button type="submit" disabled={busy} className={`h-10 px-4 rounded-xl bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60 ${FOCUS}`}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Place with this coach and create login
+          </button>
+        </form>
+      )}
+    </section>
+  )
+}
 
 function InvitedBy({ r }: { r: RecordData }) {
   return (

@@ -51,7 +51,9 @@ export interface RecordData {
   payment: { status: string; amount: number; method: string; paidAt: string | null; billing: string | null; failure: string | null } | null
   login: { joinedAt: string | null; email: string | null } | null
   link: { url: string; label: string; expiresAt: string | null; usable: boolean } | null
-  can: { resend: boolean; changeRole: boolean; changeRoleBlockedReason: string | null; notAFit: boolean }
+  can: { resend: boolean; changeRole: boolean; changeRoleBlockedReason: string | null; notAFit: boolean; assignCoach: boolean }
+  /** Active coaches, only filled when can.assignCoach. */
+  coachOptions: { id: string; name: string }[]
   roleOptions: { value: string; label: string; price: string }[]
   createdAt: string
 }
@@ -99,6 +101,12 @@ export async function loadRecord(id: string): Promise<RecordData | null> {
   })
   if (!p || !p.journeyToken) return null
   const now = new Date()
+  // A free ambassador role stops after the terms when the inviter has no coach (see login.ts).
+  const needsCoach = (p.journeyRole === 'AMBASSADOR' || p.journeyRole === 'YOUTH_AMBASSADOR') && !p.userId && !!p.roleTermsAcceptedAt && p.status === 'ORIENTATION_COMPLETED'
+  const coachOptions = needsCoach
+    ? (await prisma.coachProfile.findMany({ where: { user: { status: 'ACTIVE' } }, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }], select: { id: true, firstName: true, lastName: true } }))
+        .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`.trim() }))
+    : []
 
   const audits = await prisma.auditLog.findMany({
     where: { entityType: 'Prospect', entityId: p.id, action: { in: ['RESEND_ASSESSMENT', 'CHANGE_PROSPECT_ROLE'] } },
@@ -252,7 +260,9 @@ export async function loadRecord(id: string): Promise<RecordData | null> {
       changeRole,
       changeRoleBlockedReason: p.status === 'DISCOVERY_BOOKED' ? 'Record the call on the Discovery Calls page first.' : termsAccepted ? 'They have accepted the terms, so the role is fixed.' : null,
       notAFit: canMarkNotAFit(p.status),
+      assignCoach: needsCoach,
     },
+    coachOptions,
     roleOptions,
     createdAt: p.createdAt.toISOString(),
   }

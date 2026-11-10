@@ -3,7 +3,7 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { sendWelcomeInvite } from '@/lib/actions/password-reset'
+import { sendWelcomeInvite } from '@/lib/welcome-invite'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 

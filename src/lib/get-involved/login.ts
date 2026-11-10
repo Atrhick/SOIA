@@ -8,11 +8,12 @@ import bcrypt from 'bcryptjs'
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
-import { sendWelcomeInvite } from '@/lib/actions/password-reset'
+import { sendWelcomeInvite } from '@/lib/welcome-invite'
 import { billingLabel, canCreateLogin, formatDollars, isPaidRole, roleHasLogin, userRoleFor } from './core'
 import { appUrl } from './emails'
-import { accountReadyEmail, inviterJoinedEmail } from './emails/joined'
-import { notifyAdmins, setStatus, userDisplayName } from './server'
+import { accountReadyEmail } from './emails/joined'
+import { sendInviterJoined } from './emails/team'
+import { notifyAdmins, setStatus } from './server'
 import { prospectRoleConfig } from './roles'
 
 /** Where an inviter's My Team page is. */
@@ -35,7 +36,7 @@ export type CreateLoginResult =
  * else a random one (needsPasswordSetup = true: completeJourney then emails a set-password link).
  * Messages in `error` are safe to show the prospect.
  */
-export async function createJourneyLogin(prospectId: string, opts: { passwordHash?: string | null; byUserId?: string | null } = {}): Promise<CreateLoginResult> {
+export async function createJourneyLogin(prospectId: string, opts: { passwordHash?: string | null; byUserId?: string | null; coachProfileId?: string | null } = {}): Promise<CreateLoginResult> {
   const p = await prisma.prospect.findUnique({
     where: { id: prospectId },
     include: {
@@ -54,7 +55,8 @@ export async function createJourneyLogin(prospectId: string, opts: { passwordHas
   const existing = await prisma.user.findUnique({ where: { email: p.email }, select: { id: true } })
   if (existing) return { ok: false, error: 'An account with this email already exists. Please sign in, or reply to any of our emails and we will link it for you.' }
 
-  const sponsorCoachId = p.invitedBy?.coachProfile?.id ?? p.invitedBy?.ambassadorProfile?.coachId ?? p.invitedBy?.associateProfile?.coachId ?? null
+  // An admin-chosen coach (assignCoachAndCreateLogin) wins; otherwise the inviter's coach.
+  const sponsorCoachId = opts.coachProfileId ?? p.invitedBy?.coachProfile?.id ?? p.invitedBy?.ambassadorProfile?.coachId ?? p.invitedBy?.associateProfile?.coachId ?? null
   if (userRole === 'AMBASSADOR' && !sponsorCoachId) return { ok: false, error: 'We need to match you with a coach first. Our team has been told and will email you shortly.' }
 
   const supplied = opts.passwordHash ?? p.pendingPasswordHash
@@ -106,7 +108,7 @@ export async function createJourneyLogin(prospectId: string, opts: { passwordHas
  * under), the inviter's "joined your team", an admin notification, and a set-password link when no
  * password was chosen. Use this rather than createJourneyLogin unless you send your own emails.
  */
-export async function completeJourney(prospectId: string, opts: { passwordHash?: string | null; byUserId?: string | null } = {}): Promise<CreateLoginResult> {
+export async function completeJourney(prospectId: string, opts: { passwordHash?: string | null; byUserId?: string | null; coachProfileId?: string | null } = {}): Promise<CreateLoginResult> {
   const r = await createJourneyLogin(prospectId, opts)
   if (!r.ok) {
     if (r.error.startsWith('We need to match you with a coach')) {
@@ -130,13 +132,8 @@ export async function completeJourney(prospectId: string, opts: { passwordHash?:
       await sendEmail({ to: p.email, ...m })
       if (p.ageRange === 'UNDER_18' && p.parentEmail) await sendEmail({ to: p.parentEmail, ...m })
     }
-    if (p.invitedById) {
-      const inviter = await prisma.user.findUnique({ where: { id: p.invitedById }, select: { role: true, status: true } })
-      const name = await userDisplayName(p.invitedById)
-      if (inviter?.status === 'ACTIVE' && name) {
-        await sendEmail({ to: name.email, ...inviterJoinedEmail({ inviterFirst: name.first, prospectName: `${p.firstName} ${p.lastName}`, roleLabel: label, teamUrl: appUrl(teamPathFor(inviter.role)) }) })
-      }
-    }
+    // E13 with rank and team numbers (emails/team.ts); it checks the inviter itself.
+    if (p.invitedById) await sendInviterJoined(prospectId)
     await notifyAdmins('New member joined', `${p.firstName} ${p.lastName} finished the Get Involved journey as ${label}.`, p.id)
   } catch (e) {
     console.error('[GET-INVOLVED] joined emails failed', e)

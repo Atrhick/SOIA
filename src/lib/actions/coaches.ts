@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { sendWelcomeInvite } from '@/lib/actions/password-reset'
+import { sendWelcomeInvite } from '@/lib/welcome-invite'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'

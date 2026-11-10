@@ -37,8 +37,7 @@ export function teamJoinedEmail(p: {
 
 /**
  * Send E13 to whoever invited the prospect. Call it after the login exists (ACCOUNT_CREATED), outside
- * any transaction. Never throws. Note: completeJourney() in login.ts currently sends the simpler
- * inviterJoinedEmail itself, so call this only where that one is not sent, to avoid a double email.
+ * any transaction. Never throws. completeJourney() in login.ts sends it, so don't call it again there.
  */
 export async function sendInviterJoined(prospectId: string): Promise<void> {
   try {

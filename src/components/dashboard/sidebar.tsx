@@ -44,6 +44,7 @@ import {
   Trophy,
   UsersRound,
   SlidersHorizontal,
+  Wallet,
 } from 'lucide-react'
 import { ASSOCIATE_LABELS, isAssociateRole, type AssociateRole } from '@/lib/roles'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
@@ -200,6 +201,7 @@ const adminNavSections: NavSection[] = [
       { href: '/admin/ambassadors', label: 'Ambassadors', icon: Users },
       { href: '/admin/associates', label: 'Associates', icon: Handshake },
       { href: '/admin/role-settings', label: 'Role Settings', icon: SlidersHorizontal },
+      { href: '/admin/journey-payments', label: 'Journey Payments', icon: Wallet },
     ],
   },
   {
