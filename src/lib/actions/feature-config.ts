@@ -19,8 +19,8 @@ const DEFAULT_FEATURES: {
   { feature: 'TIME_CLOCK', isEnabled: true, enabledForCoaches: true, enabledForAmbassadors: true },
   { feature: 'SCHEDULING', isEnabled: true, enabledForCoaches: true, enabledForAmbassadors: true },
   { feature: 'KNOWLEDGE_BASE', isEnabled: true, enabledForCoaches: true, enabledForAmbassadors: true },
-  // Opt-in per coach: globally on, but off by role default so an admin grants it
-  // to specific coaches from /admin/users.
+  // Opt-in per user: globally on, but off by role default so an admin grants it
+  // to specific coaches or ambassadors from /admin/users.
   { feature: 'PROGRAM_PAGES', isEnabled: true, enabledForCoaches: false, enabledForAmbassadors: false },
 ]
 

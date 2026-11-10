@@ -32,6 +32,8 @@ import {
 import { markLeadInterested, submitQualification } from '@/lib/actions/program-pages'
 
 export interface JourneyData {
+  /** Who runs the program: shown as "your coach" or "your ambassador". */
+  ownerTerm?: 'coach' | 'ambassador'
   programName: string
   organization: string
   coachVideoEmbedUrl: string | null
@@ -81,6 +83,7 @@ export function JourneyClient({
   lead: JourneyLead
 }) {
   const previewMode = token === null
+  const term = journey.ownerTerm ?? 'coach'
   const hasChildren = audienceIncludesChildren(lead.audience)
   const questions = useMemo(
     () => [...journey.baseQuestions, ...(hasChildren ? journey.familyQuestions : [])],
@@ -166,13 +169,16 @@ export function JourneyClient({
             <CardContent className="pt-6 space-y-4">
               <div>
                 <h2 className="font-semibold text-gray-900">
-                  Welcome, {lead.firstName}. Meet your coach
+                  Welcome, {lead.firstName}. Meet your {term}
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Your coach explains the program and what taking part looks like.
+                  Your {term} explains the program and what taking part looks like.
                 </p>
               </div>
-              <VideoFrame src={journey.coachVideoEmbedUrl} title="Your coach explains the program" />
+              <VideoFrame
+                src={journey.coachVideoEmbedUrl}
+                title={`Your ${term} explains the program`}
+              />
               {lastVideoStep === 'coach' ? (
                 interestedButton
               ) : (
@@ -204,7 +210,7 @@ export function JourneyClient({
               <div className="rounded-lg bg-primary-50 border border-primary-100 p-4 space-y-3">
                 <p className="text-sm text-gray-700">
                   Like what you have heard? Tell us you are interested and answer a few short
-                  questions so your coach can follow up with you.
+                  questions so your {term} can follow up with you.
                 </p>
                 {interestedButton}
               </div>
@@ -216,7 +222,7 @@ export function JourneyClient({
               className="text-sm text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to the coach video
+              Back to the {term} video
             </button>
           )}
           {videoSteps[0] === 'nt' && journey.meeting && <MeetingCard meeting={journey.meeting} />}
@@ -235,7 +241,7 @@ export function JourneyClient({
                 <h2 className="font-semibold text-gray-900">A few quick questions</h2>
                 <p className="text-sm text-gray-500 mt-1 mb-4">
                   {journey.qualificationIntro?.trim() ||
-                    'This helps your coach make the next conversation useful for you.'}
+                    `This helps your ${term} make the next conversation useful for you.`}
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-6" noValidate>
@@ -253,7 +259,7 @@ export function JourneyClient({
                       <div>
                         <h3 className="font-medium text-gray-900">About your family</h3>
                         <p className="text-sm text-gray-500 mt-0.5">
-                          {childrenSummary(lead.children)}. Your answers go to the coach only.
+                          {childrenSummary(lead.children)}. Your answers go to the {term} only.
                         </p>
                       </div>
                       {journey.familyQuestions.map((q) => (
@@ -287,11 +293,11 @@ export function JourneyClient({
               <p className="text-gray-600 mt-1">
                 {hasChildren
                   ? 'We have everything we need. Here is what happens next.'
-                  : 'Your coach will look through your answers and be in touch.'}
+                  : `Your ${term} will look through your answers and be in touch.`}
               </p>
             </CardContent>
           </Card>
-          {hasChildren && <FamilyNextSteps kids={lead.children} />}
+          {hasChildren && <FamilyNextSteps kids={lead.children} term={term} />}
           {journey.meeting && <MeetingCard meeting={journey.meeting} />}
         </>
       )}
@@ -312,9 +318,15 @@ function childrenSummary(kids: ProgramChild[]): string {
  * Every step is with the parent; the child is never contacted directly. Per
  * child notes set expectations by age before the coach ever calls.
  */
-function FamilyNextSteps({ kids }: { kids: ProgramChild[] }) {
+function FamilyNextSteps({
+  kids,
+  term,
+}: {
+  kids: ProgramChild[]
+  term: 'coach' | 'ambassador'
+}) {
   const notes = kids
-    .map((c) => ({ child: c, note: ageNote(c) }))
+    .map((c) => ({ child: c, note: ageNote(c, term) }))
     .filter((n): n is { child: ProgramChild; note: string } => n.note !== null)
 
   return (
@@ -322,7 +334,7 @@ function FamilyNextSteps({ kids }: { kids: ProgramChild[] }) {
       <CardContent className="pt-6 space-y-5">
         <h2 className="font-semibold text-gray-900">What happens next for your family</h2>
         <ol className="space-y-4">
-          <NextStep n={1} title="Your coach contacts you within 2 business days">
+          <NextStep n={1} title={`Your ${term} contacts you within 2 business days`}>
             At the time you told us suits you best. We contact you, the parent or guardian, and
             never your child directly.
           </NextStep>
@@ -351,7 +363,7 @@ function FamilyNextSteps({ kids }: { kids: ProgramChild[] }) {
 
         <p className="text-xs text-gray-500 inline-flex items-start gap-1.5">
           <ShieldCheck className="h-4 w-4 flex-shrink-0 text-gray-400" />
-          We only keep your child&apos;s first name and age range. Ask your coach at any time and
+          We only keep your child&apos;s first name and age range. Ask your {term} at any time and
           we will remove them.
         </p>
       </CardContent>
@@ -359,9 +371,9 @@ function FamilyNextSteps({ kids }: { kids: ProgramChild[] }) {
   )
 }
 
-function ageNote(child: ProgramChild): string | null {
+function ageNote(child: ProgramChild, term: 'coach' | 'ambassador'): string | null {
   if (child.ageBand === 'UNDER_10') {
-    return 'Our youth Ambassador program starts at age 10. Your coach will talk with you about what is available now and let you know when they become eligible.'
+    return `Our youth Ambassador program starts at age 10. Your ${term} will talk with you about what is available now and let you know when they become eligible.`
   }
   if (child.ageBand === '18_24') {
     return 'As an adult, they will be asked to confirm their own place, but the first conversation still starts with you.'

@@ -25,6 +25,19 @@ import {
   type ProgramQuestion,
 } from '@/lib/program-question-types'
 import { toVideoEmbedUrl } from '@/lib/video-embed'
+import {
+  decodeOwnerChoice,
+  hasProgramOwner,
+  isProgramOwnedBy,
+  ownerAssignment,
+  ownerTerm,
+  ownerWhere,
+  programOwnerRole,
+  programsBasePath,
+  type ProgramOwnerColumns,
+  type ProgramOwnerIdentity,
+} from '@/lib/program-owner'
+import { flattenProgramLeads } from '@/lib/program-leads'
 
 // ============================================
 // Schemas
@@ -190,7 +203,7 @@ function buildSnapshot(program: ProgramRecord) {
 }
 
 // ============================================
-// Coach helpers
+// Owner helpers (coach or ambassador)
 // ============================================
 
 // Guards return an `ok` discriminant rather than relying on `'error' in x`
@@ -203,50 +216,81 @@ function buildSnapshot(program: ProgramRecord) {
  * the coach's name, because coach-side actions write no audit trail.
  *
  * Reads pass `allowImpersonation: true`; every write leaves it off.
+ *
+ * A program owner is a COACH (matched on their CoachProfile id) or an
+ * AMBASSADOR (matched on their Ambassador id), with Program Pages enabled for
+ * them by role default or a per-user grant from /admin/users.
  */
-async function requireCoach({ allowImpersonation = false } = {}) {
+async function requireProgramUser({ allowImpersonation = false } = {}) {
   const session = await auth()
-  if (!session || session.user.role !== 'COACH') {
+  const role = session?.user.role
+  if (!session || (role !== 'COACH' && role !== 'AMBASSADOR')) {
     return { ok: false as const, error: 'Unauthorized' }
   }
   if (session.user.isImpersonating && !allowImpersonation) {
     return { ok: false as const, error: 'Not available while impersonating another user' }
   }
-  const enabled = await isFeatureEnabled('PROGRAM_PAGES', 'COACH', session.user.id)
+  const enabled = await isFeatureEnabled('PROGRAM_PAGES', role, session.user.id)
   if (!enabled) {
     return { ok: false as const, error: 'This feature is not enabled for your account' }
   }
-  const coachProfile = await prisma.coachProfile.findUnique({
-    where: { userId: session.user.id },
-    select: { id: true, firstName: true, lastName: true },
-  })
-  if (!coachProfile) {
-    return { ok: false as const, error: 'Coach profile not found' }
+
+  let owner: ProgramOwnerIdentity
+  if (role === 'COACH') {
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true },
+    })
+    if (!coachProfile) return { ok: false as const, error: 'Coach profile not found' }
+    owner = { role: 'COACH', coachId: coachProfile.id }
+  } else {
+    const ambassador = await prisma.ambassador.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true },
+    })
+    if (!ambassador) return { ok: false as const, error: 'Ambassador profile not found' }
+    owner = { role: 'AMBASSADOR', ambassadorId: ambassador.id }
   }
+
   return {
     ok: true as const,
     session,
-    coachProfile,
+    owner,
     readOnly: Boolean(session.user.isImpersonating),
   }
 }
 
 async function requireProgramOwner(programId: string, opts?: { allowImpersonation?: boolean }) {
-  const ctx = await requireCoach(opts)
+  const ctx = await requireProgramUser(opts)
   if (!ctx.ok) return { ok: false as const, error: ctx.error }
 
   const program = await prisma.coachProgram.findUnique({ where: { id: programId } })
-  if (!program || program.coachId !== ctx.coachProfile.id) {
+  if (!program || !isProgramOwnedBy(program, ctx.owner)) {
     // Same message whether it does not exist or belongs to someone else.
     return { ok: false as const, error: 'Program not found' }
   }
   return {
     ok: true as const,
     session: ctx.session,
-    coachProfile: ctx.coachProfile,
+    owner: ctx.owner,
     readOnly: ctx.readOnly,
     program,
   }
+}
+
+/** Refresh the owner's list and editor after a change to one program. */
+function revalidateOwnerPages(programId: string) {
+  for (const base of [programsBasePath('COACH'), programsBasePath('AMBASSADOR')]) {
+    revalidatePath(base)
+    revalidatePath(`${base}/${programId}`)
+  }
+}
+
+/** Every page that shows program leads to their owner. */
+function revalidateLeadPages() {
+  revalidatePath('/coach/business-excellence')
+  revalidatePath('/coach/crm')
+  revalidatePath(programsBasePath('AMBASSADOR'), 'layout')
 }
 
 async function requireAdmin() {
@@ -277,21 +321,22 @@ async function audit(userId: string, action: string, entityId: string, details: 
 }
 
 // ============================================
-// Coach actions
+// Owner actions (coach or ambassador)
 // ============================================
 
 export async function getMyPrograms() {
-  const ctx = await requireCoach({ allowImpersonation: true })
+  const ctx = await requireProgramUser({ allowImpersonation: true })
   if (!ctx.ok) return { error: ctx.error }
 
   const programs = await prisma.coachProgram.findMany({
-    where: { coachId: ctx.coachProfile.id },
+    where: ownerWhere(ctx.owner),
     orderBy: { name: 'asc' },
     include: { _count: { select: { leads: true } } },
   })
 
   return {
     readOnly: ctx.readOnly,
+    ownerRole: ctx.owner.role,
     programs: programs.map((p) => ({
       id: p.id,
       slug: p.slug,
@@ -313,6 +358,7 @@ export async function getMyProgram(programId: string) {
   const p = ctx.program
   return {
     readOnly: ctx.readOnly,
+    ownerRole: ctx.owner.role,
     // What the lead will actually be asked ahead of the coach's own questions.
     // Empty while an admin has the standard questions switched off, so the
     // editor never promises questions no form will ask.
@@ -377,8 +423,7 @@ export async function updateProgram(programId: string, data: unknown) {
     },
   })
 
-  revalidatePath(`/coach/programs/${programId}`)
-  revalidatePath('/coach/programs')
+  revalidateOwnerPages(programId)
   return { success: true }
 }
 
@@ -405,7 +450,7 @@ export async function saveExtraQuestions(programId: string, questions: unknown) 
     data: { extraQuestions: parsed.data as unknown as object },
   })
 
-  revalidatePath(`/coach/programs/${programId}`)
+  revalidateOwnerPages(programId)
   return { success: true }
 }
 
@@ -420,7 +465,7 @@ export async function submitProgramForReview(programId: string) {
 
   const missing: string[] = []
   if (!p.programDescription?.trim()) missing.push('program description')
-  if (!p.coachBio?.trim()) missing.push('about the coach')
+  if (!p.coachBio?.trim()) missing.push('about you')
   if (p.showMeetingDetails) {
     if (!p.zoomUrl?.trim()) missing.push('Zoom link')
     if (!p.eventDatesText?.trim()) missing.push('at least one event date')
@@ -437,8 +482,7 @@ export async function submitProgramForReview(programId: string) {
     data: { status: 'PENDING_REVIEW', submittedAt: new Date(), reviewNotes: null },
   })
 
-  revalidatePath(`/coach/programs/${programId}`)
-  revalidatePath('/coach/programs')
+  revalidateOwnerPages(programId)
   revalidatePath('/admin/programs')
   return { success: true }
 }
@@ -454,12 +498,29 @@ export async function unpublishProgram(programId: string) {
     data: { status: 'DRAFT', publishedSnapshot: Prisma.DbNull },
   })
 
-  revalidatePath(`/coach/programs/${programId}`)
+  revalidateOwnerPages(programId)
   revalidatePath(`/p/${ctx.program.slug}`)
-  revalidatePath('/coach/programs')
   return { success: true }
 }
 
+/**
+ * The signups for one program, for its owner. Ambassadors have no CRM, so this
+ * is where they see their leads; coaches also get them in Business Excellence.
+ */
+export async function getMyProgramLeads(programId: string) {
+  const ctx = await requireProgramOwner(programId, { allowImpersonation: true })
+  if (!ctx.ok) return { error: ctx.error }
+
+  const leads = await prisma.programLead.findMany({
+    where: { programId },
+    orderBy: { registeredAt: 'desc' },
+  })
+  return {
+    leads: flattenProgramLeads([
+      { name: ctx.program.name, slug: ctx.program.slug, leads },
+    ]),
+  }
+}
 
 const ASSOCIATION_VALUES = [
   'UNCLASSIFIED',
@@ -471,7 +532,7 @@ const ASSOCIATION_VALUES = [
 ] as const
 
 export async function setLeadAssociation(leadId: string, association: string) {
-  const ctx = await requireCoach()
+  const ctx = await requireProgramUser()
   if (!ctx.ok) return { error: ctx.error }
 
   const parsed = z.enum(ASSOCIATION_VALUES).safeParse(association)
@@ -479,9 +540,9 @@ export async function setLeadAssociation(leadId: string, association: string) {
 
   const lead = await prisma.programLead.findUnique({
     where: { id: leadId },
-    select: { id: true, program: { select: { coachId: true } } },
+    select: { id: true, program: { select: { coachId: true, ambassadorId: true } } },
   })
-  if (!lead || lead.program.coachId !== ctx.coachProfile.id) {
+  if (!lead || !isProgramOwnedBy(lead.program, ctx.owner)) {
     return { error: 'Lead not found' }
   }
 
@@ -490,12 +551,12 @@ export async function setLeadAssociation(leadId: string, association: string) {
     data: { association: parsed.data, classifiedAt: new Date() },
   })
 
-  revalidatePath('/coach/business-excellence')
+  revalidateLeadPages()
   return { success: true }
 }
 
 export async function setLeadFamilyStage(leadId: string, stage: string) {
-  const ctx = await requireCoach()
+  const ctx = await requireProgramUser()
   if (!ctx.ok) return { error: ctx.error }
 
   const parsed = z.enum(FAMILY_STAGES).safeParse(stage)
@@ -503,9 +564,13 @@ export async function setLeadFamilyStage(leadId: string, stage: string) {
 
   const lead = await prisma.programLead.findUnique({
     where: { id: leadId },
-    select: { id: true, audience: true, program: { select: { coachId: true } } },
+    select: {
+      id: true,
+      audience: true,
+      program: { select: { coachId: true, ambassadorId: true } },
+    },
   })
-  if (!lead || lead.program.coachId !== ctx.coachProfile.id) {
+  if (!lead || !isProgramOwnedBy(lead.program, ctx.owner)) {
     return { error: 'Lead not found' }
   }
   if (!audienceIncludesChildren(lead.audience)) {
@@ -517,7 +582,7 @@ export async function setLeadFamilyStage(leadId: string, stage: string) {
     data: { familyStage: parsed.data },
   })
 
-  revalidatePath('/coach/business-excellence')
+  revalidateLeadPages()
   return { success: true }
 }
 
@@ -530,15 +595,22 @@ export async function getAllPrograms() {
   const ctx = await requireAdmin()
   if (!ctx.ok) return { error: ctx.error }
 
-  const [programs, coaches] = await Promise.all([
+  const [programs, coaches, ambassadors] = await Promise.all([
     prisma.coachProgram.findMany({
       orderBy: [{ status: 'asc' }, { name: 'asc' }],
       include: {
         coach: { select: { id: true, firstName: true, lastName: true } },
+        ambassador: { select: { id: true, firstName: true, lastName: true } },
         _count: { select: { leads: true } },
       },
     }),
     prisma.coachProfile.findMany({
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      select: { id: true, firstName: true, lastName: true },
+    }),
+    // Only ambassadors with a login can edit a page.
+    prisma.ambassador.findMany({
+      where: { userId: { not: null } },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
       select: { id: true, firstName: true, lastName: true },
     }),
@@ -552,7 +624,9 @@ export async function getAllPrograms() {
       organization: p.organization,
       status: p.status,
       coachId: p.coachId,
-      coachName: p.coach ? `${p.coach.firstName} ${p.coach.lastName}` : null,
+      ambassadorId: p.ambassadorId,
+      ownerRole: programOwnerRole(p),
+      ownerName: ownerDisplayName(p),
       isLive: p.status === 'PUBLISHED' && p.publishedSnapshot !== null,
       leadCount: p._count.leads,
       submittedAt: p.submittedAt?.toISOString() ?? null,
@@ -568,7 +642,22 @@ export async function getAllPrograms() {
       extraQuestionCount: ((p.extraQuestions as unknown as ProgramQuestion[]) ?? []).length,
     })),
     coaches: coaches.map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}` })),
+    ambassadors: ambassadors.map((a) => ({ id: a.id, name: `${a.firstName} ${a.lastName}` })),
   }
+}
+
+function ownerDisplayName(p: {
+  coachId: string | null
+  ambassadorId: string | null
+  coach: { firstName: string; lastName: string } | null
+  ambassador: { firstName: string; lastName: string } | null
+}): string | null {
+  const role = programOwnerRole(p)
+  if (role === 'COACH' && p.coach) return `${p.coach.firstName} ${p.coach.lastName}`
+  if (role === 'AMBASSADOR' && p.ambassador) {
+    return `${p.ambassador.firstName} ${p.ambassador.lastName}`
+  }
+  return null
 }
 
 export async function createProgram(data: unknown) {
@@ -611,33 +700,57 @@ export async function createProgram(data: unknown) {
   return { success: true, programId: program.id, slug }
 }
 
-export async function assignProgramToCoach(programId: string, coachId: string | null) {
+/**
+ * Assigns a program to a coach or an ambassador, or unassigns it. `owner` is
+ * the admin picker's value: `COACH:<coachProfileId>`, `AMBASSADOR:<ambassadorId>`
+ * or the unassigned marker. Setting one owner always clears the other.
+ */
+export async function assignProgramOwner(programId: string, owner: string) {
   const ctx = await requireAdmin()
   if (!ctx.ok) return { error: ctx.error }
 
+  const choice = decodeOwnerChoice(String(owner ?? ''))
+  if (choice === undefined) return { error: 'Invalid owner' }
+
   const program = await prisma.coachProgram.findUnique({
     where: { id: programId },
-    select: { id: true },
+    select: { id: true, coachId: true, ambassadorId: true },
   })
   if (!program) return { error: 'Program not found' }
 
-  if (coachId) {
-    const coach = await prisma.coachProfile.findUnique({ where: { id: coachId }, select: { id: true } })
+  if (choice?.role === 'COACH') {
+    const coach = await prisma.coachProfile.findUnique({
+      where: { id: choice.id },
+      select: { id: true },
+    })
     if (!coach) return { error: 'Coach not found' }
   }
+  if (choice?.role === 'AMBASSADOR') {
+    const ambassador = await prisma.ambassador.findUnique({
+      where: { id: choice.id },
+      select: { id: true, userId: true },
+    })
+    if (!ambassador) return { error: 'Ambassador not found' }
+    if (!ambassador.userId) return { error: 'This ambassador has no login yet' }
+  }
 
+  const columns = ownerAssignment(choice)
   await prisma.coachProgram.update({
     where: { id: programId },
     data: {
-      coachId,
-      assignedAt: coachId ? new Date() : null,
-      assignedBy: coachId ? ctx.session.user.id : null,
+      ...columns,
+      assignedAt: choice ? new Date() : null,
+      assignedBy: choice ? ctx.session.user.id : null,
     },
   })
 
-  await audit(ctx.session.user.id, coachId ? 'ASSIGN_PROGRAM' : 'UNASSIGN_PROGRAM', programId, { coachId })
+  await audit(ctx.session.user.id, choice ? 'ASSIGN_PROGRAM' : 'UNASSIGN_PROGRAM', programId, {
+    ...columns,
+    ownerRole: choice?.role ?? null,
+    previous: { coachId: program.coachId, ambassadorId: program.ambassadorId },
+  })
   revalidatePath('/admin/programs')
-  revalidatePath('/coach/programs')
+  revalidateOwnerPages(programId)
   return { success: true }
 }
 
@@ -647,7 +760,7 @@ export async function approveProgram(programId: string) {
 
   const program = await prisma.coachProgram.findUnique({ where: { id: programId } })
   if (!program) return { error: 'Program not found' }
-  if (!program.coachId) return { error: 'Assign a coach before publishing' }
+  if (!hasProgramOwner(program)) return { error: 'Assign a coach or ambassador before publishing' }
 
   await prisma.coachProgram.update({
     where: { id: programId },
@@ -662,7 +775,7 @@ export async function approveProgram(programId: string) {
 
   await audit(ctx.session.user.id, 'APPROVE_PROGRAM', programId, { slug: program.slug })
   revalidatePath('/admin/programs')
-  revalidatePath('/coach/programs')
+  revalidateOwnerPages(programId)
   revalidatePath(`/p/${program.slug}`)
   return { success: true }
 }
@@ -706,8 +819,7 @@ export async function setProgramNtVideo(programId: string, data: unknown) {
     appliedToLivePage: Boolean(snapshot),
   })
   revalidatePath('/admin/programs')
-  revalidatePath('/coach/programs')
-  revalidatePath(`/coach/programs/${programId}`)
+  revalidateOwnerPages(programId)
   revalidatePath(`/p/${program.slug}`)
   return { success: true }
 }
@@ -737,7 +849,7 @@ export async function rejectProgram(programId: string, reason: string) {
 
   await audit(ctx.session.user.id, 'REJECT_PROGRAM', programId, { reason: trimmed })
   revalidatePath('/admin/programs')
-  revalidatePath('/coach/programs')
+  revalidateOwnerPages(programId)
   return { success: true }
 }
 
@@ -767,6 +879,7 @@ export async function adminUnpublishProgram(programId: string, reason: string) {
 
   await audit(ctx.session.user.id, 'UNPUBLISH_PROGRAM', programId, { reason: trimmed })
   revalidatePath('/admin/programs')
+  revalidateOwnerPages(programId)
   revalidatePath(`/p/${program.slug}`)
   return { success: true }
 }
@@ -823,7 +936,8 @@ export async function setStandardQuestionsEnabled(enabled: unknown) {
     {}
   )
   revalidatePath('/admin/programs')
-  revalidatePath('/coach/programs')
+  revalidatePath(programsBasePath('COACH'), 'layout')
+  revalidatePath(programsBasePath('AMBASSADOR'), 'layout')
   return { success: true }
 }
 
@@ -1019,11 +1133,40 @@ async function loadCoreQuestions(): Promise<ProgramQuestion[]> {
 
 type PublicSnapshot = Record<string, unknown>
 
+// First names only: the owner may be a youth ambassador, so the public page
+// never shows a surname.
+const OWNER_NAME_SELECT = {
+  coach: { select: { firstName: true } },
+  ambassador: { select: { firstName: true } },
+} as const
+
+/**
+ * Who the public sees as the page's owner. Ownership is admin-controlled, so it
+ * is read live rather than from the snapshot.
+ */
+function publicOwner(p: {
+  coachId: string | null
+  ambassadorId: string | null
+  coach: { firstName: string } | null
+  ambassador: { firstName: string } | null
+}) {
+  const role = programOwnerRole(p)
+  const firstName =
+    role === 'COACH' ? p.coach?.firstName : role === 'AMBASSADOR' ? p.ambassador?.firstName : null
+  return { role, term: ownerTerm(role), firstName: firstName ?? null }
+}
+
 async function loadPublishedProgram(slug: string) {
   if (!slug || slug.length > 80) return null
-  const program = await prisma.coachProgram.findUnique({ where: { slug } })
+  const program = await prisma.coachProgram.findUnique({
+    where: { slug },
+    include: OWNER_NAME_SELECT,
+  })
   if (!program) return null
-  if (program.status !== 'PUBLISHED' || !program.coachId || !program.publishedSnapshot) return null
+  // An unassigned program (owner removed or deleted) must stop serving.
+  if (program.status !== 'PUBLISHED' || !hasProgramOwner(program) || !program.publishedSnapshot) {
+    return null
+  }
   return program
 }
 
@@ -1046,6 +1189,7 @@ export async function getPublicProgram(slug: string) {
       servicesDescription: (snap.servicesDescription as string) ?? '',
       eventDatesText: (snap.eventDatesText as string) ?? null,
       showMeetingDetails: snapshotShowsMeeting(snap),
+      owner: publicOwner(program),
     },
   }
 }
@@ -1057,6 +1201,7 @@ function snapshotShowsMeeting(snap: PublicSnapshot): boolean {
 }
 
 type JourneySource = {
+  ownerTerm: 'coach' | 'ambassador'
   pageTitle: string
   organization: string
   showMeetingDetails: boolean
@@ -1090,6 +1235,7 @@ async function buildJourney(src: JourneySource) {
       }
     : null
   return {
+    ownerTerm: src.ownerTerm,
     programName: src.pageTitle,
     organization: src.organization,
     coachVideoEmbedUrl: toVideoEmbedUrl(src.coachVideoUrl),
@@ -1102,9 +1248,13 @@ async function buildJourney(src: JourneySource) {
   }
 }
 
-function journeyFromSnapshot(snap: PublicSnapshot): JourneySource {
+function journeyFromSnapshot(
+  snap: PublicSnapshot,
+  owner: ProgramOwnerColumns
+): JourneySource {
   const str = (k: string) => (snap[k] as string | null | undefined) ?? null
   return {
+    ownerTerm: ownerTerm(programOwnerRole(owner)),
     pageTitle: (str('pageTitle') || str('name')) ?? '',
     organization: str('organization') ?? '',
     showMeetingDetails: snapshotShowsMeeting(snap),
@@ -1136,13 +1286,22 @@ export async function getProgramPreview(slug: string) {
 
   const program = await prisma.coachProgram.findUnique({
     where: { slug },
-    include: { coach: { select: { userId: true } } },
+    include: {
+      coach: { select: { userId: true, firstName: true } },
+      ambassador: { select: { userId: true, firstName: true } },
+    },
   })
   if (!program) return { error: 'Program not found' }
 
   const isAdmin = session.user.role === 'ADMIN'
+  const ownerRole = programOwnerRole(program)
   const isOwner =
-    session.user.role === 'COACH' && program.coach?.userId === session.user.id
+    (ownerRole === 'COACH' &&
+      session.user.role === 'COACH' &&
+      program.coach?.userId === session.user.id) ||
+    (ownerRole === 'AMBASSADOR' &&
+      session.user.role === 'AMBASSADOR' &&
+      program.ambassador?.userId === session.user.id)
   if (!isAdmin && !isOwner) {
     return { error: 'Program not found' }
   }
@@ -1162,10 +1321,12 @@ export async function getProgramPreview(slug: string) {
       servicesDescription: program.servicesDescription,
       eventDatesText: program.eventDatesText,
       showMeetingDetails: program.showMeetingDetails,
+      owner: publicOwner(program),
     },
     // The draft journey, so the coach can click through the videos and form
     // exactly as an applicant would before submitting for review.
     journey: await buildJourney({
+      ownerTerm: ownerTerm(ownerRole),
       pageTitle: program.pageTitle || program.name,
       organization: program.organization,
       showMeetingDetails: program.showMeetingDetails,
@@ -1259,8 +1420,10 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
 
   // Everything below is bookkeeping for the coach. None of it may fail the
   // signup - the visitor has already given us their details and is expecting
-  // their joining link.
-  if (program.coachId) {
+  // their joining link. An ambassador-owned program has no outreach log or CRM
+  // (both are keyed to a CoachProfile); the ambassador sees the ProgramLead on
+  // their program page instead.
+  if (programOwnerRole(program) === 'COACH' && program.coachId) {
     const fullName = parsed.data.fullName.trim()
 
     // Feed Business Excellence.
@@ -1311,15 +1474,14 @@ export async function registerInterest(slug: string, data: unknown, honeypot?: s
     }
   }
 
-  revalidatePath('/coach/business-excellence')
-  revalidatePath('/coach/crm')
+  revalidateLeadPages()
   return { success: true, token }
 }
 
 /**
  * A lead by its private token, only while its program is live. Same gate as
- * loadPublishedProgram, including coachId: an unassigned program must not keep
- * serving its joining details here after /p/[slug] 404s.
+ * loadPublishedProgram, including the owner: an unassigned program must not
+ * keep serving its joining details here after /p/[slug] 404s.
  */
 async function loadLeadForToken(token: string) {
   if (!token || token.length < 10 || token.length > 120) return null
@@ -1331,7 +1493,7 @@ async function loadLeadForToken(token: string) {
     !lead ||
     lead.program.status !== 'PUBLISHED' ||
     !lead.program.publishedSnapshot ||
-    !lead.program.coachId
+    !hasProgramOwner(lead.program)
   ) {
     return null
   }
@@ -1345,7 +1507,7 @@ export async function getLeadQualificationData(slug: string, token: string) {
   const snap = lead.program.publishedSnapshot as PublicSnapshot
 
   return {
-    journey: await buildJourney(journeyFromSnapshot(snap)),
+    journey: await buildJourney(journeyFromSnapshot(snap, lead.program)),
     lead: {
       firstName: lead.fullName.split(/\s+/)[0] || lead.fullName,
       audience: lead.audience,
@@ -1366,7 +1528,7 @@ export async function markLeadInterested(token: string) {
       where: { id: lead.id },
       data: { interestedAt: new Date() },
     })
-    revalidatePath('/coach/business-excellence')
+    revalidateLeadPages()
   }
   return { success: true }
 }
@@ -1443,6 +1605,6 @@ export async function submitQualification(token: string, answers: unknown) {
     },
   })
 
-  revalidatePath('/coach/business-excellence')
+  revalidateLeadPages()
   return { success: true }
 }

@@ -30,7 +30,14 @@ const STATUS_META: Record<
   REJECTED: { label: 'Needs changes', variant: 'destructive' },
 }
 
-export function ProgramsListClient({ programs }: { programs: ProgramRow[] }) {
+export function ProgramsListClient({
+  programs,
+  basePath = '/coach/programs',
+}: {
+  programs: ProgramRow[]
+  /** Where each program's editor lives: /coach/programs or /ambassador/programs. */
+  basePath?: string
+}) {
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
 
   const copyLink = async (slug: string) => {
@@ -100,7 +107,7 @@ export function ProgramsListClient({ programs }: { programs: ProgramRow[] }) {
 
                 <div className="flex items-center gap-2 pt-1">
                   <Link
-                    href={`/coach/programs/${p.id}`}
+                    href={`${basePath}/${p.id}`}
                     className={buttonVariants({ size: 'sm' })}
                   >
                     Edit program

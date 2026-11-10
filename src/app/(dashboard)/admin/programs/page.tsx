@@ -31,6 +31,7 @@ export default async function AdminProgramsPage() {
     <ProgramsAdminClient
       programs={result.programs}
       coaches={result.coaches}
+      ambassadors={result.ambassadors}
       coreQuestions={'error' in questionsResult ? [] : questionsResult.questions}
       standardQuestionsEnabled={
         'error' in settingsResult ? false : settingsResult.settings.standardQuestionsEnabled

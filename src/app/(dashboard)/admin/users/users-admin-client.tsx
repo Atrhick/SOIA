@@ -87,6 +87,10 @@ const FEATURE_INFO: Record<string, { label: string; description: string }> = {
   TIME_CLOCK: { label: 'Time Clock', description: 'Start/stop timer and timesheets' },
   SCHEDULING: { label: 'Scheduling', description: 'Calendar events and appointments' },
   KNOWLEDGE_BASE: { label: 'Knowledge Base', description: 'Articles and documentation' },
+  PROGRAM_PAGES: {
+    label: 'Program Pages',
+    description: 'Public program landing pages and leads (coaches and ambassadors)',
+  },
 }
 
 export function UsersAdminClient({
