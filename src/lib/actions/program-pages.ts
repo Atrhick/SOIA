@@ -25,6 +25,7 @@ import {
   type ProgramQuestion,
 } from '@/lib/program-question-types'
 import { toVideoEmbedUrl } from '@/lib/video-embed'
+import { draftWelcomeNoteOnPublish } from '@/lib/get-involved/program-welcome-server'
 import {
   decodeOwnerChoice,
   hasProgramOwner,
@@ -774,6 +775,9 @@ export async function approveProgram(programId: string) {
   })
 
   await audit(ctx.session.user.id, 'APPROVE_PROGRAM', programId, { slug: program.slug })
+  // Draft the Get Involved welcome-email paragraph from the published page (AI, if switched on).
+  // Never overwrites an approved or hand-written one, and never fails the publish.
+  await draftWelcomeNoteOnPublish(programId)
   revalidatePath('/admin/programs')
   revalidateOwnerPages(programId)
   revalidatePath(`/p/${program.slug}`)

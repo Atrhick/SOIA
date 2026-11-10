@@ -4,6 +4,8 @@ import { auth } from '@/lib/auth'
 import { isFeatureEnabled } from '@/lib/actions/feature-config'
 import { FeatureDisabled } from '@/components/ui/feature-disabled'
 import { getMyProgram } from '@/lib/actions/program-pages'
+import { getWelcomePanel } from '@/lib/actions/program-welcome'
+import { WelcomeEmailPanel } from '@/components/program-pages/welcome-email-panel'
 import { ProgramEditorClient } from './program-editor-client'
 
 export default async function CoachProgramEditorPage({
@@ -21,16 +23,19 @@ export default async function CoachProgramEditorPage({
     return <FeatureDisabled title="Program Pages" icon={Megaphone} />
   }
 
-  const result = await getMyProgram(params.id)
+  const [result, welcome] = await Promise.all([getMyProgram(params.id), getWelcomePanel(params.id)])
   if ('error' in result) {
     notFound()
   }
 
   return (
-    <ProgramEditorClient
-      program={result.program}
-      readOnly={result.readOnly}
-      standardQuestions={result.standardQuestions}
-    />
+    <div className="space-y-6">
+      <ProgramEditorClient
+        program={result.program}
+        readOnly={result.readOnly}
+        standardQuestions={result.standardQuestions}
+      />
+      {!('error' in welcome) && <WelcomeEmailPanel data={welcome} />}
+    </div>
   )
 }

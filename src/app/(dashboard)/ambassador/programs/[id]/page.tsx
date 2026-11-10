@@ -6,6 +6,8 @@ import { FeatureDisabled } from '@/components/ui/feature-disabled'
 import { getMyProgram, getMyProgramLeads } from '@/lib/actions/program-pages'
 import { ProgramEditorClient } from '@/app/(dashboard)/coach/programs/[id]/program-editor-client'
 import { ProgramLeadsCard } from '@/components/programs/program-leads-card'
+import { getWelcomePanel } from '@/lib/actions/program-welcome'
+import { WelcomeEmailPanel } from '@/components/program-pages/welcome-email-panel'
 
 export default async function AmbassadorProgramEditorPage({
   params,
@@ -22,9 +24,10 @@ export default async function AmbassadorProgramEditorPage({
     return <FeatureDisabled title="Program Pages" icon={Megaphone} />
   }
 
-  const [result, leadsResult] = await Promise.all([
+  const [result, leadsResult, welcome] = await Promise.all([
     getMyProgram(params.id),
     getMyProgramLeads(params.id),
+    getWelcomePanel(params.id),
   ])
   if ('error' in result) {
     notFound()
@@ -42,6 +45,7 @@ export default async function AmbassadorProgramEditorPage({
         basePath="/ambassador/programs"
         ownerNoun="ambassador"
       />
+      {!('error' in welcome) && <WelcomeEmailPanel data={welcome} />}
       {leads.length > 0 ? (
         <ProgramLeadsCard leads={leads} ownerRole="AMBASSADOR" />
       ) : (
