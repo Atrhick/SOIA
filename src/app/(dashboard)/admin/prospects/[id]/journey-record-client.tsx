@@ -7,18 +7,19 @@ import { Check, Copy, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { addProspectNote, assignCoachAndCreateLogin, changeProspectRole, markProspectNotAFit, resendAssessmentQuestions } from '@/lib/actions/journey-admin'
 import type { ActivityItem, RecordData, StepItem } from './record-data'
+import { ADMIN_TZ, adminClock } from './admin-time'
 
 const FOCUS = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'
 const CARD = 'bg-white border border-gray-200 rounded-2xl p-5'
 const CARD_TITLE = 'text-xs font-bold uppercase tracking-wide text-primary-800'
 const BTN_OUTLINE = `h-10 px-4 rounded-xl border text-sm font-semibold inline-flex items-center justify-center gap-2 bg-white disabled:opacity-50 ${FOCUS}`
-const TZ = 'America/Chicago'
+const TZ = ADMIN_TZ
 
 function fmt(isoStr: string, withTime = true) {
   const d = new Date(isoStr)
   const now = new Date()
   const key = (x: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(x)
-  const time = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' }).format(d)
+  const time = adminClock(d)
   const yesterday = new Date(now.getTime() - 86400_000)
   const day = key(d) === key(now) ? 'Today' : key(d) === key(yesterday) ? 'Yesterday'
     : new Intl.DateTimeFormat('en-US', { timeZone: TZ, month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) }).format(d)
@@ -102,8 +103,8 @@ export function JourneyRecordClient({ record: r, readOnly }: { record: RecordDat
       </div>
 
       <p className="text-xs text-gray-600">
-        Need the older coach-pipeline tools for this person?{' '}
-        <Link href={`/admin/prospects/${r.id}?view=classic`} className={`font-semibold text-primary-700 hover:underline rounded ${FOCUS}`}>Open the classic detail page</Link>
+        Looking for older coach-pipeline data on this person?{' '}
+        <Link href={`/admin/prospects/${r.id}?view=classic`} className={`font-semibold text-primary-700 hover:underline rounded ${FOCUS}`}>View the classic page (read only)</Link>
       </p>
 
       {dlg === 'resend' &&<ResendDialog r={r} onClose={() => setDlg(null)} onDone={done} />}
