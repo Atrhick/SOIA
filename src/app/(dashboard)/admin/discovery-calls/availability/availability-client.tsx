@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { saveAvailability } from '@/lib/actions/discovery-admin'
+import { zoneLabel, zoneOffset } from '@/lib/get-involved/time-zones'
 
 interface Win { dayOfWeek: number; startMinute: number; endMinute: number }
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -34,7 +35,7 @@ export function AvailabilityClient({ hostUserId, hostName, timezone, windows }: 
     <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
       <div>
         <h2 className="font-bold text-gray-900">{hostName}&apos;s weekly times</h2>
-        <p className="text-sm text-gray-600">In {timezone.replace('_', ' ')}. Calls are 30 minutes; prospects can book from 12 hours ahead up to 3 weeks out. Booked calls block their slot automatically.</p>
+        <p className="text-sm text-gray-600">In {zoneLabel(timezone)} ({zoneOffset(timezone)}). Calls are 30 minutes; prospects can book from 12 hours ahead up to 3 weeks out. Booked calls block their slot automatically.</p>
       </div>
       <div className="divide-y divide-gray-100">
         {ORDER.map((d) => {

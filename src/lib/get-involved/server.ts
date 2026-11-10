@@ -19,23 +19,28 @@ export const newToken = () => crypto.randomBytes(24).toString('base64url')
 // ---------- people ----------
 
 /** Display name for any user: coach, ambassador or associate profile, else the email's local part. */
-export async function userDisplayName(userId: string): Promise<{ first: string; full: string; email: string } | null> {
+/** Where a host manages their calls: coaches have their own page, admins use the admin one. */
+export const callsPathFor = (role?: string | null) => (role === 'COACH' ? '/coach/discovery-calls' : '/admin/discovery-calls')
+
+export async function userDisplayName(userId: string): Promise<{ first: string; full: string; email: string; role: string; tz: string | null } | null> {
   const u = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       email: true,
+      role: true,
       coachProfile: { select: { firstName: true, lastName: true } },
       ambassadorProfile: { select: { firstName: true, lastName: true } },
       associateProfile: { select: { firstName: true, lastName: true } },
-      discoveryHost: { select: { displayName: true } },
+      discoveryHost: { select: { displayName: true, timezone: true } },
     },
   })
   if (!u) return null
+  const tz = u.discoveryHost?.timezone ?? null
   const p = u.coachProfile ?? u.ambassadorProfile ?? u.associateProfile
-  if (p) return { first: p.firstName, full: `${p.firstName} ${p.lastName}`.trim(), email: u.email }
-  if (u.discoveryHost) return { first: u.discoveryHost.displayName.split(' ')[0], full: u.discoveryHost.displayName, email: u.email }
+  if (p) return { first: p.firstName, full: `${p.firstName} ${p.lastName}`.trim(), email: u.email, role: u.role, tz }
+  if (u.discoveryHost) return { first: u.discoveryHost.displayName.split(' ')[0], full: u.discoveryHost.displayName, email: u.email, role: u.role, tz }
   const local = u.email.split('@')[0]
-  return { first: local, full: local, email: u.email }
+  return { first: local, full: local, email: u.email, role: u.role, tz }
 }
 
 /** The user's invite slug, created on first use. */
@@ -242,7 +247,7 @@ export async function afterCancelEmails(
   if (p.ageRange === 'UNDER_18' && p.parentEmail) await sendEmail({ to: p.parentEmail, ...m })
   if (!opts.byHost && call.hostId) {
     const host = await userDisplayName(call.hostId)
-    if (host) await sendEmail({ to: host.email, ...mail.hostCallEmail({ kind: 'cancelled', hostName: host.first, prospectName: `${p.firstName} ${p.lastName}`, startsAt: call.startsAt, ageLabel: ageRangeLabel(p.ageRange), inviterName: null, phone: null, parent: null, callsUrl: mail.appUrl('/admin/discovery-calls') }) })
+    if (host) await sendEmail({ to: host.email, ...mail.hostCallEmail({ kind: 'cancelled', hostName: host.first, prospectName: `${p.firstName} ${p.lastName}`, startsAt: call.startsAt, ageLabel: ageRangeLabel(p.ageRange), inviterName: null, phone: null, parent: null, callsUrl: mail.appUrl(callsPathFor(host.role)), tz: host.tz }) })
   }
   await emailInviter(p.invitedById, `${p.firstName} ${p.lastName}`, opts.noParent ? 'needs to rebook so a parent can join the call' : 'cancelled their discovery call. A friendly check-in from you could help')
 }

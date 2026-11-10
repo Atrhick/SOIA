@@ -1,5 +1,6 @@
 'use client'
 
+import { TimeZoneSelect } from '@/components/get-involved/time-zone-select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarCheck, CalendarPlus, Loader2, Video } from 'lucide-react'
@@ -24,7 +25,6 @@ export type DiscoveryView =
 const focusRing = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
 const btn = `h-12 px-5 rounded-xl bg-primary-700 hover:bg-primary-800 text-white font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60 ${focusRing}`
 const btnOutline = `h-12 px-5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60 ${focusRing}`
-const TZ_CHOICES = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu']
 
 function fmt(iso: string, tz: string, o: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('en-US', { ...o, timeZone: tz }).format(new Date(iso))
@@ -100,7 +100,6 @@ function Book({ token, v, card }: { token: string; v: Extract<DiscoveryView, { k
     return Array.from(map.entries()).map(([key, list]) => ({ key, label: fmt(list[0], tz, { weekday: 'short', month: 'short', day: 'numeric' }), list }))
   }, [v.slots, tz])
   const current = days.find((d) => d.key === day) ?? days[0] ?? null
-  const tzOptions = TZ_CHOICES.includes(tz) ? TZ_CHOICES : [tz, ...TZ_CHOICES]
   const firstParent = (v.parentName ?? '').split(' ')[0] || 'Your parent'
   const h1 = `text-2xl md:text-3xl font-bold text-gray-900 rounded ${focusRing}`
 
@@ -209,9 +208,8 @@ function Book({ token, v, card }: { token: string; v: Extract<DiscoveryView, { k
         <>
           <div>
             <label htmlFor="tz" className="block text-sm font-semibold text-gray-700 mb-1.5">Your time zone</label>
-            <select id="tz" value={tz} onChange={(e) => { setTz(e.target.value); setSlot(null) }} className="w-full sm:w-auto max-w-full h-11 rounded-lg border border-gray-300 px-3">
-              {tzOptions.map((z) => <option key={z} value={z}>{z.replace('_', ' ')}</option>)}
-            </select>
+            <TimeZoneSelect id="tz" value={tz} onChange={(z) => { setTz(z); setSlot(null) }} className="w-full sm:w-auto max-w-full h-11 rounded-lg border border-gray-300 px-3" />
+            <p className="text-xs text-gray-600 mt-1">Times below are shown in this time zone. We set it from your device; change it if it&apos;s wrong.</p>
           </div>
           <fieldset className="min-w-0">
             <legend className="block text-sm font-semibold text-gray-700 mb-1.5">Day</legend>

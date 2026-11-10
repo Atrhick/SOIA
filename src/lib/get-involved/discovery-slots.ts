@@ -10,7 +10,7 @@ import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import { AgeRangeValue, HostForSlots, Slot, ageRangeLabel, dayKeyIn, generateSlots, journeyOpen } from './core'
 import { startOfBusinessDay } from './call-tools'
-import { busyBlocks, eligibleHosts, emailInviter, journeyUrl, notifyAdmins, userDisplayName } from './server'
+import { busyBlocks, callsPathFor, eligibleHosts, emailInviter, journeyUrl, notifyAdmins, userDisplayName } from './server'
 import * as mail from './emails'
 import { timesOpenEmail } from './emails/slots-open'
 
@@ -139,8 +139,8 @@ export async function afterStaffMoveEmails(
     await sendEmail({ to: p.email, ...mail.rescheduledEmail(base) })
     if (minor && p.parentEmail) await sendEmail({ to: p.parentEmail, ...mail.rescheduledEmail({ ...base, parent: { first: (p.parentName ?? '').split(' ')[0] || 'Hi' } }) })
     const inviter = p.invitedById ? await userDisplayName(p.invitedById) : null
-    const hostMail = (kind: 'new' | 'moved' | 'cancelled', to: { first: string; email: string }, startsAt: Date, oldStartsAt?: Date) =>
-      sendEmail({ to: to.email, ...mail.hostCallEmail({ kind, hostName: to.first, prospectName: `${p.firstName} ${p.lastName}`, startsAt, oldStartsAt, ageLabel: ageRangeLabel(p.ageRange), inviterName: inviter?.full ?? null, phone: p.phone, parent: minor && p.parentName && p.parentEmail ? { name: p.parentName, email: p.parentEmail, phone: p.parentPhone } : null, callsUrl: mail.appUrl('/admin/discovery-calls') }) })
+    const hostMail = (kind: 'new' | 'moved' | 'cancelled', to: { first: string; email: string; role: string; tz: string | null }, startsAt: Date, oldStartsAt?: Date) =>
+      sendEmail({ to: to.email, ...mail.hostCallEmail({ kind, hostName: to.first, prospectName: `${p.firstName} ${p.lastName}`, startsAt, oldStartsAt, ageLabel: ageRangeLabel(p.ageRange), inviterName: inviter?.full ?? null, phone: p.phone, parent: minor && p.parentName && p.parentEmail ? { name: p.parentName, email: p.parentEmail, phone: p.parentPhone } : null, callsUrl: mail.appUrl(callsPathFor(to.role)), tz: to.tz }) })
     if (host) {
       if (old.hostId === call.hostId) await hostMail('moved', host, call.startsAt, old.startsAt)
       else {
@@ -150,7 +150,7 @@ export async function afterStaffMoveEmails(
       }
     }
     if (p.invitedById) {
-      const when = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' }).format(call.startsAt)
+      const when = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: call.timezone || 'America/Chicago', timeZoneName: 'short' }).format(call.startsAt)
       await emailInviter(p.invitedById, `${p.firstName} ${p.lastName}`, `had their discovery call moved to ${when}`)
     }
   } catch (e) {

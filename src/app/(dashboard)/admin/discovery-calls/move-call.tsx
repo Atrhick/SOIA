@@ -11,9 +11,10 @@ import { MoveSlot, moveDiscoveryCall, slotsForMove } from '@/lib/actions/discove
 
 const ring = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
 export const smallBtn = `h-9 px-3 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 inline-flex items-center gap-1.5 disabled:opacity-60 ${ring}`
-const ct = (iso: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' }).format(new Date(iso))
+const fmtIn = (iso: string, tz: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' }).format(new Date(iso))
 
-export function MoveCall({ callId, name }: { callId: string; name: string }) {
+export function MoveCall({ callId, name, tz = 'America/Chicago' }: { callId: string; name: string; tz?: string }) {
+  const ct = (iso: string) => fmtIn(iso, tz)
   const router = useRouter()
   const id = useId()
   const [open, setOpen] = useState(false)

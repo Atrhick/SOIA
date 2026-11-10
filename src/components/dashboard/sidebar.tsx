@@ -125,6 +125,7 @@ const coachNavSections: NavSection[] = [
     items: [
       { href: '/coach/one-a-day', label: 'One-A-Day', icon: Sparkles },
       { href: '/coach/my-team', label: 'My Team', icon: UsersRound },
+      { href: '/coach/discovery-calls', label: 'Discovery Calls', icon: PhoneCall },
       { href: '/coach/ambassadors', label: 'Ambassadors', icon: Users },
     ],
   },

@@ -21,7 +21,7 @@ const dayLabel = (day: string) => {
 }
 const timeIn = (iso: string, tz: string) => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' }).format(new Date(iso))
 
-export function BlockedDatesClient({ hostUserId, hostName, timezone, today, blocked }: { hostUserId: string; hostName: string; timezone: string; today: string; blocked: BlockedDay[] }) {
+export function BlockedDatesClient({ hostUserId, hostName, timezone, today, blocked, base = '/admin/discovery-calls', canMove = true }: { hostUserId: string; hostName: string; timezone: string; today: string; blocked: BlockedDay[]; base?: string; canMove?: boolean }) {
   const router = useRouter()
   const [day, setDay] = useState('')
   const [note, setNote] = useState('')
@@ -77,12 +77,12 @@ export function BlockedDatesClient({ hostUserId, hostName, timezone, today, bloc
               </div>
               {b.calls.length > 0 && (
                 <div className="rounded-lg border border-orange-300 bg-orange-50 p-3 space-y-2">
-                  <p className="text-sm font-semibold text-orange-900">Still booked this day ({b.calls.length}). Move or cancel {b.calls.length === 1 ? 'it' : 'them'}:</p>
+                  <p className="text-sm font-semibold text-orange-900">Still booked this day ({b.calls.length}). {canMove ? 'Move or cancel' : 'Open and cancel, or ask an admin to move'} {b.calls.length === 1 ? 'it' : 'them'}:</p>
                   <ul className="space-y-2">
                     {b.calls.map((c) => (
                       <li key={c.id} className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm text-gray-900 pt-1.5"><Link href={`/admin/discovery-calls/${c.id}`} className={`font-semibold text-primary-700 hover:underline rounded ${ring}`}>{c.name}</Link> · {timeIn(c.startsAt, timezone)}</p>
-                        <MoveCall callId={c.id} name={c.name} />
+                        <p className="text-sm text-gray-900 pt-1.5"><Link href={`${base}/${c.id}`} className={`font-semibold text-primary-700 hover:underline rounded ${ring}`}>{c.name}</Link> · {timeIn(c.startsAt, timezone)}</p>
+                        {canMove && <MoveCall callId={c.id} name={c.name} tz={timezone} />}
                       </li>
                     ))}
                   </ul>

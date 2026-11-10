@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { removeDiscoveryHost, saveDiscoveryHost } from '@/lib/actions/discovery-admin'
 import { AGE_RANGES, AgeRangeValue } from '@/lib/get-involved/core'
+import { TimeZoneSelect } from '@/components/get-involved/time-zone-select'
 
 interface HostInfo { displayName: string; active: boolean; ageRanges: string[]; meetingUrl: string; timezone: string; blocks: number }
-interface Person { userId: string; email: string; role: string; host: HostInfo | null }
+interface Person { userId: string; email: string; role: string; name: string; host: HostInfo | null }
 
-const TZS = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles']
+const ROLE_TAG: Record<string, string> = { ADMIN: 'Admin', COACH: 'Coach' }
+
 const input = 'w-full h-10 rounded-lg border border-gray-300 px-3 text-sm'
 
 export function HostsClient({ people }: { people: Person[] }) {
@@ -38,12 +40,20 @@ export function HostsClient({ people }: { people: Person[] }) {
 
       <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
         <h2 className="font-bold text-gray-900">Add a host</h2>
-        {others.length === 0 ? <p className="text-sm text-gray-600">Every admin account is already a host. Create more admin accounts in User Management.</p> : (
+        <p className="text-sm text-gray-600">Admins and coaches can host. A coach host sees only their own calls, under Discovery Calls in their menu, and sets their own times there.</p>
+        {others.length === 0 ? <p className="text-sm text-gray-600">Every active admin and coach is already a host.</p> : (
           <>
-            <label htmlFor="add-host" className="block text-sm font-semibold text-gray-700">Admin account</label>
+            <label htmlFor="add-host" className="block text-sm font-semibold text-gray-700">Person</label>
             <select id="add-host" value={adding} onChange={(e) => setAdding(e.target.value)} className={`${input} sm:max-w-md`}>
-              <option value="">Choose an admin</option>
-              {others.map((o) => <option key={o.userId} value={o.userId}>{o.email}</option>)}
+              <option value="">Choose an admin or coach</option>
+              {(['ADMIN', 'COACH'] as const).map((role) => {
+                const list = others.filter((o) => o.role === role)
+                return list.length ? (
+                  <optgroup key={role} label={role === 'ADMIN' ? 'Admins' : 'Coaches'}>
+                    {list.map((o) => <option key={o.userId} value={o.userId}>{o.name ? `${o.name} · ${o.email}` : o.email}</option>)}
+                  </optgroup>
+                ) : null
+              })}
             </select>
             {adding && <HostEditor key={adding} person={others.find((o) => o.userId === adding)!} isNew onDone={() => setAdding('')} />}
           </>
@@ -56,7 +66,7 @@ export function HostsClient({ people }: { people: Person[] }) {
 function HostEditor({ person, isNew, onDone }: { person: Person; isNew?: boolean; onDone?: () => void }) {
   const router = useRouter()
   const h = person.host
-  const [name, setName] = useState(h?.displayName ?? '')
+  const [name, setName] = useState(h?.displayName ?? person.name)
   const [ranges, setRanges] = useState<string[]>(h?.ageRanges ?? [])
   const [url, setUrl] = useState(h?.meetingUrl ?? '')
   const [tz, setTz] = useState(h?.timezone ?? 'America/Chicago')
@@ -84,7 +94,7 @@ function HostEditor({ person, isNew, onDone }: { person: Person; isNew?: boolean
     <Wrap className={isNew ? 'space-y-4 border-t border-gray-100 pt-4' : 'bg-white border border-gray-200 rounded-xl p-5 space-y-4'}>
       {!isNew && (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><h2 className="font-bold text-gray-900">{h?.displayName}</h2><p className="text-xs text-gray-600">{person.email}</p></div>
+          <div><h2 className="font-bold text-gray-900">{h?.displayName}{ROLE_TAG[person.role] && <span className="ml-2 align-middle text-xs font-semibold rounded-full px-2 py-0.5 bg-gray-100 text-gray-700">{ROLE_TAG[person.role]}</span>}</h2><p className="text-xs text-gray-600">{person.email}</p></div>
           <div className="flex items-center gap-2">
             {h && h.blocks === 0 && <span className="text-xs font-semibold rounded-full px-2.5 py-1 bg-amber-100 text-amber-800">No availability set</span>}
             <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>{active ? 'Taking calls' : 'Off'}</span>
@@ -94,7 +104,7 @@ function HostEditor({ person, isNew, onDone }: { person: Person; isNew?: boolean
       <div className="grid gap-4 md:grid-cols-2">
         <div><label className="block text-sm font-semibold text-gray-700 mb-1" htmlFor={`dn-${person.userId}`}>Name prospects see</label><input id={`dn-${person.userId}`} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className={input} placeholder="e.g. Lina Lopez" /></div>
         <div><label className="block text-sm font-semibold text-gray-700 mb-1" htmlFor={`mu-${person.userId}`}>Meeting link (Zoom)</label><input id={`mu-${person.userId}`} value={url} onChange={(e) => setUrl(e.target.value)} maxLength={500} className={input} placeholder="https://zoom.us/j/..." /></div>
-        <div><label className="block text-sm font-semibold text-gray-700 mb-1" htmlFor={`tz-${person.userId}`}>Their time zone</label><select id={`tz-${person.userId}`} value={tz} onChange={(e) => setTz(e.target.value)} className={input}>{(TZS.includes(tz) ? TZS : [tz, ...TZS]).map((z) => <option key={z} value={z}>{z.replace('_', ' ')}</option>)}</select></div>
+        <div><label className="block text-sm font-semibold text-gray-700 mb-1" htmlFor={`tz-${person.userId}`}>Their time zone</label><TimeZoneSelect id={`tz-${person.userId}`} value={tz} onChange={setTz} className={input} /></div>
         <fieldset>
           <legend className="block text-sm font-semibold text-gray-700 mb-1">Age ranges they take</legend>
           <div className="flex flex-wrap gap-2">

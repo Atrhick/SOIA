@@ -209,8 +209,10 @@ export function hostCallEmail(p: {
   phone: string | null
   parent: { name: string; email: string; phone: string | null } | null
   callsUrl: string
+  /** The host's own time zone (DiscoveryHost.timezone). */
+  tz?: string | null
 }): Mail {
-  const tz = 'America/Chicago'
+  const tz = p.tz || 'America/Chicago'
   const head = p.kind === 'new' ? 'A new discovery call is on your calendar.' : p.kind === 'moved' ? 'A discovery call has moved.' : 'A discovery call was cancelled.'
   const subj = p.kind === 'new' ? 'New discovery call' : p.kind === 'moved' ? 'Discovery call moved' : 'Discovery call cancelled'
   return {

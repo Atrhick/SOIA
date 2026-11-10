@@ -1,6 +1,10 @@
 'use server'
 
-/** Admin side of discovery calls: hosts, availability, outcomes, staff cancels. */
+/**
+ * Staff side of discovery calls: hosts, availability, outcomes, staff cancels.
+ * Admins can do everything. A coach who is a host can manage their own availability and
+ * days off, and record or cancel the calls they host. Choosing hosts and moving calls stay admin-only.
+ */
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
@@ -27,10 +31,33 @@ async function requireAdmin(): Promise<Guard> {
   return { session }
 }
 
+/** An admin, or a coach. Coaches are then limited to their own host record and their own calls. */
+type StaffGuard = { error: string; session?: never; isAdmin?: never } | { session: Session; isAdmin: boolean; error?: never }
+async function requireStaff(): Promise<StaffGuard> {
+  const session = await auth()
+  if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'COACH')) return { error: 'Unauthorized' }
+  if (session.user.isImpersonating) return { error: 'Switch back to your own account first.' }
+  return { session, isAdmin: session.user.role === 'ADMIN' }
+}
+
+/** Admins can act on any host; a coach only on their own host record. */
+async function requireHostAccess(hostUserId: string): Promise<StaffGuard> {
+  const g = await requireStaff()
+  if (!g.session) return g
+  if (!g.isAdmin && String(hostUserId ?? '') !== g.session.user.id) return { error: 'You can only change your own times.' }
+  return g
+}
+
+/** Admins can act on any call; a coach only on calls they host. */
+const canActOnCall = (g: { session: Session; isAdmin: boolean }, call: { hostId: string | null }) => g.isAdmin || (!!call.hostId && call.hostId === g.session.user.id)
+const NOT_YOUR_CALL = 'Only the host or an admin can change this call.'
+
 function refresh() {
-  revalidatePath('/admin/discovery-calls')
+  for (const base of ['/admin/discovery-calls', '/coach/discovery-calls']) {
+    revalidatePath(base)
+    revalidatePath(`${base}/availability`)
+  }
   revalidatePath('/admin/discovery-calls/hosts')
-  revalidatePath('/admin/discovery-calls/availability')
 }
 
 const AGE = z.enum(['UNDER_18', 'AGE_18_24', 'AGE_25_55', 'AGE_56_PLUS'])
@@ -51,8 +78,9 @@ export async function saveDiscoveryHost(input: z.input<typeof hostSchema>): Prom
   const parsed = hostSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form' }
   const user = await prisma.user.findUnique({ where: { id: parsed.data.userId }, select: { role: true, status: true } })
-  // ADMIN only: the calls page and outcomes are ADMIN-only, so a sub-admin host couldn't run their calls.
-  if (!user || user.role !== 'ADMIN') return { error: 'Only admin accounts can host discovery calls.' }
+  // Admins and coaches have a calls page (/admin or /coach/discovery-calls). Sub-admins don't, so they can't host.
+  if (!user || (user.role !== 'ADMIN' && user.role !== 'COACH')) return { error: 'Only admin and coach accounts can host discovery calls.' }
+  if (user.status !== 'ACTIVE') return { error: 'This account is not active.' }
 
   const { userId, ...rest } = parsed.data
   const data = { ...rest, meetingUrl: rest.meetingUrl || null }
@@ -60,6 +88,24 @@ export async function saveDiscoveryHost(input: z.input<typeof hostSchema>): Prom
     await tx.discoveryHost.upsert({ where: { userId }, create: { userId, ...data }, update: data })
     await tx.auditLog.create({ data: { userId: g.session.user.id, action: 'SAVE_DISCOVERY_HOST', entityType: 'DiscoveryHost', entityId: userId, details: JSON.stringify({ ageRanges: data.ageRanges, active: data.active }) } })
   })
+  await notifyWaitingProspects()
+  refresh()
+  return { success: true }
+}
+
+const mySettingsSchema = z.object({
+  timezone: tz,
+  meetingUrl: z.string().trim().max(500).refine((v) => v === '' || /^https:\/\//i.test(v), 'The meeting link must start with https://'),
+})
+
+/** A host (admin or coach) updates their own time zone and meeting link. Age ranges and on/off stay with admins. */
+export async function saveMyHostSettings(input: z.input<typeof mySettingsSchema>): Promise<Result> {
+  const g = await requireStaff()
+  if (!g.session) return { error: g.error }
+  const parsed = mySettingsSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form' }
+  const r = await prisma.discoveryHost.updateMany({ where: { userId: g.session.user.id }, data: { timezone: parsed.data.timezone, meetingUrl: parsed.data.meetingUrl || null } })
+  if (r.count === 0) return { error: 'You are not set up as a host yet.' }
   await notifyWaitingProspects()
   refresh()
   return { success: true }
@@ -82,9 +128,9 @@ const windowSchema = z.object({
   endMinute: z.number().int().min(0).max(24 * 60),
 }).refine((w) => w.endMinute - w.startMinute >= 30, 'Each time block must be at least 30 minutes')
 
-/** Replace a host's weekly availability. Admins can edit their own or anyone's. */
+/** Replace a host's weekly availability. Admins can edit anyone's; a coach host edits their own. */
 export async function saveAvailability(hostUserId: string, windows: z.input<typeof windowSchema>[]): Promise<Result> {
-  const g = await requireAdmin()
+  const g = await requireHostAccess(hostUserId)
   if (!g.session) return { error: g.error }
   const parsed = z.array(windowSchema).max(50).safeParse(windows)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the times' }
@@ -120,6 +166,7 @@ type RecordResult = { success: true; message: string } | { error: string; fieldE
 function refreshCall(callId: string, prospectId: string) {
   refresh()
   revalidatePath(`/admin/discovery-calls/${callId}`)
+  revalidatePath(`/coach/discovery-calls/${callId}`)
   revalidatePath(`/admin/prospects/${prospectId}`)
   revalidatePath('/admin/prospects')
 }
@@ -141,11 +188,12 @@ async function afterRoleChosen(p: { id: string; firstName: string; lastName: str
  * under, and the role, which sends the assessment), No-show, Not a fit, or Reschedule.
  */
 export async function saveCallRecord(callId: string, input: CallRecordPayload): Promise<RecordResult> {
-  const g = await requireAdmin()
+  const g = await requireStaff()
   if (!g.session) return { error: g.error }
   const parsed = recordSchema.safeParse(input)
   if (!parsed.success) return { error: 'Please check the form.' }
   const call = await prisma.discoveryCall.findUnique({ where: { id: String(callId ?? '') }, include: { prospect: true } })
+  if (call && !canActOnCall(g, call)) return { error: NOT_YOUR_CALL }
   if (!call || call.status !== 'BOOKED') return { error: 'This call is not waiting for an outcome.' }
   const p = call.prospect
   const minor = p.ageRange === 'UNDER_18'
@@ -260,11 +308,12 @@ const afterCallSchema = z.object({
  * (sends the assessment) or close as Not a fit. Changing an existing role is done on the prospect record.
  */
 export async function decideAfterCall(callId: string, input: z.input<typeof afterCallSchema>): Promise<RecordResult> {
-  const g = await requireAdmin()
+  const g = await requireStaff()
   if (!g.session) return { error: g.error }
   const parsed = afterCallSchema.safeParse(input)
   if (!parsed.success) return { error: 'Please choose a role or Not a fit.' }
   const call = await prisma.discoveryCall.findUnique({ where: { id: String(callId ?? '') }, include: { prospect: true } })
+  if (call && !canActOnCall(g, call)) return { error: NOT_YOUR_CALL }
   if (!call || call.status !== 'KEPT') return { error: 'This call has not been recorded as kept.' }
   const p = call.prospect
   if (p.journeyRole) return { error: 'A role is already chosen. Change it on the prospect record.' }
@@ -296,11 +345,12 @@ const staffCancelSchema = z.object({ reason: z.string().trim().max(300).optional
 
 /** Staff cancel (including "no parent joined, reschedule"). The prospect gets a link to pick a new time. */
 export async function staffCancelCall(callId: string, input: z.input<typeof staffCancelSchema>): Promise<Result> {
-  const g = await requireAdmin()
+  const g = await requireStaff()
   if (!g.session) return { error: g.error }
   const parsed = staffCancelSchema.safeParse(input)
   if (!parsed.success) return { error: 'Please check the form' }
-  const call = await prisma.discoveryCall.findUnique({ where: { id: callId }, include: { prospect: true } })
+  const call = await prisma.discoveryCall.findUnique({ where: { id: String(callId ?? '') }, include: { prospect: true } })
+  if (call && !canActOnCall(g, call)) return { error: NOT_YOUR_CALL }
   if (!call || call.status !== 'BOOKED') return { error: 'This call is not booked.' }
   const now = new Date()
   let ok: boolean
@@ -333,7 +383,7 @@ type MessageResult = { success: true; message: string } | { error: string }
 
 /** Block off one whole day for a host. No new slots that day; calls already booked stay and are listed. */
 export async function blockDiscoveryDate(hostUserId: string, input: z.input<typeof blockSchema>): Promise<MessageResult> {
-  const g = await requireAdmin()
+  const g = await requireHostAccess(hostUserId)
   if (!g.session) return { error: g.error }
   const parsed = blockSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Pick a date' }
@@ -354,11 +404,12 @@ export async function blockDiscoveryDate(hostUserId: string, input: z.input<type
   const booked = await bookedCallsOnDays(host, [day])
   refresh()
   const n = booked.length
-  return { success: true, message: n ? `Blocked. ${n} call${n === 1 ? ' is' : 's are'} still booked that day: move ${n === 1 ? 'it' : 'them'} below.` : 'Blocked. No one can book that day.' }
+  const fix = g.isAdmin ? `move ${n === 1 ? 'it' : 'them'} below` : `open ${n === 1 ? 'it' : 'each one'} below to cancel, or ask an admin to move ${n === 1 ? 'it' : 'them'}`
+  return { success: true, message: n ? `Blocked. ${n} call${n === 1 ? ' is' : 's are'} still booked that day: ${fix}.` : 'Blocked. No one can book that day.' }
 }
 
 export async function unblockDiscoveryDate(hostUserId: string, day: string): Promise<Result> {
-  const g = await requireAdmin()
+  const g = await requireHostAccess(hostUserId)
   if (!g.session) return { error: g.error }
   if (typeof day !== 'string' || !isDayKey(day)) return { error: 'Pick a date' }
   const host = await prisma.discoveryHost.findUnique({ where: { userId: String(hostUserId ?? '') }, select: { id: true, userId: true } })

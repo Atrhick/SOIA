@@ -19,7 +19,7 @@ import {
 } from '@/lib/get-involved/core'
 import * as mail from '@/lib/get-involved/emails'
 import {
-  afterCancelEmails, busyBlocks, clientIp, consentUrl, emailEquals, emailInviter, emailInviterNewLead, eligibleHosts, inviterBySlug,
+  afterCancelEmails, busyBlocks, callsPathFor, clientIp, consentUrl, emailEquals, emailInviter, emailInviterNewLead, eligibleHosts, inviterBySlug,
   isStatusConflict, journeyUrl, journeyUsable, mustTransition, newToken, notifyAdmins, prospectByJourneyToken, rateLimited,
   transitionStatus, upcomingCounts, userDisplayName,
 } from '@/lib/get-involved/server'
@@ -324,10 +324,10 @@ async function sendCallEmails(
     await sendEmail({ to: p.parentEmail, ...pm })
   }
   const inviter = p.invitedById ? await userDisplayName(p.invitedById) : null
-  const hostMail = (kind: 'new' | 'moved' | 'cancelled', to: { full: string; first: string; email: string }, old?: Date) =>
+  const hostMail = (kind: 'new' | 'moved' | 'cancelled', to: { full: string; first: string; email: string; role: string; tz: string | null }, old?: Date) =>
     sendEmail({
       to: to.email,
-      ...mail.hostCallEmail({ kind, hostName: to.first, prospectName: `${p.firstName} ${p.lastName}`, startsAt: kind === 'cancelled' && old ? old : call.startsAt, oldStartsAt: kind === 'moved' ? old : undefined, ageLabel: ageRangeLabel(p.ageRange), inviterName: inviter?.full ?? null, phone: p.phone, parent: minor && p.parentName && p.parentEmail ? { name: p.parentName, email: p.parentEmail, phone: p.parentPhone } : null, callsUrl: mail.appUrl('/admin/discovery-calls') }),
+      ...mail.hostCallEmail({ kind, hostName: to.first, prospectName: `${p.firstName} ${p.lastName}`, startsAt: kind === 'cancelled' && old ? old : call.startsAt, oldStartsAt: kind === 'moved' ? old : undefined, ageLabel: ageRangeLabel(p.ageRange), inviterName: inviter?.full ?? null, phone: p.phone, parent: minor && p.parentName && p.parentEmail ? { name: p.parentName, email: p.parentEmail, phone: p.parentPhone } : null, callsUrl: mail.appUrl(callsPathFor(to.role)), tz: to.tz }),
     })
   if (host) {
     if (!oldStartsAt) await hostMail('new', host)
@@ -338,7 +338,8 @@ async function sendCallEmails(
       if (oldHost) await hostMail('cancelled', oldHost, oldStartsAt)
     }
   }
-  const when = mail.esc(new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' }).format(call.startsAt))
+  // The prospect's own zone: the inviter usually lives in the same region.
+  const when = mail.esc(new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' }).format(call.startsAt))
   await emailInviter(p.invitedById, `${p.firstName} ${p.lastName}`, oldStartsAt ? `moved their discovery call to ${when}` : `booked a discovery call for ${when}`)
 }
 

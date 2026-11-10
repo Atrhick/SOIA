@@ -24,10 +24,14 @@ export interface CallRecordData {
   steps: { label: string; state: 'done' | 'current' | 'todo' }[]
   nextStep: string
   closed: boolean
+  /** The viewer's zone for times on this page. */
+  tz: string
+  /** Link to the full prospect record (admins only); null for a coach host. */
+  prospectHref: string | null
 }
 
-const when = (iso: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' }).format(new Date(iso))
-const sameDay = (a: Date, b: Date) => a.toLocaleDateString('en-US', { timeZone: 'America/Chicago' }) === b.toLocaleDateString('en-US', { timeZone: 'America/Chicago' })
+const whenIn = (iso: string, tz: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' }).format(new Date(iso))
+const sameDay = (a: Date, b: Date, tz: string) => a.toLocaleDateString('en-US', { timeZone: tz }) === b.toLocaleDateString('en-US', { timeZone: tz })
 
 const card = 'bg-white border border-gray-200 rounded-xl p-5'
 const h2 = 'text-xs font-bold uppercase tracking-wide text-primary-800'
@@ -50,7 +54,8 @@ function FieldError({ id, msg }: { id: string; msg?: string }) {
 export function CallRecordClient({ data, now }: { data: CallRecordData; now: string }) {
   const { call, prospect: p } = data
   const started = new Date(call.startsAt).getTime() <= new Date(now).getTime()
-  const today = sameDay(new Date(call.startsAt), new Date(now))
+  const today = sameDay(new Date(call.startsAt), new Date(now), data.tz)
+  const when = (iso: string) => whenIn(iso, data.tz)
   const [done, setDone] = useState<string | null>(null)
 
   return (
@@ -77,7 +82,7 @@ export function CallRecordClient({ data, now }: { data: CallRecordData; now: str
             )}
             {call.status !== 'BOOKED' && <span className={`text-xs font-semibold rounded-full px-3 py-1.5 ${RESULT[call.status]?.cls ?? ''}`}>{RESULT[call.status]?.label ?? call.status}</span>}
             {call.meetingUrl && call.status === 'BOOKED' && <a href={call.meetingUrl} target="_blank" rel="noreferrer" className={`h-9 px-3 rounded-lg border border-gray-300 text-sm font-semibold inline-flex items-center gap-1.5 ${focus}`}><Video className="h-4 w-4" aria-hidden />Join call</a>}
-            <Link href={`/admin/prospects/${p.id}`} className={`h-9 px-3 rounded-lg border border-gray-300 text-sm font-semibold inline-flex items-center ${focus}`}>Prospect record</Link>
+            {data.prospectHref && <Link href={data.prospectHref} className={`h-9 px-3 rounded-lg border border-gray-300 text-sm font-semibold inline-flex items-center ${focus}`}>Prospect record</Link>}
           </div>
         </div>
       </div>
@@ -303,6 +308,7 @@ function RecordForm({ data, started, onDone }: { data: CallRecordData; started: 
 }
 
 function Recorded({ data, onDone }: { data: CallRecordData; onDone: (m: string) => void }) {
+  const when = (iso: string) => whenIn(iso, data.tz)
   const { call, prospect: p } = data
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start">
@@ -321,8 +327,10 @@ function Recorded({ data, onDone }: { data: CallRecordData; onDone: (m: string) 
         <section className={`${card} space-y-2 min-w-0`}>
           <h2 className={h2}>What&apos;s next</h2>
           <p className="text-sm text-gray-800">{data.nextStep}</p>
-          <p className="text-sm text-gray-600">Changes to the role, notes and later steps are made on the prospect record.</p>
-          <Link href={`/admin/prospects/${p.id}`} className={`mt-1 h-10 px-4 rounded-lg border border-gray-300 text-sm font-semibold inline-flex items-center ${focus}`}>Open prospect record</Link>
+          {data.prospectHref ? <>
+            <p className="text-sm text-gray-600">Changes to the role, notes and later steps are made on the prospect record.</p>
+            <Link href={data.prospectHref} className={`mt-1 h-10 px-4 rounded-lg border border-gray-300 text-sm font-semibold inline-flex items-center ${focus}`}>Open prospect record</Link>
+          </> : <p className="text-sm text-gray-600">An admin handles later changes to the role. Reply to any of our emails if something needs fixing.</p>}
         </section>
       )}
     </div>
