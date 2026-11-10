@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { checkWelcomeNote, cleanWelcomeNote, programParentLine, programWelcomeParts } from './program-welcome'
+import { checkWelcomeNote, cleanWelcomeNote, exampleWelcomeNote, programParentLine, programWelcomeParts, SAMPLE_WELCOME_NOTE } from './program-welcome'
 import { welcomeEmail, parentConsentEmail } from './emails'
 import { draftWelcomeNoteWithAI, trimToSentence, userPrompt } from '../ai/welcome-note-ai'
 
@@ -18,7 +18,7 @@ describe('program welcome email', () => {
   it('works without an inviter', () => {
     const w = programWelcomeParts({ firstName: 'Ana', inviterName: null, programName: 'Usawa Health', note: NOTE })
     expect(w.subject).toBe('Your next step with Usawa Health')
-    expect(w.paragraphs[0][0].text).toBe('Hi Ana, thanks for your interest in Usawa Health.')
+    expect(w.paragraphs[0].map((s) => s.text).join('')).toBe('Hi Ana, thanks for your interest in Usawa Health.')
   })
   it('email HTML escapes the note and keeps the booking button', () => {
     const m = welcomeEmail({ firstName: 'Jordan', inviterName: 'Daniella <b>', bookUrl: 'https://x.test/journey/abc', program: { name: 'Usawa & Co', note: 'You <script>learn</script> well, with real support every week.' } })
@@ -27,6 +27,26 @@ describe('program welcome email', () => {
     expect(m.html).not.toContain('<script>')
     expect(m.html).toContain('https://x.test/journey/abc')
     expect(m.html).toContain('Book my discovery call')
+  })
+  it('names the company apart from the program', () => {
+    const w = programWelcomeParts({ firstName: 'Jordan', inviterName: 'Daniella Munene', programName: 'Health & Stress Management', companyName: 'USAWA', note: NOTE })
+    const text = (i: number) => w.paragraphs[i].map((s) => s.text).join('')
+    expect(text(0)).toBe("Hi Jordan, Daniella Munene shared Health & Stress Management from USAWA with you because they believe you'd be a great addition to our community.")
+    expect(w.paragraphs[0].filter((s) => s.bold).map((s) => s.text)).toEqual(['Daniella Munene', 'Health & Stress Management', 'USAWA'])
+    expect(text(2)).toMatch(/^USAWA offers Health & Stress Management through NowTransformed, a grant-funded/)
+    expect(w.subject).toBe("Daniella thought you'd like Health & Stress Management")
+  })
+  it('leaves the company out when blank or the same as the program', () => {
+    for (const companyName of ['', '  ', 'usawa health', null]) {
+      const w = programWelcomeParts({ firstName: 'A', inviterName: null, programName: 'Usawa Health', companyName, note: NOTE })
+      expect(w.paragraphs[0].map((s) => s.text).join('')).toBe('Hi A, thanks for your interest in Usawa Health.')
+      expect(w.paragraphs[2][0].text).toBe('Usawa Health is offered through ')
+    }
+  })
+  it('emails carry the company name', () => {
+    const program = { name: 'Health & Stress Management', company: 'USAWA', note: NOTE }
+    expect(welcomeEmail({ firstName: 'J', inviterName: 'D', bookUrl: 'https://x.test/j', program }).html).toContain('<strong>USAWA</strong>')
+    expect(parentConsentEmail({ parentName: 'R', childFirst: 'M', inviterName: null, consentUrl: 'https://x.test/c', program }).html).toContain('About Health &amp; Stress Management from USAWA:')
   })
   it('falls back to the standard email with no program', () => {
     const m = welcomeEmail({ firstName: 'Jordan', inviterName: 'Daniella', bookUrl: 'https://x.test/j' })
@@ -48,6 +68,13 @@ describe('note checks', () => {
     expect(checkWelcomeNote('x'.repeat(701))).toMatch(/under 700/)
     expect(checkWelcomeNote(`${NOTE} See https://example.com`)).toMatch(/links/)
     expect(checkWelcomeNote(NOTE)).toBeNull()
+  })
+  it('the example template has brackets to fill in and is refused until they are replaced', () => {
+    const ex = exampleWelcomeNote('Health & Stress Management', 'USAWA')
+    expect(ex.startsWith('Health & Stress Management from USAWA helps [')).toBe(true)
+    expect(ex.length).toBeLessThanOrEqual(700)
+    expect(checkWelcomeNote(ex)).toMatch(/brackets/)
+    expect(checkWelcomeNote(SAMPLE_WELCOME_NOTE)).toBeNull()
   })
 })
 

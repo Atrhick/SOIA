@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Mail, Sparkles } from 'lucide-react'
+import { Check, Copy, Loader2, Mail, Pencil, Sparkles } from 'lucide-react'
 import { draftWelcomeNote, saveWelcomeNote, stopWelcomeNote, type WelcomePanelData } from '@/lib/actions/program-welcome'
-import { WELCOME_NOTE_MAX, cleanWelcomeNote, programWelcomeParts } from '@/lib/get-involved/program-welcome'
+import { SAMPLE_WELCOME_NOTE, WELCOME_NOTE_MAX, cleanWelcomeNote, companyFor, exampleWelcomeNote, programWelcomeParts } from '@/lib/get-involved/program-welcome'
+import { EDIT_NAMES_EVENT } from './events'
 
 const btn = 'h-10 px-4 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
 const day = (iso: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(iso))
@@ -23,10 +24,22 @@ export function WelcomeEmailPanel({ data }: { data: WelcomePanelData }) {
   const changed = cleanWelcomeNote(note) !== cleanWelcomeNote(data.note)
   const inUse = approved && !changed
   const ro = data.readOnly
+  const company = companyFor(data.programName, data.companyName)
+  const example = exampleWelcomeNote(data.programName, data.companyName)
+  const [copied, setCopied] = useState(false)
+
+  async function copyExample() {
+    try { await navigator.clipboard.writeText(example); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { /* the text is on screen to select */ }
+  }
+  function startFromExample() {
+    if (note.trim() && !window.confirm('Replace your paragraph with the example?')) return
+    setNote(example)
+    setMsg({ ok: true, text: 'Example added. Replace each part in [brackets] with your own words, then save.' })
+  }
 
   const preview = useMemo(
-    () => programWelcomeParts({ firstName: 'Jordan', inviterName: data.ownerName ?? 'Your name', programName: data.programName, note: note || '(Your paragraph about the program goes here.)' }),
-    [note, data.ownerName, data.programName],
+    () => programWelcomeParts({ firstName: 'Jordan', inviterName: data.ownerName ?? 'Your name', programName: data.programName, companyName: data.companyName, note: note || '(Your paragraph about the program goes here.)' }),
+    [note, data.ownerName, data.programName, data.companyName],
   )
 
   async function ai() {
@@ -65,6 +78,19 @@ export function WelcomeEmailPanel({ data }: { data: WelcomePanelData }) {
       </div>
       {!data.live && <p className="text-sm text-gray-700 rounded-lg bg-gray-50 border border-gray-200 p-3">This program page isn&apos;t live yet. You can prepare the email now; it is used once the page is published and you&apos;ve clicked &quot;Use this email&quot;.</p>}
 
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+        <dl className="flex flex-wrap gap-x-8 gap-y-1 text-sm min-w-0">
+          <div className="min-w-0"><dt className="text-xs text-gray-500">Program name</dt><dd className="font-semibold text-gray-900 break-words">{data.programName}</dd></div>
+          <div className="min-w-0"><dt className="text-xs text-gray-500">Company</dt><dd className="font-semibold text-gray-900 break-words">{company ?? <span className="font-normal text-amber-800">Not set</span>}</dd></div>
+        </dl>
+        {!ro && (
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(EDIT_NAMES_EVENT))} className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 rounded">
+            <Pencil className="h-4 w-4" aria-hidden />Change names
+          </button>
+        )}
+        <p className="basis-full text-xs text-gray-600">The email uses both names. Change them at the top of this page; new emails use them as soon as you save.</p>
+      </div>
+
       <div className="grid gap-5 lg:grid-cols-2 items-start">
         <div className="space-y-3 min-w-0">
           <div className="flex flex-wrap items-end justify-between gap-2">
@@ -86,6 +112,21 @@ export function WelcomeEmailPanel({ data }: { data: WelcomePanelData }) {
             Keep it to 2–3 sentences, in plain words, and only promise what the program really offers. No links: the email has the booking button.
             {data.source === 'AI' && !changed && ' This text was drafted by AI from your program page.'}
           </p>
+          <div className="rounded-lg border border-dashed border-primary-300 bg-primary-50/40 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary-800">Example to copy and change</p>
+              {!ro && (
+                <div className="flex gap-2">
+                  <button type="button" onClick={copyExample} className="h-8 px-3 rounded-md border border-gray-300 bg-white text-xs font-semibold text-gray-800 inline-flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600">
+                    {copied ? <Check className="h-3.5 w-3.5 text-green-600" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}{copied ? 'Copied' : 'Copy'}
+                  </button>
+                  <button type="button" onClick={startFromExample} className="h-8 px-3 rounded-md bg-primary-700 hover:bg-primary-800 text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1">Use this example</button>
+                </div>
+              )}
+            </div>
+            <p className="text-sm text-gray-800 leading-relaxed">{example}</p>
+            <p className="text-xs text-gray-600">Replace each part in [brackets]. A finished one reads like this: <em>{SAMPLE_WELCOME_NOTE}</em></p>
+          </div>
           {!ro && (
             <div className="flex flex-wrap gap-2">
               {data.aiAvailable && (

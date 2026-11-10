@@ -122,7 +122,7 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
   }
 
   const inviter = inviterId ? await userDisplayName(inviterId) : null
-  const programMail = program?.note ? { name: program.name, note: program.note } : null
+  const programMail = program?.note ? { name: program.name, company: program.company, note: program.note } : null
   if (minor) {
     await sendEmail({ to: data.parentEmail, ...mail.parentConsentEmail({ parentName: data.parentName, childFirst: data.firstName, inviterName: inviter?.full ?? null, consentUrl: consentUrl(parentConsentToken!), program: programMail }) })
   } else {

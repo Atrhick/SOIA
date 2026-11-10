@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toVideoEmbedUrl, VIDEO_LINK_HINT } from '@/lib/video-embed'
+import { EDIT_NAMES_EVENT } from '@/components/program-pages/events'
 import {
   ArrowLeft,
   Check,
@@ -113,6 +114,21 @@ export function ProgramEditorClient({
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [tab, setTab] = useState('content')
+  const nameRef = useRef<HTMLInputElement>(null)
+
+  // "Change names" in the welcome email panel opens the names fields here.
+  useEffect(() => {
+    const open = () => {
+      setTab('content')
+      setTimeout(() => {
+        document.getElementById('program-names')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        nameRef.current?.focus({ preventScroll: true })
+      }, 50)
+    }
+    window.addEventListener(EDIT_NAMES_EVENT, open)
+    return () => window.removeEventListener(EDIT_NAMES_EVENT, open)
+  }, [])
 
   const [form, setForm] = useState({
     name: program.name,
@@ -286,8 +302,8 @@ export function ProgramEditorClient({
         />
       )}
 
-      <Tabs defaultValue="content">
-        <TabsList>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="content">Page content</TabsTrigger>
           <TabsTrigger value="videos">Videos</TabsTrigger>
           <TabsTrigger value="event">Event &amp; Zoom</TabsTrigger>
@@ -298,6 +314,31 @@ export function ProgramEditorClient({
         <fieldset disabled={readOnly} className="min-w-0">
         {/* ---- Page content ---- */}
         <TabsContent value="content" className="space-y-4">
+          <Card id="program-names" className="scroll-mt-24">
+            <CardHeader>
+              <CardTitle className="text-base">Program and company</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-500">
+                Two separate names: what the program is called, and the company or organization that
+                runs it. The welcome email uses both as soon as you save; the public page changes after
+                an administrator approves.
+              </p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Program name" htmlFor="name" hint="For example: Health & Stress Management">
+                  <Input id="name" ref={nameRef} value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={150} />
+                </Field>
+                <Field label="Company or organization name" htmlFor="organization" hint="For example: USAWA">
+                  <Input
+                    id="organization"
+                    value={form.organization}
+                    onChange={(e) => set('organization', e.target.value)}
+                    maxLength={150}
+                  />
+                </Field>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle className="text-base">What visitors see first</CardTitle>
@@ -602,16 +643,6 @@ export function ProgramEditorClient({
                 administrator has to approve the change before it appears publicly.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Program name" htmlFor="name">
-                  <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} />
-                </Field>
-                <Field label="Organization" htmlFor="organization">
-                  <Input
-                    id="organization"
-                    value={form.organization}
-                    onChange={(e) => set('organization', e.target.value)}
-                  />
-                </Field>
                 <Field label="Target market" htmlFor="targetMarket">
                   <Input
                     id="targetMarket"

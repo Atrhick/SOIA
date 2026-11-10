@@ -16,6 +16,7 @@ import { rateLimited, userDisplayName } from '@/lib/get-involved/server'
 export interface WelcomePanelData {
   programId: string
   programName: string
+  companyName: string
   ownerName: string | null
   note: string
   source: 'AI' | 'MANUAL' | null
@@ -69,6 +70,7 @@ export async function getWelcomePanel(programId: string): Promise<WelcomePanelDa
   return {
     programId: p.id,
     programName: p.name,
+    companyName: p.organization,
     ownerName: owner?.full ?? null,
     note: p.welcomeNote ?? '',
     source: p.welcomeNoteSource === 'AI' || p.welcomeNoteSource === 'MANUAL' ? p.welcomeNoteSource : null,

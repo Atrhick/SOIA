@@ -65,9 +65,9 @@ const segs = (s: Seg[]) => s.map((x) => (x.bold ? `<strong>${esc(x.text)}</stron
  * Welcome email for 18 and over. With an approved program note (the person came in through a
  * program page's share link, or the inviter's latest program), it is about that program.
  */
-export function welcomeEmail(p: { firstName: string; inviterName: string | null; bookUrl: string; program?: { name: string; note: string } | null }): Mail {
+export function welcomeEmail(p: { firstName: string; inviterName: string | null; bookUrl: string; program?: { name: string; company?: string | null; note: string } | null }): Mail {
   if (p.program) {
-    const w = programWelcomeParts({ firstName: p.firstName, inviterName: p.inviterName, programName: p.program.name, note: p.program.note })
+    const w = programWelcomeParts({ firstName: p.firstName, inviterName: p.inviterName, programName: p.program.name, companyName: p.program.company, note: p.program.note })
     return { subject: w.subject, html: layout(w.paragraphs.map((x) => `<p style="${P}">${segs(x)}</p>`).join('\n'), { label: w.cta, url: p.bookUrl }) }
   }
   const by = p.inviterName ? `<strong>${esc(p.inviterName)}</strong> shared NowTransformed with you because they believe you'd add to this community.` : 'Thanks for your interest in NowTransformed.'
@@ -82,13 +82,13 @@ export function welcomeEmail(p: { firstName: string; inviterName: string | null;
   }
 }
 
-export function parentConsentEmail(p: { parentName: string; childFirst: string; inviterName: string | null; consentUrl: string; program?: { name: string; note: string } | null }): Mail {
+export function parentConsentEmail(p: { parentName: string; childFirst: string; inviterName: string | null; consentUrl: string; program?: { name: string; company?: string | null; note: string } | null }): Mail {
   return {
     subject: `${p.childFirst} would like to join NowTransformed: your okay is needed`,
     html: layout(
       `<p style="${P}">Hi ${esc(p.parentName)},</p>
        <p style="${P}">${esc(p.childFirst)} filled out our Get Involved form${p.inviterName ? ` after hearing about us from <strong>${esc(p.inviterName)}</strong>` : ''}. Our youth ambassador program helps young people grow as leaders and give back to their community. It's free.</p>
-       ${p.program ? `<p style="${P}">${segs(programParentLine(p.program.name, p.program.note))}</p>` : ''}
+       ${p.program ? `<p style="${P}">${segs(programParentLine(p.program.name, p.program.note, p.program.company))}</p>` : ''}
        <p style="${P}">Before we go any further, we need your consent. It takes about two minutes. <strong>A parent or guardian must also be on ${esc(p.childFirst)}'s discovery call</strong>, so please pick a time that works for you both.</p>`,
       { label: 'Review and give consent', url: p.consentUrl },
       `<p style="${SMALL}">If we don't hear from you within 14 days, we'll delete ${esc(p.childFirst)}'s details.</p>`,

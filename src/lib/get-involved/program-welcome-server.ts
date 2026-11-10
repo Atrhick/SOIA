@@ -20,13 +20,15 @@ export interface InviteProgram {
   id: string
   slug: string
   name: string
+  /** The company or organization that runs the program (CoachProgram.organization). */
+  company: string
   /** The approved program paragraph, or null if none is approved yet (standard welcome email). */
   note: string | null
 }
 
-const SELECT = { id: true, slug: true, name: true, welcomeNote: true, welcomeNoteApprovedAt: true } as const
-const toInvite = (p: { id: string; slug: string; name: string; welcomeNote: string | null; welcomeNoteApprovedAt: Date | null }): InviteProgram => ({
-  id: p.id, slug: p.slug, name: p.name, note: p.welcomeNoteApprovedAt && p.welcomeNote ? p.welcomeNote : null,
+const SELECT = { id: true, slug: true, name: true, organization: true, welcomeNote: true, welcomeNoteApprovedAt: true } as const
+const toInvite = (p: { id: string; slug: string; name: string; organization: string; welcomeNote: string | null; welcomeNoteApprovedAt: Date | null }): InviteProgram => ({
+  id: p.id, slug: p.slug, name: p.name, company: p.organization, note: p.welcomeNoteApprovedAt && p.welcomeNote ? p.welcomeNote : null,
 })
 
 /** A program share link (/join/[slug]/[program]): the program must be live and owned by the inviter. */
