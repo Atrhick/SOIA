@@ -235,7 +235,7 @@ export function Book({ token, v, card, variant = 'manage' }: { token: string; v:
                 const on = current?.key === d.key
                 return (
                   <button key={d.key} type="button" aria-pressed={on} aria-label={d.full} onClick={() => { setDay(d.key); setSlot(null) }}
-                    className={`flex-none w-16 h-[68px] rounded-xl border flex flex-col items-center justify-center gap-0.5 ${focusRing} ${on ? 'border-2 border-primary-700 bg-primary-50' : 'border-gray-300 bg-white'}`}>
+                    className={`flex-none min-w-[4rem] px-2 h-[68px] rounded-xl border flex flex-col items-center justify-center gap-0.5 ${focusRing} ${on ? 'border-2 border-primary-700 bg-primary-50' : 'border-gray-300 bg-white'}`}>
                     <span className={`text-xs ${on ? 'text-primary-800 font-semibold' : 'text-gray-600'}`}>{d.top}</span>
                     <span className="text-lg font-bold text-gray-900">{d.num}</span>
                   </button>
