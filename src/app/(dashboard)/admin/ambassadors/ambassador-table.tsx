@@ -86,6 +86,8 @@ interface AdminAmbassadorTableProps {
   ambassadors: AmbassadorWithCoach[]
   coaches: Coach[]
   features: FeatureConfig[]
+  /** Shown when the list is empty (e.g. a search found no one). */
+  emptyText?: string
 }
 
 function calculateAgeFromDate(dateString: string): number | null {
@@ -100,7 +102,7 @@ function calculateAgeFromDate(dateString: string): number | null {
   return age
 }
 
-export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAmbassadorTableProps) {
+export function AdminAmbassadorTable({ ambassadors, coaches, features, emptyText }: AdminAmbassadorTableProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const editing = ambassadors.find((a) => a.id === editingId) ?? null
@@ -502,7 +504,7 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAm
     return (
       <div className="text-center py-8">
         <Users className="mx-auto h-12 w-12 text-gray-300" />
-        <p className="mt-4 text-gray-500">No ambassadors in the system yet</p>
+        <p className="mt-4 text-gray-500">{emptyText ?? 'No ambassadors in the system yet'}</p>
         <div className="mt-4">{createButton}</div>
       </div>
     )
@@ -562,7 +564,7 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features }: AdminAm
                 </td>
                 <td className="py-4">
                   <Badge variant={statusVariants[ambassador.status]}>
-                    {ambassador.status}
+                    {statusOptions.find((o) => o.value === ambassador.status)?.label ?? ambassador.status}
                   </Badge>
                 </td>
                 <td className="py-4">

@@ -13,7 +13,7 @@ export type TemplateStats = Partial<Record<TemplateKey, { used: number; yesPct: 
 
 const SAMPLE = {
   firstName: 'Sarah',
-  personalLine: 'Saw your post about the new job, congrats!',
+  personalLine: 'You mentioned wanting to give back more, so I thought of you.',
   program: 'Health & Stress Management',
   description: 'a small group for busy people who want simpler ways to handle stress',
   link: 'https://example.org/join/maya/health-stress?via=text',

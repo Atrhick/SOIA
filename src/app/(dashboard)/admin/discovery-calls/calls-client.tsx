@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Loader2, Video } from 'lucide-react'
+import { Loader2, Search, Video } from 'lucide-react'
+import { ClientPager, usePaged } from '@/components/ui/client-pager'
 import { staffCancelCall } from '@/lib/actions/discovery-admin'
 import { AGE_RANGES } from '@/lib/get-involved/core'
 import { callStats } from '@/lib/get-involved/call-tools'
@@ -25,12 +26,20 @@ const LABEL: Record<string, string> = { BOOKED: 'Booked', KEPT: 'Kept', NO_SHOW:
 export function CallsClient({ rows: allRows, now, mine, isHost, view }: { rows: CallRow[]; now: string; mine: boolean; isHost: boolean; view: CallsView }) {
   const when = (iso: string) => whenIn(iso, view.tz)
   const [age, setAge] = useState('')
-  const rows = useMemo(() => (age ? allRows.filter((r) => r.ageRange === age) : allRows), [allRows, age])
+  const [q, setQ] = useState('')
+  const rows = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    return allRows.filter((r) => (!age || r.ageRange === age) && (!t || r.name.toLowerCase().includes(t) || (r.email ?? '').toLowerCase().includes(t) || (r.host ?? '').toLowerCase().includes(t) || (r.inviter ?? '').toLowerCase().includes(t)))
+  }, [allRows, age, q])
   const t = new Date(now).getTime()
   const needs = rows.filter((r) => r.status === 'BOOKED' && new Date(r.startsAt).getTime() <= t)
   const upcoming = rows.filter((r) => r.status === 'BOOKED' && new Date(r.startsAt).getTime() > t)
   const past = rows.filter((r) => r.status !== 'BOOKED').reverse()
   const stats = callStats(rows, new Date(now))
+  const key = `${age}|${q}`
+  const needsP = usePaged(needs, 10, key)
+  const upcomingP = usePaged(upcoming, 20, key)
+  const pastP = usePaged(past, 25, key)
   const tiles = [
     { label: 'Today', value: String(stats.today) },
     { label: 'This week', value: String(stats.thisWeek) },
@@ -48,12 +57,21 @@ export function CallsClient({ rows: allRows, now, mine, isHost, view }: { rows: 
           {mine && !isHost && <span className="text-sm text-gray-600">You&apos;re not set up as a host yet. See the Hosts tab.</span>}
           </> : <span className="text-sm text-gray-600">Calls you host. Admins can also see them.</span>}
         </div>
+        <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label htmlFor="call-q" className="block text-xs font-semibold text-gray-600 mb-1">Search</label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+            <input id="call-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, email, host or inviter" className={`h-9 w-60 rounded-lg border border-gray-300 bg-white pl-8 pr-2 text-sm ${ring}`} />
+          </div>
+        </div>
         <div>
           <label htmlFor="age-filter" className="block text-xs font-semibold text-gray-600 mb-1">Age range</label>
           <select id="age-filter" value={age} onChange={(e) => setAge(e.target.value)} className={`h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm ${ring}`}>
             <option value="">All age ranges</option>
             {AGE_RANGES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
           </select>
+        </div>
         </div>
       </div>
 
@@ -69,27 +87,28 @@ export function CallsClient({ rows: allRows, now, mine, isHost, view }: { rows: 
       <section className={`bg-white border rounded-xl p-5 ${needs.length ? 'border-orange-300' : 'border-gray-200'}`}>
         <h2 className="font-bold text-gray-900">Needs an outcome ({needs.length})</h2>
         {needs.length === 0 ? <p className="text-sm text-gray-600 mt-2">Nothing waiting. After each call, record what happened here.</p> : (
-          <ul className="mt-3 space-y-3">{needs.map((r) => <OutcomeCard key={r.id} r={r} view={view} />)}</ul>
+          <><ul className="mt-3 space-y-3">{needsP.slice.map((r) => <OutcomeCard key={r.id} r={r} view={view} />)}</ul><ClientPager paged={needsP} noun="calls" /></>
         )}
       </section>
 
       <section className="bg-white border border-gray-200 rounded-xl p-5">
         <h2 className="font-bold text-gray-900">Upcoming ({upcoming.length})</h2>
         {upcoming.length === 0 ? <p className="text-sm text-gray-600 mt-2">No upcoming calls.</p> : (
-          <ul className="mt-3 divide-y divide-gray-100">{upcoming.map((r) => <UpcomingRow key={r.id} r={r} view={view} />)}</ul>
+          <><ul className="mt-3 divide-y divide-gray-100">{upcomingP.slice.map((r) => <UpcomingRow key={r.id} r={r} view={view} />)}</ul><ClientPager paged={upcomingP} noun="calls" /></>
         )}
       </section>
 
       <section className="bg-white border border-gray-200 rounded-xl p-5">
-        <h2 className="font-bold text-gray-900">Last 30 days</h2>
+        <h2 className="font-bold text-gray-900">Last 30 days ({past.length})</h2>
         {past.length === 0 ? <p className="text-sm text-gray-600 mt-2">No finished calls yet.</p> : (
           <div className="overflow-x-auto mt-3">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-xs text-gray-600"><th className="py-2 pr-3 font-semibold">When</th><th className="py-2 pr-3 font-semibold">Prospect</th><th className="py-2 pr-3 font-semibold">Age</th><th className="py-2 pr-3 font-semibold">Host</th><th className="py-2 pr-3 font-semibold">Result</th></tr></thead>
-              <tbody>{past.map((r) => (
+              <tbody>{pastP.slice.map((r) => (
                 <tr key={r.id} className="border-t border-gray-100"><td className="py-2.5 pr-3 whitespace-nowrap">{when(r.startsAt)}</td><td className="py-2.5 pr-3"><Link className="font-semibold text-primary-700 hover:underline" href={`${view.base}/${r.id}`}>{r.name}</Link></td><td className="py-2.5 pr-3 whitespace-nowrap">{r.age}</td><td className="py-2.5 pr-3 whitespace-nowrap">{r.host ?? '–'}</td><td className="py-2.5 pr-3"><span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${STATUS[r.status]}`}>{LABEL[r.status]}</span></td></tr>
               ))}</tbody>
             </table>
+            <ClientPager paged={pastP} noun="calls" />
           </div>
         )}
       </section>

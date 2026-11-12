@@ -11,6 +11,16 @@ import {
 import type { ShareKitProgram } from './data'
 
 export type KitTab = ShareChannel | 'AFTER_YES'
+/** Example personal lines: why this person came to mind, so the line leads into the program sentence. */
+const PERSONAL_EXAMPLE: Partial<Record<KitTab, string>> = {
+  TEXT: "You're so good with the young people at church, and you came to mind.",
+  WHATSAPP: "You're so good with the young people at church, and you came to mind.",
+  EMAIL: 'You mentioned wanting to give back more, so I thought of you.',
+  DM: 'Loved what you posted about mentoring. This felt right up your street.',
+  POST: 'Every young person deserves someone in their corner.',
+  PARENT: 'You mentioned your son is figuring out what comes next after school.',
+}
+
 const TABS: { key: KitTab; label: string; short: string }[] = [
   { key: 'TEXT', label: 'Text', short: 'Text' },
   { key: 'WHATSAPP', label: 'WhatsApp', short: 'WhatsApp' },
@@ -199,8 +209,9 @@ export function ShareKit({ role, programs, defaultProgram, templates }: ShareKit
             {(generated.parts.hasSlot || personalRequired) && (
               <label className="block rounded-lg border border-dashed border-amber-600 bg-amber-50 px-3 py-2">
                 <span className="block text-xs font-bold text-amber-900">YOUR PERSONAL LINE {personalRequired ? '(required)' : '(optional)'}</span>
+                <span className="block text-xs text-amber-900">{tab === 'POST' ? 'One line on why this matters to you.' : 'One line on why you thought of this person for it.'}</span>
                 <input value={personal} onChange={(e) => setPersonal(e.target.value)} maxLength={200} required={personalRequired}
-                  placeholder="e.g. Saw your post about the new job, congrats!" className="mt-1 w-full h-11 rounded-md border border-amber-300 bg-white px-3 text-base" />
+                  placeholder={`e.g. ${PERSONAL_EXAMPLE[tab] ?? PERSONAL_EXAMPLE.TEXT}`} className="mt-1 w-full h-11 rounded-md border border-amber-300 bg-white px-3 text-base" />
               </label>
             )}
             <textarea aria-label="Message" value={parts.after} onChange={(e) => edit('after', e.target.value)} rows={Math.max(3, Math.ceil(parts.after.length / 70) + parts.after.split('\n').length - 1)}

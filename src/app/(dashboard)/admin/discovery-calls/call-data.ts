@@ -28,16 +28,26 @@ export const tzNote = (tz: string) => `${zoneLabel(tz)} (${zoneOffset(tz)})`
 
 export async function loadCallRows(where: Prisma.DiscoveryCallWhereInput): Promise<CallRow[]> {
   const now = new Date()
-  const calls = await prisma.discoveryCall.findMany({
-    where: { AND: [where, { OR: [{ status: 'BOOKED' }, { updatedAt: { gte: new Date(now.getTime() - 30 * 86400_000) } }] }] },
-    orderBy: { startsAt: 'asc' },
-    take: 300,
-    include: { prospect: { select: { id: true, firstName: true, lastName: true, ageRange: true, phone: true, email: true, parentName: true, parentEmail: true, invitedById: true } } },
-  })
+  // Every booked call (upcoming or waiting for an outcome) plus calls finished in the last 30 days.
+  // Two queries so a busy month of finished calls can never push booked ones off the list.
+  const [booked, finished] = await Promise.all([
+    prisma.discoveryCall.findMany({
+      where: { AND: [where, { status: 'BOOKED' }] },
+      orderBy: { startsAt: 'asc' },
+      take: 2000,
+      include: { prospect: { select: { id: true, firstName: true, lastName: true, ageRange: true, phone: true, email: true, parentName: true, parentEmail: true, invitedById: true } } },
+    }),
+    prisma.discoveryCall.findMany({
+      where: { AND: [where, { status: { not: 'BOOKED' } }, { updatedAt: { gte: new Date(now.getTime() - 30 * 86400_000) } }] },
+      orderBy: { startsAt: 'desc' },
+      take: 1000,
+      include: { prospect: { select: { id: true, firstName: true, lastName: true, ageRange: true, phone: true, email: true, parentName: true, parentEmail: true, invitedById: true } } },
+    }),
+  ])
+  const calls = [...booked, ...finished.reverse()]
   const names = new Map<string, string>()
-  for (const id of Array.from(new Set(calls.flatMap((c) => [c.hostId, c.prospect.invitedById]).filter(Boolean) as string[]))) {
-    names.set(id, (await userDisplayName(id))?.full ?? 'Unknown')
-  }
+  await Promise.all(Array.from(new Set(calls.flatMap((c) => [c.hostId, c.prospect.invitedById]).filter(Boolean) as string[]))
+    .map(async (id) => { names.set(id, (await userDisplayName(id))?.full ?? 'Unknown') }))
   return calls.map((c) => ({
     id: c.id,
     prospectId: c.prospect.id,

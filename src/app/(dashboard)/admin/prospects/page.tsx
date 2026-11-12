@@ -5,7 +5,7 @@ import { getAllProspects, getProspectStats } from '@/lib/actions/prospects'
 import { listRoleConfigs } from '@/lib/get-involved/roles'
 import { ProspectsClient } from './prospects-client'
 import { JourneyProspectsClient } from './journey-prospects-client'
-import { joinedLast30Days, loadJourneyRows } from './journey-data'
+import { JOURNEY_ROW_CAP, joinedLast30Days, loadJourneyRows } from './journey-data'
 import { filtersFrom } from './journey-list'
 
 export const dynamic = 'force-dynamic'
@@ -69,7 +69,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Re
   return (
     <div className="space-y-6">
       <ViewTabs active="journey" />
-      <JourneyProspectsClient rows={rows} joined30={joined30} roleOptions={roleOptions} initialFilters={filtersFrom(searchParams)} />
+      <JourneyProspectsClient rows={rows} capped={rows.length >= JOURNEY_ROW_CAP ? JOURNEY_ROW_CAP : null} joined30={joined30} roleOptions={roleOptions} initialFilters={filtersFrom(searchParams)} />
     </div>
   )
 }

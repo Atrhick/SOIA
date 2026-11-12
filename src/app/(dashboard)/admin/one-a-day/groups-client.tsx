@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Loader2, Mail, Search } from 'lucide-react'
+import { Loader2, Mail, Search } from 'lucide-react'
+import { ClientPager, usePaged } from '@/components/ui/client-pager'
 import { reshuffleOutreachGroups, sendOutreachCheckIn, sendOutreachCheckInBulk } from '@/lib/actions/outreach-admin'
 import type { AdminGroupMember, AdminGroupsData } from '@/lib/get-involved/outreach-stats'
 
@@ -27,30 +28,6 @@ function SearchBox({ id, value, onChange, placeholder }: { id: string; value: st
         className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30" />
     </div>
   )
-}
-
-/** Client-side pager for lists already on the page. */
-function MiniPager({ page, pages, total, from, to, onPage, noun }: { page: number; pages: number; total: number; from: number; to: number; onPage: (p: number) => void; noun: string }) {
-  if (total === 0) return null
-  return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
-      <p>Showing <strong className="text-gray-900">{from}–{to}</strong> of <strong className="text-gray-900">{total}</strong> {noun}</p>
-      {pages > 1 && (
-        <div className="flex items-center gap-1">
-          <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 1} className={`rounded-md p-1.5 hover:bg-gray-100 disabled:text-gray-300 disabled:hover:bg-transparent ${focus}`} aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button>
-          <span className="px-1">Page {page} of {pages}</span>
-          <button type="button" onClick={() => onPage(page + 1)} disabled={page >= pages} className={`rounded-md p-1.5 hover:bg-gray-100 disabled:text-gray-300 disabled:hover:bg-transparent ${focus}`} aria-label="Next page"><ChevronRight className="h-4 w-4" /></button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function usePaged<T>(items: T[], size: number) {
-  const [page, setPage] = useState(1)
-  const pages = Math.max(1, Math.ceil(items.length / size))
-  const p = Math.min(page, pages)
-  return { page: p, pages, setPage, slice: items.slice((p - 1) * size, p * size), from: items.length ? (p - 1) * size + 1 : 0, to: Math.min(items.length, p * size) }
 }
 
 type Who = 'all' | 'quiet' | 'never'
@@ -175,7 +152,7 @@ export function NudgeList({ data, canAct, needsHelpDays }: { data: AdminGroupsDa
               ))}
             </ul>
           )}
-          <MiniPager page={paged.page} pages={paged.pages} total={shown.length} from={paged.from} to={paged.to} onPage={paged.setPage} noun="people" />
+          <ClientPager paged={paged} noun="people" />
         </>
       )}
     </section>
@@ -250,7 +227,7 @@ export function GroupsClient({ data, canAct }: { data: AdminGroupsData; canAct: 
               ))}
             </ul>
           )}
-          <MiniPager page={paged.page} pages={paged.pages} total={groups.length} from={paged.from} to={paged.to} onPage={paged.setPage} noun="groups" />
+          <ClientPager paged={paged} noun="groups" />
           <p className="mt-2 flex items-center gap-3 text-xs text-gray-500">
             <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />invited someone this month</span>
             <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gray-300" aria-hidden="true" />not yet</span>

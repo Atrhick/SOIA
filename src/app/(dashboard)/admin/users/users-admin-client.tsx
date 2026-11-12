@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ClientPager, usePaged } from '@/components/ui/client-pager'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -138,6 +139,7 @@ export function UsersAdminClient({
 
     return matchesSearch && matchesRole
   })
+  const paged = usePaged(filteredUsers, 25, `${searchQuery}|${roleFilter}`)
 
   const resetCreateForm = () => {
     setNewEmail('')
@@ -434,6 +436,7 @@ export function UsersAdminClient({
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
                 <SelectItem value="ADMIN">Admin</SelectItem>
+                <SelectItem value="SUB_ADMIN">Sub-admin</SelectItem>
                 <SelectItem value="COACH">Coach</SelectItem>
                 <SelectItem value="AMBASSADOR">Ambassador</SelectItem>
                 <SelectItem value="PARENT">Parent</SelectItem>
@@ -457,7 +460,7 @@ export function UsersAdminClient({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredUsers.map((user) => (
+                {paged.slice.map((user) => (
                   <tr
                     key={user.id}
                     className="hover:bg-gray-50 cursor-pointer"
@@ -485,6 +488,7 @@ export function UsersAdminClient({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ADMIN">Admin</SelectItem>
+                <SelectItem value="SUB_ADMIN">Sub-admin</SelectItem>
                           <SelectItem value="COACH">Coach</SelectItem>
                           <SelectItem value="AMBASSADOR">Ambassador</SelectItem>
                           <SelectItem value="PARENT">Parent</SelectItem>
@@ -543,6 +547,7 @@ export function UsersAdminClient({
               </div>
             )}
           </div>
+          <ClientPager paged={paged} noun="users" />
         </CardContent>
       </Card>
 

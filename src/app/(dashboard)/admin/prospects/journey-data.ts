@@ -8,12 +8,15 @@ import { journeyFactsFor } from '@/lib/get-involved/journey'
 import { userDisplayName } from '@/lib/get-involved/server'
 import { JourneyRow, ListStage, lastActivity, listStageFor, stageBadgeClass, stageBadgeLabel } from './journey-list'
 
+/** Most rows the list loads (most recently active first). */
+export const JOURNEY_ROW_CAP = 2000
+
 /** Most recent first. A Get Involved prospect is one with a journeyToken. */
 export async function loadJourneyRows(now = new Date()): Promise<JourneyRow[]> {
   const prospects = await prisma.prospect.findMany({
     where: { journeyToken: { not: null } },
     orderBy: { updatedAt: 'desc' },
-    take: 2000,
+    take: JOURNEY_ROW_CAP,
     select: {
       id: true, firstName: true, lastName: true, email: true, phone: true, city: true, ageRange: true, status: true,
       invitedById: true, journeyRole: true, roleConfigSnapshot: true, userId: true, noShowCount: true,

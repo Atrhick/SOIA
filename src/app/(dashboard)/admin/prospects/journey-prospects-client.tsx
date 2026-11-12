@@ -4,13 +4,15 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Download, Search, Users } from 'lucide-react'
 import { AGE_RANGES } from '@/lib/get-involved/core'
+import { ClientPager, usePaged } from '@/components/ui/client-pager'
 import { COUNT_STAGES, JourneyRow, LIST_STAGES, ListFilters, ListStage, exportHref, filterRows, stageInfo } from './journey-list'
 
 const FIELD = 'w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
 const FOCUS = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'
 
-export function JourneyProspectsClient({ rows, joined30, roleOptions, initialFilters }: {
+export function JourneyProspectsClient({ rows, capped, joined30, roleOptions, initialFilters }: {
   rows: JourneyRow[]
+  capped: number | null
   joined30: number
   roleOptions: { value: string; label: string }[]
   initialFilters: ListFilters
@@ -27,6 +29,7 @@ export function JourneyProspectsClient({ rows, joined30, roleOptions, initialFil
   }, [f])
 
   const shown = useMemo(() => filterRows(rows, f), [rows, f])
+  const paged = usePaged(shown, 50, JSON.stringify(f))
   const counts = useMemo(() => {
     const c = {} as Record<ListStage, number>
     for (const s of LIST_STAGES) c[s.value] = 0
@@ -158,7 +161,7 @@ export function JourneyProspectsClient({ rows, joined30, roleOptions, initialFil
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map((r) => (
+                  {paged.slice.map((r) => (
                     <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                       <td className="py-3 pr-3 font-semibold text-gray-900">
                         <Link href={`/admin/prospects/${r.id}`} className={`hover:underline rounded ${FOCUS}`}>{r.name}</Link>
@@ -179,7 +182,7 @@ export function JourneyProspectsClient({ rows, joined30, roleOptions, initialFil
 
             {/* Phone: one card per person, no sideways scroll */}
             <ul className="md:hidden mt-2 divide-y divide-gray-100">
-              {shown.map((r) => (
+              {paged.slice.map((r) => (
                 <li key={r.id}>
                   <Link href={`/admin/prospects/${r.id}`} className={`block py-3 rounded-lg ${FOCUS}`}>
                     <div className="flex items-start justify-between gap-2">
@@ -194,7 +197,13 @@ export function JourneyProspectsClient({ rows, joined30, roleOptions, initialFil
                 </li>
               ))}
             </ul>
+            <ClientPager paged={paged} noun="people" />
           </>
+        )}
+        {capped && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            This list holds the {capped.toLocaleString()} most recently active people. Older records are still saved; open them from Discovery calls or the person&apos;s inviter.
+          </p>
         )}
       </section>
     </div>
