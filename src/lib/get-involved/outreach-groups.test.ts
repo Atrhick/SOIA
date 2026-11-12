@@ -65,3 +65,15 @@ describe('planGroups', () => {
     expect(planGroups([])).toEqual([])
   })
 })
+
+describe('planNewcomers', () => {
+  it('fills the smallest group first and opens a new group when all have 6', async () => {
+    const { planNewcomers } = await import('./outreach-groups')
+    const out = planNewcomers(new Map([[1, 5], [2, 4], [3, 6]]), ['a', 'b', 'c', 'd'])
+    expect(out).toEqual([{ userId: 'a', groupNo: 2 }, { userId: 'b', groupNo: 1 }, { userId: 'c', groupNo: 2 }, { userId: 'd', groupNo: 4 }])
+  })
+  it('starts group 1 when there are no groups', async () => {
+    const { planNewcomers } = await import('./outreach-groups')
+    expect(planNewcomers(new Map(), ['a'])).toEqual([{ userId: 'a', groupNo: 1 }])
+  })
+})

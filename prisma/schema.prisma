@@ -2758,11 +2758,14 @@ model CoachProgram {
   welcomeNoteDraftedAt  DateTime?
   welcomeNoteApprovedAt DateTime?
   welcomeNoteApprovedBy String?
-  // Sponsored-seat offer (admin-set; coaches can't change it). Shown only when sponsoredSeatsPerMonth > 0.
+  // Sponsored-seat offer. Prices: owner or admin. Reason + seats: admin only. Shown only when sponsoredSeatsPerMonth > 0.
   offerFullPrice         String?
   offerSponsoredPrice    String?
   offerReason            String?       @db.Text
   sponsoredSeatsPerMonth Int?
+  offerPricesUpdatedAt   DateTime?
+  /// User id of whoever last changed the prices (owner or admin).
+  offerPricesUpdatedById String?
   // Get Involved prospects who came in through this program's share link.
   prospects           Prospect[]
 

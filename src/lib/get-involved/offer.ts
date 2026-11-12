@@ -139,22 +139,69 @@ export interface OfferProgramRow {
   reason: string
   seatsPerMonth: number | null
   usedThisMonth: number
+  /** Who last changed the prices and when (null before anyone has). */
+  pricesUpdatedAt: string | null
+  pricesUpdatedBy: { name: string; isOwner: boolean } | null
 }
 
-/** Live programs (published, with a snapshot) with their offer settings and this month's seat use. */
-export async function listOfferPrograms(now = new Date()): Promise<OfferProgramRow[]> {
-  const rows = await prisma.coachProgram.findMany({
-    where: { status: 'PUBLISHED', NOT: { publishedSnapshot: { equals: Prisma.DbNull } } },
-    orderBy: { name: 'asc' },
-    select: {
-      id: true, name: true, slug: true, organization: true,
-      offerFullPrice: true, offerSponsoredPrice: true, offerReason: true, sponsoredSeatsPerMonth: true,
-      coach: { select: { firstName: true, lastName: true, user: { select: { inviteSlug: true } } } },
-      ambassador: { select: { firstName: true, lastName: true, user: { select: { inviteSlug: true } } } },
-    },
+export type OfferFilter = 'all' | 'offer' | 'none'
+
+/** Seats used this month for many programs in one query. */
+export async function seatsUsedByProgram(programIds: string[], now = new Date()): Promise<Map<string, number>> {
+  if (programIds.length === 0) return new Map()
+  const rows = await prisma.prospect.groupBy({
+    by: ['programId'],
+    where: { programId: { in: programIds }, discoveryCalls: { some: { createdAt: { gte: monthStart(now) }, status: { not: 'CANCELLED' } } } },
+    _count: { _all: true },
   })
-  return Promise.all(rows.map(async (p) => {
+  return new Map(rows.filter((r) => r.programId).map((r) => [r.programId as string, r._count._all]))
+}
+
+/** One page of live programs (published, with a snapshot) with their offer settings and this month's seat use. */
+export async function listOfferPrograms(opts: { q?: string; filter?: OfferFilter; page?: number; pageSize?: number } = {}, now = new Date()) {
+  const { q = '', filter = 'all', page = 1, pageSize = 25 } = opts
+  const live: Prisma.CoachProgramWhereInput = { status: 'PUBLISHED', NOT: { publishedSnapshot: { equals: Prisma.DbNull } } }
+  const search: Prisma.CoachProgramWhereInput[] = q.split(/\s+/).filter(Boolean).slice(0, 4).map((w) => ({ OR: [
+    { name: { contains: w, mode: 'insensitive' } },
+    { organization: { contains: w, mode: 'insensitive' } },
+    { coach: { OR: [{ firstName: { contains: w, mode: 'insensitive' } }, { lastName: { contains: w, mode: 'insensitive' } }] } },
+    { ambassador: { OR: [{ firstName: { contains: w, mode: 'insensitive' } }, { lastName: { contains: w, mode: 'insensitive' } }] } },
+  ] }))
+  const hasOffer: Prisma.CoachProgramWhereInput = { sponsoredSeatsPerMonth: { gt: 0 } }
+  const noOffer: Prisma.CoachProgramWhereInput = { OR: [{ sponsoredSeatsPerMonth: null }, { sponsoredSeatsPerMonth: { lte: 0 } }] }
+  const where = (f: OfferFilter): Prisma.CoachProgramWhereInput => ({ AND: [live, ...search, ...(f === 'offer' ? [hasOffer] : f === 'none' ? [noOffer] : [])] })
+
+  const [rows, total, all, offer, none] = await Promise.all([
+    prisma.coachProgram.findMany({
+      where: where(filter),
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true, name: true, slug: true, organization: true, coachId: true, ambassadorId: true,
+        offerFullPrice: true, offerSponsoredPrice: true, offerReason: true, sponsoredSeatsPerMonth: true,
+        offerPricesUpdatedAt: true, offerPricesUpdatedById: true,
+        coach: { select: { firstName: true, lastName: true, userId: true, user: { select: { inviteSlug: true } } } },
+        ambassador: { select: { firstName: true, lastName: true, userId: true, user: { select: { inviteSlug: true } } } },
+      },
+    }),
+    prisma.coachProgram.count({ where: where(filter) }),
+    prisma.coachProgram.count({ where: where('all') }),
+    prisma.coachProgram.count({ where: where('offer') }),
+    prisma.coachProgram.count({ where: where('none') }),
+  ])
+  const editorIds = Array.from(new Set(rows.map((r) => r.offerPricesUpdatedById).filter((x): x is string => !!x)))
+  const [used, editors] = await Promise.all([
+    seatsUsedByProgram(rows.map((r) => r.id), now),
+    editorIds.length ? prisma.user.findMany({ where: { id: { in: editorIds } }, select: { id: true, email: true, coachProfile: { select: { firstName: true, lastName: true } }, ambassadorProfile: { select: { firstName: true, lastName: true } } } }) : Promise.resolve([]),
+  ])
+  const editorName = new Map(editors.map((u) => {
+    const n = u.coachProfile ?? u.ambassadorProfile
+    return [u.id, n ? `${n.firstName} ${n.lastName}`.trim() : u.email.split('@')[0]]
+  }))
+  const programs: OfferProgramRow[] = rows.map((p) => {
     const owner = p.coach ?? p.ambassador
+    const by = p.offerPricesUpdatedById
     return {
       id: p.id,
       name: p.name,
@@ -167,7 +214,10 @@ export async function listOfferPrograms(now = new Date()): Promise<OfferProgramR
       sponsoredPrice: p.offerSponsoredPrice ?? '',
       reason: p.offerReason ?? '',
       seatsPerMonth: p.sponsoredSeatsPerMonth,
-      usedThisMonth: await seatsUsedThisMonth(p.id, now),
+      usedThisMonth: used.get(p.id) ?? 0,
+      pricesUpdatedAt: p.offerPricesUpdatedAt?.toISOString() ?? null,
+      pricesUpdatedBy: by ? { name: editorName.get(by) ?? 'Someone', isOwner: by === owner?.userId } : null,
     }
-  }))
+  })
+  return { programs, total, counts: { all, offer, none } as Record<OfferFilter, number> }
 }

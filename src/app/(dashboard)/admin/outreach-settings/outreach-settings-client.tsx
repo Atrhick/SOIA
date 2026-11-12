@@ -1,23 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { ExternalLink, Info, Loader2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { ExternalLink, Loader2, Pencil, X } from 'lucide-react'
 import { saveProgramOffer, saveSiteOutreach } from '@/lib/actions/outreach-settings'
 import type { OfferProgramRow, OutreachSettings } from '@/lib/get-involved/offer'
 
-interface Props {
-  programs: OfferProgramRow[]
-  site: OutreachSettings
-  /** ISO date of the next 1st of the month (UTC), when seats reset. */
-  resetsOn: string
-}
-
-const inp = 'w-full h-11 rounded-lg border border-gray-400 px-3 text-[15px] text-gray-900 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600 disabled:bg-gray-100'
+const inp = 'w-full h-10 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600'
 const lbl = 'block text-sm font-semibold text-gray-800 mb-1'
-const hint = 'text-[13px] text-gray-600'
-const card = 'bg-white border border-gray-200 rounded-xl p-4 sm:p-5'
-const btnPrimary = 'h-11 px-5 rounded-lg bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
-const btnSecondary = 'h-11 px-4 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-sm font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
+const hint = 'text-xs text-gray-500 mt-1'
+const btnPrimary = 'h-10 px-4 rounded-lg bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
+const btnSecondary = 'h-10 px-4 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-sm font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
+const th = 'px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 whitespace-nowrap'
 
 type Banner = { ok: boolean; text: string } | null
 
@@ -28,117 +23,204 @@ function BannerView({ banner }: { banner: Banner }) {
     : <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{banner.text}</div>
 }
 
-function ProgramOfferCard({ p }: { p: OfferProgramRow }) {
+const fmtDate = (iso: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(iso))
+
+function changedBy(p: OfferProgramRow) {
+  if (!p.pricesUpdatedAt || !p.pricesUpdatedBy) return null
+  return `${p.pricesUpdatedBy.isOwner ? 'Owner' : p.pricesUpdatedBy.name} · ${fmtDate(p.pricesUpdatedAt)}`
+}
+
+/** One row per live program; "Edit" opens the full offer form in a side panel. */
+export function ProgramOfferTable({ programs, emptyText }: { programs: OfferProgramRow[]; emptyText: string }) {
+  const [editing, setEditing] = useState<OfferProgramRow | null>(null)
+
+  if (programs.length === 0) {
+    return <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">{emptyText}</p>
+  }
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <caption className="sr-only">Live programs and their sponsored-seat offers</caption>
+          <thead className="border-b border-gray-200 bg-gray-50">
+            <tr>
+              <th scope="col" className={th}>Program</th>
+              <th scope="col" className={th}>Prices</th>
+              <th scope="col" className={th}>Sponsored seats this month</th>
+              <th scope="col" className={th}><span className="sr-only">Edit</span></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {programs.map((p) => {
+              const on = (p.seatsPerMonth ?? 0) > 0
+              const left = on ? Math.max(0, (p.seatsPerMonth ?? 0) - p.usedThisMonth) : 0
+              const who = changedBy(p)
+              return (
+                <tr key={p.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 min-w-[14rem]">
+                    <p className="font-semibold text-gray-900">{p.name}</p>
+                    <p className="text-gray-500">{p.ownerName ? `${p.ownerName} (${p.ownerRole === 'COACH' ? 'coach' : 'ambassador'})` : 'No owner'}{p.organization ? ` · ${p.organization}` : ''}</p>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {p.sponsoredPrice || p.fullPrice ? (
+                      <>
+                        <p className="text-gray-900">
+                          {p.sponsoredPrice && <strong>{p.sponsoredPrice}</strong>}
+                          {p.fullPrice && <span className={p.sponsoredPrice ? 'ml-1.5 text-gray-500 line-through' : ''}>{p.fullPrice}</span>}
+                        </p>
+                        {who && <p className="text-xs text-gray-500">Changed by {who}</p>}
+                      </>
+                    ) : <span className="text-gray-400">Not set</span>}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {on ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
+                          <span className={`block h-full rounded-full ${left === 0 ? 'bg-amber-500' : 'bg-primary-600'}`} style={{ width: `${Math.min(100, (p.usedThisMonth / (p.seatsPerMonth || 1)) * 100)}%` }} />
+                        </span>
+                        <span className={left === 0 ? 'font-semibold text-amber-800' : 'text-gray-900'}>{left} of {p.seatsPerMonth} left</span>
+                      </span>
+                    ) : <span className="text-gray-500">Off (no offer shown)</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button type="button" onClick={() => setEditing(p)} className={`${btnSecondary} h-9`}>
+                      <Pencil className="h-3.5 w-3.5" aria-hidden />Edit<span className="sr-only"> offer for {p.name}</span>
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <OfferSheet program={editing} onClose={() => setEditing(null)} />
+    </div>
+  )
+}
+
+function OfferSheet({ program, onClose }: { program: OfferProgramRow | null; onClose: () => void }) {
+  return (
+    <DialogPrimitive.Root open={!!program} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
+        <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl focus:outline-none">
+          {program && <OfferForm key={program.id} p={program} onDone={onClose} />}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  )
+}
+
+function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
+  const router = useRouter()
   const [fullPrice, setFullPrice] = useState(p.fullPrice)
   const [sponsoredPrice, setSponsoredPrice] = useState(p.sponsoredPrice)
   const [reason, setReason] = useState(p.reason)
   const [seats, setSeats] = useState(p.seatsPerMonth === null ? '' : String(p.seatsPerMonth))
-  const [saved, setSaved] = useState({ seats: p.seatsPerMonth, used: p.usedThisMonth })
   const [busy, setBusy] = useState(false)
   const [banner, setBanner] = useState<Banner>(null)
-
   const id = (k: string) => `offer-${p.id}-${k}`
   const seatsNum = seats.trim() === '' ? 0 : Number(seats)
   const showsOffer = Number.isInteger(seatsNum) && seatsNum > 0
-  const previewLeft = Math.max(0, seatsNum - saved.used)
+  const previewLeft = Math.max(0, seatsNum - p.usedThisMonth)
+  const who = changedBy(p)
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
-    setBanner(null)
-    setBusy(true)
+    setBanner(null); setBusy(true)
     try {
       const r = await saveProgramOffer({ programId: p.id, fullPrice, sponsoredPrice, reason, seats: seats.trim() })
       if (!r.ok) { setBanner({ ok: false, text: r.error }); return }
-      setSaved({ seats: r.seatsPerMonth, used: r.usedThisMonth })
-      setBanner({ ok: true, text: r.seatsPerMonth && r.seatsPerMonth > 0 ? 'Offer saved.' : 'Saved. No offer is shown for this program.' })
+      router.refresh()
+      onDone()
     } finally {
       setBusy(false)
     }
   }
 
-  const savedLeft = saved.seats && saved.seats > 0 ? Math.max(0, saved.seats - saved.used) : null
-
   return (
-    <section className={card} aria-labelledby={id('title')}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+    <form onSubmit={save} className="flex h-full flex-col">
+      <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-5 py-4">
         <div className="min-w-0">
-          <h2 id={id('title')} className="text-lg font-bold text-gray-900">{p.name}</h2>
-          <p className="text-sm text-gray-600">
-            {p.ownerName ? <>Owner: {p.ownerName} ({p.ownerRole === 'COACH' ? 'coach' : 'ambassador'})</> : 'No owner assigned'}
-            {p.organization ? <> &middot; {p.organization}</> : null}
-          </p>
+          <DialogPrimitive.Title className="text-lg font-bold text-gray-900">{p.name}</DialogPrimitive.Title>
+          <DialogPrimitive.Description className="text-sm text-gray-600">
+            {p.ownerName ? `Owner: ${p.ownerName}` : 'No owner'} · {p.usedThisMonth} seat{p.usedThisMonth === 1 ? '' : 's'} used this month
+          </DialogPrimitive.Description>
         </div>
-        <p className="text-sm text-gray-800">
-          This month: <strong>{saved.used} used</strong>
-          {savedLeft !== null ? <> &middot; <strong>{savedLeft} left</strong> of {saved.seats}</> : <> &middot; no offer shown</>}
-        </p>
+        <DialogPrimitive.Close className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close"><X className="h-5 w-5" /></DialogPrimitive.Close>
       </div>
 
-      <div className="flex flex-wrap gap-5 items-start">
-        <form onSubmit={save} className="flex-[3_1_420px] min-w-0 space-y-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-[1_1_160px]">
+      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-bold text-gray-900">Prices <span className="font-normal text-gray-500">(the owner can change these too)</span></legend>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className={lbl} htmlFor={id('full')}>Full price</label>
               <input id={id('full')} className={inp} value={fullPrice} maxLength={40} onChange={(e) => setFullPrice(e.target.value)} placeholder="$299" />
             </div>
-            <div className="flex-[1_1_160px]">
+            <div>
               <label className={lbl} htmlFor={id('sponsored')}>Sponsored price</label>
               <input id={id('sponsored')} className={inp} value={sponsoredPrice} maxLength={40} onChange={(e) => setSponsoredPrice(e.target.value)} placeholder="$99" />
             </div>
           </div>
-          <p className={`${hint} -mt-2`}>Keep the reduction moderate. Very deep cuts can make a program look less valuable.</p>
+          {who && <p className={hint}>Last changed by {who}.</p>}
+        </fieldset>
 
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-bold text-gray-900">Sponsorship <span className="font-normal text-gray-500">(admins only)</span></legend>
+          <div className="max-w-[12rem]">
+            <label className={lbl} htmlFor={id('seats')}>Seats per month</label>
+            <input id={id('seats')} className={inp} inputMode="numeric" type="number" min={0} max={1000} step={1} value={seats} onChange={(e) => setSeats(e.target.value)} placeholder="0" />
+            <p className={hint}>0 or empty = no offer shown.</p>
+          </div>
           <div>
-            <label className={lbl} htmlFor={id('reason')}>Why it&apos;s sponsored (shown to prospects)</label>
-            <textarea id={id('reason')} rows={2} className={`${inp} h-auto py-2.5 leading-normal`} value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)}
+            <label className={lbl} htmlFor={id('reason')}>Why it&apos;s sponsored (shown to people signing up)</label>
+            <textarea id={id('reason')} rows={2} className={`${inp} h-auto py-2 leading-normal`} value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)}
               placeholder="NowTransformed, a nonprofit, pays part of the cost so more people can take part." />
             <p className={hint}>{300 - reason.length} characters left.</p>
           </div>
+        </fieldset>
 
-          <div className="max-w-[220px]">
-            <label className={lbl} htmlFor={id('seats')}>Sponsored seats per month</label>
-            <input id={id('seats')} className={inp} inputMode="numeric" type="number" min={0} max={1000} step={1} value={seats} onChange={(e) => setSeats(e.target.value)} placeholder="0" />
-          </div>
-
-          <BannerView banner={banner} />
-
-          <div className="flex flex-wrap gap-2.5">
-            <button type="submit" className={btnPrimary} disabled={busy}>
-              {busy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-              Save offer
-            </button>
-            {p.ownerInviteSlug && (
-              <a className={btnSecondary} href={`/join/${encodeURIComponent(p.ownerInviteSlug)}/${encodeURIComponent(p.slug)}`} target="_blank" rel="noopener noreferrer">
-                Preview sign-up page <ExternalLink className="w-4 h-4" aria-hidden />
-              </a>
-            )}
-          </div>
-        </form>
-
-        <div className="flex-[2_1_260px] min-w-0 space-y-2" aria-label={`How the offer for ${p.name} shows`}>
-          <p className="text-sm font-bold text-gray-900">How it shows</p>
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-gray-900">How it shows on the sign-up page</p>
           {showsOffer ? (
-            <div className="rounded-xl border-2 border-primary-700 p-4 space-y-2">
+            <div className="rounded-xl border-2 border-primary-700 p-4 space-y-1.5">
               <p className="text-xs font-bold text-sky-800 tracking-wide">SPONSORED SEAT</p>
               <p className="flex flex-wrap items-baseline gap-2">
                 {fullPrice.trim() && <span className="text-gray-500 line-through">{fullPrice.trim()}</span>}
                 <strong className="text-xl text-gray-900">{sponsoredPrice.trim() || '[Sponsored price]'}</strong>
               </p>
-              {reason.trim() && <p className="text-[13px] text-gray-700 break-words">{reason.trim()}</p>}
-              <p className="text-[13px] font-semibold text-amber-800">
+              {reason.trim() && <p className="text-sm text-gray-700 break-words">{reason.trim()}</p>}
+              <p className="text-sm font-semibold text-amber-800">
                 {previewLeft > 0 ? `${previewLeft} of ${seatsNum} sponsored seats left this month` : "Join the waiting list for next month's seats"}
               </p>
             </div>
           ) : (
-            <p className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">No offer is shown for this program (seats are 0 or empty).</p>
+            <p className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">No offer box is shown (seats are 0 or empty).</p>
           )}
         </div>
+        <BannerView banner={banner} />
       </div>
-    </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-5 py-3">
+        {p.ownerInviteSlug ? (
+          <a className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:underline" href={`/join/${encodeURIComponent(p.ownerInviteSlug)}/${encodeURIComponent(p.slug)}`} target="_blank" rel="noopener noreferrer">
+            Open sign-up page <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          </a>
+        ) : <span />}
+        <div className="flex gap-2">
+          <DialogPrimitive.Close type="button" className={btnSecondary}>Cancel</DialogPrimitive.Close>
+          <button type="submit" className={btnPrimary} disabled={busy}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Save
+          </button>
+        </div>
+      </div>
+    </form>
   )
 }
 
-function SiteCard({ site }: { site: OutreachSettings }) {
+/** Mailing address and reply promise used by every outreach email. */
+export function SiteCard({ site }: { site: OutreachSettings }) {
   const [mailingAddress, setMailingAddress] = useState(site.mailingAddress)
   const [replyWithin, setReplyWithin] = useState(site.replyWithin)
   const [busy, setBusy] = useState(false)
@@ -146,68 +228,37 @@ function SiteCard({ site }: { site: OutreachSettings }) {
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
-    setBanner(null)
-    setBusy(true)
+    setBanner(null); setBusy(true)
     try {
       const r = await saveSiteOutreach({ mailingAddress, replyWithin })
-      setBanner(r.ok ? { ok: true, text: 'Site-wide settings saved.' } : { ok: false, text: r.error })
+      setBanner(r.ok ? { ok: true, text: 'Saved.' } : { ok: false, text: r.error })
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <form onSubmit={save} className={`${card} space-y-4`} aria-labelledby="site-title">
-      <h2 id="site-title" className="text-lg font-bold text-gray-900">Site-wide</h2>
+    <form onSubmit={save} className="rounded-xl border border-gray-200 bg-white p-5 space-y-4" aria-labelledby="site-title">
       <div>
-        <label className={lbl} htmlFor="site-address">Mailing address</label>
-        <input id="site-address" className={inp} value={mailingAddress} maxLength={300} onChange={(e) => setMailingAddress(e.target.value)} placeholder="NowTransformed, 123 Main St, Las Vegas, NV 89101" />
-        <p className={hint}>Shown in every email footer and at the bottom of the sign-up page. Empty = the line is hidden.</p>
+        <h2 id="site-title" className="text-lg font-bold text-gray-900">Email details</h2>
+        <p className="text-sm text-gray-600">Used in every outreach email, for all programs.</p>
       </div>
-      <div className="max-w-md">
-        <label className={lbl} htmlFor="site-reply">Reply promise</label>
-        <input id="site-reply" className={inp} value={replyWithin} maxLength={60} onChange={(e) => setReplyWithin(e.target.value)} placeholder="1 business day" />
-        <p className={hint}>Used when someone asks to be contacted, e.g. &ldquo;We&apos;ll reply within 1 business day.&rdquo; Empty = no time is promised.</p>
+      <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+        <div>
+          <label className={lbl} htmlFor="site-address">Mailing address</label>
+          <input id="site-address" className={inp} value={mailingAddress} maxLength={300} onChange={(e) => setMailingAddress(e.target.value)} placeholder="NowTransformed, 123 Main St, Las Vegas, NV 89101" />
+          <p className={hint}>Shown in the email footer and at the bottom of sign-up pages. Leave empty to hide it.</p>
+        </div>
+        <div>
+          <label className={lbl} htmlFor="site-reply">We reply within</label>
+          <input id="site-reply" className={inp} value={replyWithin} maxLength={60} onChange={(e) => setReplyWithin(e.target.value)} placeholder="1 business day" />
+          <p className={hint}>When someone asks to be contacted. Leave empty to promise no time.</p>
+        </div>
       </div>
       <BannerView banner={banner} />
       <button type="submit" className={btnPrimary} disabled={busy}>
-        {busy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-        Save site-wide settings
+        {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Save email details
       </button>
     </form>
-  )
-}
-
-export function OutreachSettingsClient({ programs, site, resetsOn }: Props) {
-  const reset = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(resetsOn))
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Outreach settings</h1>
-        <p className="text-gray-600 mt-1">One sponsored-seat offer per program. Coaches and ambassadors can&apos;t change it, so every page and message says the same true thing.</p>
-      </div>
-
-      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 flex gap-3">
-        <Info className="w-5 h-5 flex-none mt-0.5" aria-hidden />
-        <ul className="space-y-1 list-disc pl-4">
-          <li>Seats reset on the 1st of each month (next reset: {reset}).</li>
-          <li>A seat is used when someone who came through that program books a discovery call this month. Cancelled calls give the seat back.</li>
-          <li>0 or empty seats = no offer is shown anywhere for that program.</li>
-          <li>When no seats are left, pages offer the waiting list for next month. Never a fake countdown.</li>
-          <li>Shown on the sign-up page, welcome and nudge emails, and the call guide.</li>
-        </ul>
-      </div>
-
-      <SiteCard site={site} />
-
-      <div className="space-y-4">
-        <h2 className="text-lg font-bold text-gray-900">Live programs</h2>
-        {programs.length === 0 ? (
-          <p className={`${card} text-sm text-gray-600`}>No program pages are live yet. Offers can be set once a program page is approved and published.</p>
-        ) : (
-          programs.map((p) => <ProgramOfferCard key={p.id} p={p} />)
-        )}
-      </div>
-    </div>
   )
 }

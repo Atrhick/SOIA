@@ -4,15 +4,18 @@ import { Download } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { adminBoardTotals, adminLeaderboard, firstInviteAt } from '@/lib/get-involved/leaderboard-extra'
 import { ADMIN_BOARDS, boardHref, memberKindLabel, parseBoard, parsePeriod, periodOptions } from '@/lib/get-involved/leaderboard-period'
-import { adminGroups, programStats } from '@/lib/get-involved/outreach-stats'
-import { ProgramFunnel } from './program-funnel'
-import { GroupsClient } from './groups-client'
+import { NEEDS_HELP_DAYS, adminGroups, programStats } from '@/lib/get-involved/outreach-stats'
+import { ChannelTable, ProgramOverview } from './program-funnel'
+import { GroupsClient, NudgeList } from './groups-client'
+import { Pager, parsePage } from '@/components/ui/pager'
 
 export const dynamic = 'force-dynamic'
 
+const BOARD_PAGE = 25
+
 const focusRing = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
 
-export default async function AdminOneADayPage({ searchParams }: { searchParams: { role?: string; period?: string } }) {
+export default async function AdminOneADayPage({ searchParams }: { searchParams: { role?: string; period?: string; lp?: string } }) {
   const session = await auth()
   if (!session || session.user.role !== 'ADMIN') redirect('/login')
   const now = new Date()
@@ -26,21 +29,16 @@ export default async function AdminOneADayPage({ searchParams }: { searchParams:
     adminGroups(period, now),
   ])
   const options = periodOptions(earliest, now, 24, period)
+  const lp = parsePage(searchParams.lp)
+  const pageRows = rows.slice((lp - 1) * BOARD_PAGE, lp * BOARD_PAGE)
   const boardLabel = ADMIN_BOARDS.find((b) => b.value === board)!.label
   const canExport = !session.user.isImpersonating
-  const tiles: [string, string | number][] = [
-    [period.key === 'all' ? 'Forms (all time)' : `Forms in ${period.label}`, totals.forms],
-    ['Calls kept', totals.kept],
-    [period.key === 'all' ? 'Joined (all time)' : `Joined in ${period.label}`, totals.joined],
-    ['People active today', totals.activeToday],
-    ['Form → joined', totals.forms ? `${Math.round((totals.joined / totals.forms) * 100)}%` : '–'],
-  ]
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">One-A-Day Leaderboard</h1>
-        <p className="text-gray-600 mt-1">Ranked by people who joined, then by forms submitted. Coaches and ambassadors see the same board on their One-A-Day page.</p>
+        <h1 className="text-2xl font-bold text-gray-900">One-A-Day</h1>
+        <p className="text-gray-600 mt-1">Coaches and ambassadors aim to invite one person a day. See how it&apos;s going, who could use a nudge, and who&apos;s leading.</p>
       </div>
 
       <div className="flex flex-wrap gap-3 items-end justify-between">
@@ -62,36 +60,32 @@ export default async function AdminOneADayPage({ searchParams }: { searchParams:
         )}
       </div>
 
-      <ProgramFunnel stats={program} periodLabel={period.key === 'all' ? 'all time' : period.current ? 'this month' : period.label} />
-      <GroupsClient data={groups} canAct={!session.user.isImpersonating} />
+      <ProgramOverview stats={program} activeToday={totals.activeToday} periodLabel={period.key === 'all' ? 'all time' : period.current ? 'this month' : period.label} />
+      <NudgeList data={groups} canAct={!session.user.isImpersonating} needsHelpDays={NEEDS_HELP_DAYS} />
 
-      <nav aria-label="Leaderboard boards" className="flex flex-wrap gap-2">
-        {ADMIN_BOARDS.map((b) => (
-          <Link key={b.value} href={boardHref('/admin/one-a-day', b.value, period.key)} aria-current={board === b.value ? 'page' : undefined}
-            className={`h-9 px-4 rounded-full text-sm font-semibold border inline-flex items-center ${focusRing} ${board === b.value ? 'bg-primary-700 border-primary-700 text-white' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
-            {b.label}
-          </Link>
-        ))}
-      </nav>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {tiles.map(([l, v]) => (
-          <div key={l} className="bg-white border border-gray-200 rounded-xl p-4 min-w-0"><p className="text-2xl font-bold text-gray-900">{v}</p><p className="text-sm text-gray-600 break-words">{l}</p></div>
-        ))}
-      </div>
-
-      <section aria-labelledby="board-h" className="bg-white border border-gray-200 rounded-xl p-5">
-        <h2 id="board-h" className="font-bold text-gray-900 mb-3">{boardLabel} · {period.label}</h2>
-        {rows.length === 0 ? <p className="text-sm text-gray-600">No invites in this period.</p> : (
-          <div className="overflow-x-auto">
+      <section aria-labelledby="board-h" className="bg-white border border-gray-200 rounded-xl p-5 min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="board-h" className="text-lg font-bold text-gray-900">Leaderboard · {period.label}</h2>
+          <nav aria-label="Leaderboard boards" className="flex flex-wrap gap-1.5">
+            {ADMIN_BOARDS.map((b) => (
+              <Link key={b.value} href={boardHref('/admin/one-a-day', b.value, period.key)} aria-current={board === b.value ? 'page' : undefined}
+                className={`h-8 px-3 rounded-full text-sm font-semibold border inline-flex items-center ${focusRing} ${board === b.value ? 'bg-primary-700 border-primary-700 text-white' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
+                {b.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <p className="text-sm text-gray-600 mt-1">Ranked by people who joined, then forms filled. Members see this same board on their One-A-Day page.</p>
+        {rows.length === 0 ? <p className="text-sm text-gray-600 mt-3">No invites in this period yet.</p> : (
+          <div className="overflow-x-auto mt-3">
             <table className="w-full text-sm">
               <caption className="sr-only">{boardLabel} leaderboard, {period.label}</caption>
-              <thead><tr className="text-left text-xs text-gray-600">{['Rank', 'Name', 'Role', 'Joined', 'Forms', 'Calls kept', 'Streak', 'Team size'].map((h) => <th key={h} scope="col" className="py-2 pr-4 font-semibold whitespace-nowrap">{h}</th>)}</tr></thead>
-              <tbody>{rows.map((r) => (
-                <tr key={r.userId} className="border-t border-gray-100">
+              <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-600 border-b border-gray-200">{['#', 'Name', 'Role', 'Joined', 'Forms', 'Calls kept', 'Streak', 'Team size'].map((h) => <th key={h} scope="col" className="py-2 pr-4 font-semibold whitespace-nowrap">{h}</th>)}</tr></thead>
+              <tbody>{pageRows.map((r) => (
+                <tr key={r.userId} className="border-b border-gray-100">
                   <td className="py-2.5 pr-4 font-bold text-primary-800">{r.rank}</td>
                   <th scope="row" className="py-2.5 pr-4 font-semibold text-gray-900 whitespace-nowrap text-left">{r.name}</th>
-                  <td className="py-2.5 pr-4 whitespace-nowrap">{memberKindLabel(r.kind)}</td>
+                  <td className="py-2.5 pr-4 whitespace-nowrap text-gray-700">{memberKindLabel(r.kind)}</td>
                   <td className="py-2.5 pr-4">{r.joined}</td>
                   <td className="py-2.5 pr-4">{r.forms}</td>
                   <td className="py-2.5 pr-4">{r.callsKept}</td>
@@ -102,12 +96,21 @@ export default async function AdminOneADayPage({ searchParams }: { searchParams:
             </table>
           </div>
         )}
+        <div className="mt-3"><Pager page={lp} pageSize={BOARD_PAGE} total={rows.length} basePath="/admin/one-a-day" paramName="lp" params={{ role: board === 'ALL' ? undefined : board, period: searchParams.period }} label="members" /></div>
+        <details className="mt-3 text-sm text-gray-600">
+          <summary className="cursor-pointer font-semibold text-gray-700">How this is counted</summary>
+          <p className="mt-2">
+            Streak = days in a row (Central Time) with at least one form or added person{period.current ? '' : `, as of the last day of ${period.label}`}. Team size = everyone they invited who now has a login (all time).
+            Youth ambassadors joined through the Youth ambassador role or are 17 and under; the Ambassadors board shows the rest.
+            Someone who signs up twice is only counted once, for the first person who invited them.
+          </p>
+        </details>
       </section>
-      <p className="text-sm text-gray-600">
-        Streak = days in a row (Central Time) with at least one form or added person{period.current ? '' : `, as of the last day of ${period.label}`}. Team size = everyone they invited who now has a login (all time).
-        People active today = coaches and ambassadors with at least one form or added person today. Youth ambassadors joined through the Youth ambassador role or are 17 and under; the Ambassadors board shows the rest.
-        Someone who signs up twice is only counted once, for the first person who invited them.
-      </p>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <ChannelTable stats={program} />
+        <GroupsClient data={groups} canAct={!session.user.isImpersonating} />
+      </div>
     </div>
   )
 }

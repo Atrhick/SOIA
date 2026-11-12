@@ -28,21 +28,17 @@ async function requireAdmin() {
   return session
 }
 
-export async function sendOutreachCheckIn(userId: string): Promise<Result> {
-  const session = await requireAdmin()
-  if (!session) return { error: 'Only admins can send check-ins (and not while viewing as someone else).' }
-  const parsed = z.string().min(1).max(64).safeParse(userId)
-  if (!parsed.success) return { error: 'Unknown member.' }
+type CheckInOutcome = 'sent' | 'recent' | 'unreachable' | 'failed'
 
-  const user = await prisma.user.findUnique({ where: { id: parsed.data }, select: { id: true, role: true, status: true } })
-  if (!user || user.status !== 'ACTIVE' || !canInvite(user.role)) return { error: 'That member can\'t be reached here.' }
-
+/** Sends one check-in (no auth check: callers do it). Skips people checked in on in the last few days. */
+async function checkInOne(adminId: string, userId: string): Promise<CheckInOutcome> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, status: true } })
+  if (!user || user.status !== 'ACTIVE' || !canInvite(user.role)) return 'unreachable'
   const since = new Date(Date.now() - CHECK_IN_EVERY_DAYS * 86400_000)
   const recent = await prisma.auditLog.findFirst({ where: { action: CHECK_IN_ACTION, entityId: user.id, createdAt: { gte: since } }, select: { createdAt: true } })
-  if (recent) return { error: `A check-in was sent in the last ${CHECK_IN_EVERY_DAYS} days. Give them a little time.` }
-
+  if (recent) return 'recent'
   const name = await userDisplayName(user.id)
-  if (!name) return { error: 'Unknown member.' }
+  if (!name) return 'unreachable'
   const path = user.role === 'COACH' ? '/coach/one-a-day' : '/ambassador/one-a-day'
   const html = layout(
     `<p style="${P}">Hi ${esc(name.first)},</p>
@@ -54,13 +50,54 @@ export async function sendOutreachCheckIn(userId: string): Promise<Result> {
     { audience: 'team' },
   )
   const sent = await sendEmail({ to: name.email, subject: 'Checking in on your One-A-Day', html })
-  if (!sent.sent) return { error: 'The email could not be sent. Please try again later.' }
-
+  if (!sent.sent) return 'failed'
   await prisma.auditLog.create({
-    data: { userId: session.user.id, action: CHECK_IN_ACTION, entityType: 'User', entityId: user.id, details: JSON.stringify({ to: 'member' }) },
+    data: { userId: adminId, action: CHECK_IN_ACTION, entityType: 'User', entityId: user.id, details: JSON.stringify({ to: 'member' }) },
   })
+  return 'sent'
+}
+
+export async function sendOutreachCheckIn(userId: string): Promise<Result> {
+  const session = await requireAdmin()
+  if (!session) return { error: 'Only admins can send check-ins (and not while viewing as someone else).' }
+  const parsed = z.string().min(1).max(64).safeParse(userId)
+  if (!parsed.success) return { error: 'Unknown member.' }
+  const r = await checkInOne(session.user.id, parsed.data)
+  if (r === 'recent') return { error: `A check-in was sent in the last ${CHECK_IN_EVERY_DAYS} days. Give them a little time.` }
+  if (r === 'unreachable') return { error: "That member can't be reached here." }
+  if (r === 'failed') return { error: 'The email could not be sent. Please try again later.' }
   revalidatePath('/admin/one-a-day')
-  return { ok: true, message: `Check-in sent to ${name.first}.` }
+  const name = await userDisplayName(parsed.data)
+  return { ok: true, message: `Check-in sent to ${name?.first ?? 'them'}.` }
+}
+
+/** Most check-ins one click sends; the email provider allows only a few per second. */
+const BULK_CHECK_IN_MAX = 50
+
+export type BulkCheckInResult = { ok: true; sentIds: string[]; skipped: number; failed: number; remaining: number; message: string } | { error: string }
+
+/** Check in on many members at once (people checked in on recently are skipped). Sends at most BULK_CHECK_IN_MAX per call. */
+export async function sendOutreachCheckInBulk(userIds: string[]): Promise<BulkCheckInResult> {
+  const session = await requireAdmin()
+  if (!session) return { error: 'Only admins can send check-ins (and not while viewing as someone else).' }
+  const parsed = z.array(z.string().min(1).max(64)).max(5000).safeParse(userIds)
+  if (!parsed.success) return { error: 'Unknown members.' }
+  const ids = Array.from(new Set(parsed.data))
+  const sentIds: string[] = []
+  let skipped = 0, failed = 0, i = 0
+  for (; i < ids.length && sentIds.length < BULK_CHECK_IN_MAX; i++) {
+    const r = await checkInOne(session.user.id, ids[i])
+    if (r === 'sent') { sentIds.push(ids[i]); await new Promise((ok) => setTimeout(ok, 550)) }
+    else if (r === 'failed') failed++
+    else skipped++
+  }
+  const remaining = ids.length - i
+  revalidatePath('/admin/one-a-day')
+  const parts = [`${sentIds.length} check-in${sentIds.length === 1 ? '' : 's'} sent`]
+  if (skipped) parts.push(`${skipped} skipped (checked in on recently)`)
+  if (failed) parts.push(`${failed} couldn't be sent`)
+  if (remaining) parts.push(`${remaining} still to go: click again to continue`)
+  return { ok: true, sentIds, skipped, failed, remaining, message: parts.join(' · ') + '.' }
 }
 
 /** Assigns (or reshuffles) the groups for next month. Only next month can be reshuffled, so this month's groups never move under people. */

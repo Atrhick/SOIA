@@ -109,6 +109,44 @@ export async function assignGroups(month: string, opts: { force?: boolean; now?:
 export async function ensureMonthGroups(month: string, now = new Date()): Promise<void> {
   const any = await prisma.outreachGroupMember.findFirst({ where: { month }, select: { id: true } })
   if (!any) await assignGroups(month, { now })
+  else await placeNewcomers(month)
+}
+
+/** Pure: put each newcomer in the smallest group under 6; when every group is full, start a new one. */
+export function planNewcomers(sizes: Map<number, number>, newcomers: readonly string[]): { userId: string; groupNo: number }[] {
+  const s = new Map(sizes)
+  const out: { userId: string; groupNo: number }[] = []
+  for (const userId of newcomers) {
+    let best: number | null = null
+    for (const [g, n] of Array.from(s.entries())) if (n < GROUP_SIZE + 1 && (best === null || n < (s.get(best) ?? 0) || (n === s.get(best) && g < best))) best = g
+    if (best === null) best = Math.max(0, ...Array.from(s.keys())) + 1
+    s.set(best, (s.get(best) ?? 0) + 1)
+    out.push({ userId, groupNo: best })
+  }
+  return out
+}
+
+/**
+ * Coaches and ambassadors who joined after the month's groups were made get a group straight away
+ * (otherwise they'd wait until next month and be missing from the admin's nudge list).
+ */
+export async function placeNewcomers(month: string): Promise<number> {
+  if (!isMonthKey(month)) return 0
+  const [eligible, placed] = await Promise.all([
+    prisma.user.findMany({ where: { status: 'ACTIVE', role: { in: INVITER_ROLES as ('COACH' | 'AMBASSADOR')[] } }, select: { id: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.outreachGroupMember.findMany({ where: { month }, select: { userId: true } }),
+  ])
+  const have = new Set(placed.map((p) => p.userId))
+  const newcomers = eligible.map((u) => u.id).filter((id) => !have.has(id))
+  if (newcomers.length === 0) return 0
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'outreach-groups:' + month}))`
+    const rows = await tx.outreachGroupMember.groupBy({ by: ['groupNo'], where: { month, user: { status: 'ACTIVE' } }, _count: { _all: true } })
+    const taken = new Set((await tx.outreachGroupMember.findMany({ where: { month, userId: { in: newcomers } }, select: { userId: true } })).map((r) => r.userId))
+    const plan = planNewcomers(new Map(rows.map((r) => [r.groupNo, r._count._all])), newcomers.filter((id) => !taken.has(id)))
+    if (plan.length) await tx.outreachGroupMember.createMany({ data: plan.map((p) => ({ month, ...p })), skipDuplicates: true })
+    return plan.length
+  }, { timeout: 20_000 })
 }
 
 /** Whether a month has groups yet (no side effects). */

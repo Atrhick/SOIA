@@ -110,24 +110,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null
         }
 
-        const email = credentials.email as string
+        // Phones often capitalise the first letter or autofill a trailing space.
+        const typed = String(credentials.email).trim()
+        const email = typed.toLowerCase()
 
         // SEC-4: Check rate limit before hitting the DB
         if (isRateLimited(email)) {
           return null
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-          include: {
-            ambassadorProfile: {
-              select: { id: true }
-            },
-            coachProfile: {
-              select: { id: true }
-            }
-          }
-        })
+        const include = {
+          ambassadorProfile: { select: { id: true } },
+          coachProfile: { select: { id: true } },
+        } as const
+        // Exact match first; otherwise ignore letter case, but only when exactly one account matches.
+        let user = await prisma.user.findUnique({ where: { email: typed }, include })
+        if (!user) {
+          const matches = await prisma.user.findMany({ where: { email: { equals: typed, mode: 'insensitive' } }, include, take: 2 })
+          user = matches.length === 1 ? matches[0] : null
+        }
 
         if (!user || user.status !== 'ACTIVE') {
           // Still record an attempt to prevent user enumeration via timing

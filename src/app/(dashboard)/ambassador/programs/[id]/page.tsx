@@ -8,6 +8,8 @@ import { ProgramEditorClient } from '@/app/(dashboard)/coach/programs/[id]/progr
 import { ProgramLeadsCard } from '@/components/programs/program-leads-card'
 import { getWelcomePanel } from '@/lib/actions/program-welcome'
 import { WelcomeEmailPanel } from '@/components/program-pages/welcome-email-panel'
+import { ProgramPricesPanel } from '@/components/program-pages/program-prices-panel'
+import { getMyProgramOffer } from '@/lib/actions/outreach-settings'
 
 export default async function AmbassadorProgramEditorPage({
   params,
@@ -24,10 +26,11 @@ export default async function AmbassadorProgramEditorPage({
     return <FeatureDisabled title="Program Pages" icon={Megaphone} />
   }
 
-  const [result, leadsResult, welcome] = await Promise.all([
+  const [result, leadsResult, welcome, offer] = await Promise.all([
     getMyProgram(params.id),
     getMyProgramLeads(params.id),
     getWelcomePanel(params.id),
+    getMyProgramOffer(params.id),
   ])
   if ('error' in result) {
     notFound()
@@ -45,6 +48,7 @@ export default async function AmbassadorProgramEditorPage({
         basePath="/ambassador/programs"
         ownerNoun="ambassador"
       />
+      {offer && <ProgramPricesPanel programId={params.id} offer={offer} />}
       {!('error' in welcome) && <WelcomeEmailPanel data={welcome} />}
       {leads.length > 0 ? (
         <ProgramLeadsCard leads={leads} ownerRole="AMBASSADOR" />
