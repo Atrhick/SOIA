@@ -476,7 +476,7 @@ export async function moveDiscoveryCall(callId: string, input: z.input<typeof mo
       const host = hosts.find((h) => h.userId === hostId)!
       const c = await tx.discoveryCall.update({
         where: { id: call.id },
-        data: { hostId, startsAt, endsAt: new Date(startsAt.getTime() + CALL_MINUTES * 60_000), meetingUrl: host.meetingUrl, reminder24hSentAt: null, reminder1hSentAt: null, rescheduleCount: { increment: 1 } },
+        data: { hostId, startsAt, endsAt: new Date(startsAt.getTime() + CALL_MINUTES * 60_000), meetingUrl: host.meetingUrl, reminder24hSentAt: null, reminder1hSentAt: null, reminder3dSentAt: null, attendanceConfirmedAt: null, rescheduleCount: { increment: 1 } },
       })
       await tx.auditLog.create({ data: { userId: g.session.user.id, action: 'MOVE_DISCOVERY_CALL', entityType: 'DiscoveryCall', entityId: call.id, details: JSON.stringify({ from: old.startsAt.toISOString(), to: startsAt.toISOString(), hostId }) } })
       return c

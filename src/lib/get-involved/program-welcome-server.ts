@@ -40,7 +40,8 @@ export async function inviterProgramBySlug(inviterId: string, programSlug: strin
 
 /**
  * The program for a sign-up. With a program link, that program; otherwise (the inviter's main link,
- * or "Add someone") the inviter's most recently published program that has an approved note.
+ * or "Add someone") the program the inviter chose for their main link (User.inviteProgramId) while it
+ * is live and still theirs, else their most recently published program that has an approved note.
  */
 export async function programForSignup(inviterId: string | null, programSlug?: string | null): Promise<InviteProgram | null> {
   if (!inviterId) return null
@@ -48,12 +49,43 @@ export async function programForSignup(inviterId: string | null, programSlug?: s
     const p = await inviterProgramBySlug(inviterId, programSlug)
     if (p) return p
   }
+  const u = await prisma.user.findUnique({ where: { id: inviterId }, select: { inviteProgramId: true } })
+  if (u?.inviteProgramId) {
+    const chosen = await prisma.coachProgram.findFirst({ where: { AND: [{ id: u.inviteProgramId }, LIVE, ownedByUser(inviterId)] }, select: SELECT })
+    if (chosen) return toInvite(chosen)
+  }
   const p = await prisma.coachProgram.findFirst({
     where: { AND: [LIVE, ownedByUser(inviterId), { welcomeNoteApprovedAt: { not: null } }, { welcomeNote: { not: null } }] },
     orderBy: { reviewedAt: 'desc' },
     select: SELECT,
   })
   return p ? toInvite(p) : null
+}
+
+/** What the sign-up page shows about a program: the published wording only (never unapproved edits). */
+export interface ProgramDisplay {
+  /** Short label above the headline (page title, else the program name). */
+  label: string
+  headline: string | null
+  bullets: string[]
+}
+
+export async function programDisplay(programId: string): Promise<ProgramDisplay | null> {
+  const p = await prisma.coachProgram.findFirst({ where: { AND: [{ id: programId }, LIVE] }, select: { name: true, publishedSnapshot: true } })
+  if (!p) return null
+  const snap = (p.publishedSnapshot ?? {}) as Record<string, unknown>
+  const str = (k: string) => (typeof snap[k] === 'string' && (snap[k] as string).trim() ? (snap[k] as string).trim() : null)
+  return {
+    label: str('pageTitle') ?? str('name') ?? p.name,
+    headline: str('headline'),
+    bullets: [str('weeklyEngagement1'), str('weeklyEngagement2')].filter((b): b is string => !!b),
+  }
+}
+
+/** True when the user owns this program (coach or ambassador owner). */
+export async function userOwnsProgram(userId: string, programId: string): Promise<boolean> {
+  const n = await prisma.coachProgram.count({ where: { AND: [{ id: programId }, ownedByUser(userId)] } })
+  return n > 0
 }
 
 /** The inviter's live programs, for share links on One-A-Day. */

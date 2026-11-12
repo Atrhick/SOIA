@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { AGE_RANGES, AgeRangeValue } from '@/lib/get-involved/core'
+import { PhoneField } from '@/components/get-involved/signup/phone-field'
 
 const input = 'w-full h-11 rounded-lg border border-gray-300 px-3 text-[15px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
 const label = 'block text-sm font-semibold text-gray-700 mb-1.5'
 
 /**
- * Name, email, phone, city, age range, and parent fields for 17 and under.
+ * Name, email, phone (with country code; required for 18 and over), city, age range, and parent fields for 17 and under.
  * Field names match intakeSchema in src/lib/actions/get-involved.ts.
  * `forInviter` changes the wording for a coach or ambassador adding someone.
  */
@@ -24,7 +25,7 @@ export function IntakeFields({ forInviter = false }: { forInviter?: boolean }) {
         <div><label className={label} htmlFor="gi-fn">First name</label><input id="gi-fn" name="firstName" required maxLength={60} autoComplete="given-name" className={input} /></div>
         <div><label className={label} htmlFor="gi-ln">Last name</label><input id="gi-ln" name="lastName" required maxLength={60} autoComplete="family-name" className={input} /></div>
         <div><label className={label} htmlFor="gi-em">Email</label><input id="gi-em" name="email" type="email" required maxLength={200} autoComplete="email" placeholder="name@example.com" className={input} /></div>
-        <div><label className={label} htmlFor="gi-ph">Phone{minor ? ' (optional)' : ''}</label><input id="gi-ph" name="phone" type="tel" maxLength={40} autoComplete="tel" placeholder="(000) 000-0000" className={input} /></div>
+        <div><label className={label} htmlFor="gi-ph">Mobile number{minor ? ' (optional)' : ''}</label><PhoneField id="gi-ph" className="h-11 [&_input]:h-11 [&>button]:h-11" /></div>
       </div>
       <div><label className={label} htmlFor="gi-city">City and state / country</label><input id="gi-city" name="city" maxLength={100} placeholder="e.g. Atlanta, GA" className={input} /></div>
 

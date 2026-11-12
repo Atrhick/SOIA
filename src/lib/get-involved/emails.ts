@@ -6,6 +6,7 @@
 import { formatCallTime } from './core'
 
 import { type Seg, programParentLine, programWelcomeParts } from './program-welcome'
+import { emailActionPath } from './email-links'
 
 export function appUrl(path = ''): string {
   const base = (process.env.APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3001').replace(/\/+$/, '')
@@ -25,11 +26,55 @@ export function esc(v: string | null | undefined): string {
 export const P = 'color:#374151;font-size:15px;line-height:1.55;margin:0 0 14px'
 export const SMALL = 'color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 10px'
 
+// ---- footer (outreach round 1, mockup 12: on every Get Involved email) ----
+
 /**
- * The NowTransformed email frame: logo, card, optional button, sign-off and footer.
- * `body` is raw HTML: escape every user value in it with esc(). `cta` and `after` are escaped/raw the same way.
+ * Mailing address for the footer, cached in-process. Templates are sync, so a send path loads it first
+ * with primeEmailFooter() (emails/footer-settings.ts, server only; cached for a minute). If nobody
+ * primed it, the address part is simply left out.
  */
-export function layout(body: string, cta?: { label: string; url: string }, after = ''): string {
+let footerAddress = { value: '', at: 0 }
+export function setEmailFooterAddress(address: string, at = Date.now()) { footerAddress = { value: address.trim(), at } }
+export const emailFooterAddressAge = (now = Date.now()) => now - footerAddress.at
+export const emailFooterAddress = () => footerAddress.value
+
+/** The site named in "you asked about a NowTransformed program at ...": env PUBLIC_SITE_DOMAIN, else APP_URL's host. */
+export function siteLabel(): string {
+  const env = (process.env.PUBLIC_SITE_DOMAIN ?? '').trim()
+  if (env) return env
+  try { return new URL(appUrl()).host.replace(/^www\./, '') } catch { return 'nowtransformed.org' }
+}
+
+export interface LayoutOpts {
+  /** The prospect this email is about: adds "Stop emails about this" and "Delete my details". */
+  prospectId?: string | null
+  /** 'team' = to an inviter or host: no "you asked about a program" line and no opt-out links. */
+  audience?: 'prospect' | 'team'
+  /** Replaces "With gratitude,". */
+  signOff?: string
+}
+
+/** Footer 12. Exported for tests. */
+export function footerHtml(opts: LayoutOpts = {}): string {
+  const line = 'text-align:center;color:#6b7280;font-size:12px;line-height:1.6;margin:4px 0 0'
+  const addr = emailFooterAddress()
+  const stop = opts.audience !== 'team' ? emailActionPath('stop', opts.prospectId) : null
+  const del = opts.audience !== 'team' ? emailActionPath('delete', opts.prospectId) : null
+  const links = [stop && `<a href="${esc(appUrl(stop))}" style="color:#6b7280">Stop emails about this</a>`, del && `<a href="${esc(appUrl(del))}" style="color:#6b7280">Delete my details</a>`].filter(Boolean)
+  return [
+    `<p style="${line};margin-top:12px">Questions? Just reply to this email.</p>`,
+    opts.audience === 'team' ? '' : `<p style="${line}">You're getting this because you asked about a NowTransformed program at ${esc(siteLabel())}.</p>`,
+    `<p style="${line}">NowTransformed${addr ? ` · ${esc(addr)}` : ''}</p>`,
+    links.length ? `<p style="${line}">${links.join(' · ')}</p>` : '',
+  ].filter(Boolean).join('\n  ')
+}
+
+/**
+ * The NowTransformed email frame: logo, card, optional button, sign-off and footer (12).
+ * `body` is raw HTML: escape every user value in it with esc(). `cta` and `after` are escaped/raw the same way.
+ * Pass `opts.prospectId` so the footer carries the stop/delete links; `opts.audience: 'team'` for staff emails.
+ */
+export function layout(body: string, cta?: { label: string; url: string }, after = '', opts: LayoutOpts = {}): string {
   return `
 <div style="background:#f3f4f6;padding:24px 12px;font-family:Inter,Segoe UI,Arial,sans-serif">
   <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:28px">
@@ -38,12 +83,18 @@ export function layout(body: string, cta?: { label: string; url: string }, after
       <span style="font-weight:600;font-size:15px;color:#111827;margin-left:8px">NowTransformed</span>
     </div>
     ${body}
-    ${cta ? `<a href="${esc(cta.url)}" style="display:inline-block;margin:6px 0 16px;padding:13px 22px;background:#0369a1;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px">${esc(cta.label)}</a>` : ''}
+    ${cta ? button(cta) : ''}
     ${after}
-    <p style="${SMALL};border-top:1px solid #f3f4f6;padding-top:14px;margin-top:8px">With gratitude,<br>The NowTransformed team</p>
+    <p style="${SMALL};border-top:1px solid #f3f4f6;padding-top:14px;margin-top:8px">${esc(opts.signOff ?? 'With gratitude,')}<br>The NowTransformed team</p>
   </div>
-  <p style="text-align:center;color:#6b7280;font-size:12px;margin:12px 0 0">Questions? Just reply to this email. NowTransformed · Building community, one person at a time.</p>
+  ${footerHtml(opts)}
 </div>`
+}
+
+/** The primary button; `secondary` = outlined. Label and URL are escaped here. */
+export function button(cta: { label: string; url: string }, secondary = false): string {
+  const look = secondary ? 'background:#ffffff;color:#111827;border:1px solid #d1d5db' : 'background:#0369a1;color:#ffffff'
+  return `<a href="${esc(cta.url)}" style="display:inline-block;margin:6px 8px 16px 0;padding:13px 22px;${look};text-decoration:none;border-radius:10px;font-weight:600;font-size:15px">${esc(cta.label)}</a>`
 }
 
 export function callBox(when: Date, tz: string, withWhom: string, meetingUrl?: string | null): string {
@@ -62,13 +113,15 @@ export interface Mail { subject: string; html: string }
 const segs = (s: Seg[]) => s.map((x) => (x.bold ? `<strong>${esc(x.text)}</strong>` : esc(x.text))).join('')
 
 /**
+ * LEGACY welcome email (sent at sign-up until outreach round 1). The cron now sends the E9 version,
+ * welcomeCallEmail() in ./emails/welcome.ts; this one is kept for older callers and its tests.
  * Welcome email for 18 and over. With an approved program note (the person came in through a
  * program page's share link, or the inviter's latest program), it is about that program.
  */
-export function welcomeEmail(p: { firstName: string; inviterName: string | null; bookUrl: string; program?: { name: string; company?: string | null; note: string } | null }): Mail {
+export function welcomeEmail(p: { firstName: string; inviterName: string | null; bookUrl: string; program?: { name: string; company?: string | null; note: string } | null; prospectId?: string | null }): Mail {
   if (p.program) {
     const w = programWelcomeParts({ firstName: p.firstName, inviterName: p.inviterName, programName: p.program.name, companyName: p.program.company, note: p.program.note })
-    return { subject: w.subject, html: layout(w.paragraphs.map((x) => `<p style="${P}">${segs(x)}</p>`).join('\n'), { label: w.cta, url: p.bookUrl }) }
+    return { subject: w.subject, html: layout(w.paragraphs.map((x) => `<p style="${P}">${segs(x)}</p>`).join('\n'), { label: w.cta, url: p.bookUrl }, '', { prospectId: p.prospectId }) }
   }
   const by = p.inviterName ? `<strong>${esc(p.inviterName)}</strong> shared NowTransformed with you because they believe you'd add to this community.` : 'Thanks for your interest in NowTransformed.'
   return {
@@ -78,11 +131,13 @@ export function welcomeEmail(p: { firstName: string; inviterName: string | null;
        <p style="${P}">NowTransformed helps young people and adults grow, lead and build community. People get involved as coaches, mentors and service providers, ambassadors, volunteers, business affiliates and sponsors.</p>
        <p style="${P}">The first step is a free 30-minute discovery call, so we can learn your goals and show you where you'd fit.</p>`,
       { label: 'Book my discovery call', url: p.bookUrl },
+      '',
+      { prospectId: p.prospectId },
     ),
   }
 }
 
-export function parentConsentEmail(p: { parentName: string; childFirst: string; inviterName: string | null; consentUrl: string; program?: { name: string; company?: string | null; note: string } | null }): Mail {
+export function parentConsentEmail(p: { parentName: string; childFirst: string; inviterName: string | null; consentUrl: string; program?: { name: string; company?: string | null; note: string } | null; prospectId?: string | null }): Mail {
   return {
     subject: `${p.childFirst} would like to join NowTransformed: your okay is needed`,
     html: layout(
@@ -92,16 +147,19 @@ export function parentConsentEmail(p: { parentName: string; childFirst: string; 
        <p style="${P}">Before we go any further, we need your consent. It takes about two minutes. <strong>A parent or guardian must also be on ${esc(p.childFirst)}'s discovery call</strong>, so please pick a time that works for you both.</p>`,
       { label: 'Review and give consent', url: p.consentUrl },
       `<p style="${SMALL}">If we don't hear from you within 14 days, we'll delete ${esc(p.childFirst)}'s details.</p>`,
+      { prospectId: p.prospectId },
     ),
   }
 }
 
-export function thanksAfterConsentEmail(p: { firstName: string; bookUrl: string }): Mail {
+export function thanksAfterConsentEmail(p: { firstName: string; bookUrl: string; prospectId?: string | null }): Mail {
   return {
     subject: `Your parent said yes, ${p.firstName}! Book your call`,
     html: layout(
       `<p style="${P}">Hi ${esc(p.firstName)}, great news: your parent or guardian gave consent. Next, book your discovery call. They need to be on the call with you, so pick a time that works for both of you.</p>`,
       { label: 'Book my discovery call', url: p.bookUrl },
+      '',
+      { prospectId: p.prospectId },
     ),
   }
 }
@@ -114,7 +172,13 @@ interface CallMailBase {
   meetingUrl: string | null
   manageUrl: string
   parent?: { first: string } | null
+  /** For the footer's stop/delete links. */
+  prospectId?: string | null
+  /** True when this copy goes to the host (team footer). */
+  toHost?: boolean
 }
+
+const callFooter = (p: CallMailBase): LayoutOpts => (p.toHost ? { audience: 'team' } : { prospectId: p.prospectId })
 
 const manageLinks = (url: string) => `<p style="${SMALL}"><a href="${esc(url)}" style="color:#0369a1">Reschedule or cancel</a> (up to 2 hours before)</p>`
 
@@ -128,6 +192,7 @@ export function bookedEmail(p: CallMailBase): Mail {
        <p style="${P}"><strong>Before the call:</strong> think about what you'd love to grow in, and what you'd like to give. There are no wrong answers.</p>`,
       p.meetingUrl ? { label: 'Join the call', url: p.meetingUrl } : undefined,
       manageLinks(p.manageUrl),
+      callFooter(p),
     ),
   }
 }
@@ -141,6 +206,7 @@ export function reminderEmail(p: CallMailBase & { soon: boolean }): Mail {
        ${callBox(p.startsAt, p.tz, p.hostName, p.meetingUrl)}`,
       p.meetingUrl ? { label: 'Join the call', url: p.meetingUrl } : undefined,
       p.soon ? '' : manageLinks(p.manageUrl),
+      callFooter(p),
     ),
   }
 }
@@ -155,11 +221,12 @@ export function rescheduledEmail(p: CallMailBase & { oldStartsAt: Date }): Mail 
        ${callBox(p.startsAt, p.tz, p.hostName, p.meetingUrl)}`,
       p.meetingUrl ? { label: 'Join the call', url: p.meetingUrl } : undefined,
       manageLinks(p.manageUrl),
+      callFooter(p),
     ),
   }
 }
 
-export function cancelledEmail(p: { firstName: string; startsAt: Date; tz: string; bookUrl: string; byHost: boolean; noParent?: boolean }): Mail {
+export function cancelledEmail(p: { firstName: string; startsAt: Date; tz: string; bookUrl: string; byHost: boolean; noParent?: boolean; prospectId?: string | null }): Mail {
   const lead = p.noParent
     ? `We need a parent or guardian on the call, so we've moved yours off the calendar. Let's find a time that works for you both.`
     : p.byHost
@@ -167,26 +234,28 @@ export function cancelledEmail(p: { firstName: string; startsAt: Date; tz: strin
       : `Your call on <strong>${esc(formatCallTime(p.startsAt, p.tz))}</strong> is cancelled. No problem at all: life happens. Whenever you're ready, pick a new time. Your place in the community is still here.`
   return {
     subject: 'Your discovery call is cancelled',
-    html: layout(`<p style="${P}">Hi ${esc(p.firstName)}, ${lead}</p>`, { label: 'Book a new time', url: p.bookUrl }),
+    html: layout(`<p style="${P}">Hi ${esc(p.firstName)}, ${lead}</p>`, { label: 'Book a new time', url: p.bookUrl }, '', { prospectId: p.prospectId }),
   }
 }
 
-export function noShowEmail(p: { firstName: string; bookUrl: string }): Mail {
+export function noShowEmail(p: { firstName: string; bookUrl: string; prospectId?: string | null }): Mail {
   return {
     subject: 'We missed you today. Want to pick a new time?',
     html: layout(
       `<p style="${P}">Hi ${esc(p.firstName)}, we were sorry to miss you on today's call. We know schedules get busy.</p>
        <p style="${P}">If you're still interested, pick a new time below. It only takes a minute.</p>`,
       { label: 'Pick a new time', url: p.bookUrl },
+      '',
+      { prospectId: p.prospectId },
     ),
   }
 }
 
-export function continueLinkEmail(p: { firstName: string; url: string }): Mail {
+export function continueLinkEmail(p: { firstName: string; url: string; prospectId?: string | null }): Mail {
   return {
     subject: 'Your link to continue with NowTransformed',
     html: layout(`<p style="${P}">Hi ${esc(p.firstName)}, here's a fresh link to pick up where you left off.</p>`, { label: 'Continue', url: p.url },
-      `<p style="${SMALL}">If you didn't ask for this, you can ignore this email.</p>`),
+      `<p style="${SMALL}">If you didn't ask for this, you can ignore this email.</p>`, { prospectId: p.prospectId }),
   }
 }
 
@@ -201,6 +270,8 @@ export function inviterNewLeadEmail(p: { inviterFirst: string; prospectName: str
        <p style="${P}">${p.minor ? "They're 17 or under, so we've emailed their parent for consent first." : "We've sent them the welcome email and a link to book a discovery call."} A quick personal message from you helps a lot.</p>
        <p style="${SMALL}">Your streak: ${p.streak} day${p.streak === 1 ? '' : 's'}.</p>`,
       { label: 'See them on my dashboard', url: p.dashUrl },
+      '',
+      { audience: 'team' },
     ),
   }
 }
@@ -208,7 +279,7 @@ export function inviterNewLeadEmail(p: { inviterFirst: string; prospectName: str
 export function inviterCallUpdateEmail(p: { inviterFirst: string; prospectName: string; what: string; dashUrl: string }): Mail {
   return {
     subject: `${p.prospectName}: ${p.what}`,
-    html: layout(`<p style="${P}">Hi ${esc(p.inviterFirst)}, an update on someone you invited: <strong>${esc(p.prospectName)}</strong> ${esc(p.what)}.</p>`, { label: 'Open my dashboard', url: p.dashUrl }),
+    html: layout(`<p style="${P}">Hi ${esc(p.inviterFirst)}, an update on someone you invited: <strong>${esc(p.prospectName)}</strong> ${esc(p.what)}.</p>`, { label: 'Open my dashboard', url: p.dashUrl }, '', { audience: 'team' }),
   }
 }
 
@@ -238,6 +309,8 @@ export function hostCallEmail(p: {
        <p style="${SMALL}">Age range: <strong>${esc(p.ageLabel)}</strong>${p.inviterName ? ` · Invited by <strong>${esc(p.inviterName)}</strong>` : ''}${p.phone ? ` · Phone ${esc(p.phone)}` : ''}</p>
        ${p.parent ? `<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:12px 14px;margin:0 0 14px;color:#7c2d12;font-size:14px;line-height:1.5"><strong>Parent must be on the call. Don't start without them.</strong><br>${esc(p.parent.name)} · ${esc(p.parent.email)}${p.parent.phone ? ` · ${esc(p.parent.phone)}` : ''}</div>` : ''}`,
       { label: 'Open Discovery Calls', url: p.callsUrl },
+      '',
+      { audience: 'team' },
     ),
   }
 }
@@ -245,13 +318,15 @@ export function hostCallEmail(p: {
 // ---- phase 2/3 (more templates live in ./emails/) ----
 
 /** E9: the interviewer marked "Not a fit". `eventsUrl` null = no button. */
-export function notAFitEmail(p: { firstName: string; eventsUrl: string | null }): Mail {
+export function notAFitEmail(p: { firstName: string; eventsUrl: string | null; prospectId?: string | null }): Mail {
   return {
     subject: 'Thank you for talking with us',
     html: layout(
       `<p style="${P}">Hi ${esc(p.firstName)}, thank you for taking the time to talk with us. After our conversation, we don't think any of our roles is the right fit right now.</p>
        <p style="${P}">That can change. You're always welcome at our free community events, and you can reach out any time if your situation changes.</p>`,
       p.eventsUrl ? { label: 'See upcoming community events', url: p.eventsUrl } : undefined,
+      '',
+      { prospectId: p.prospectId },
     ),
   }
 }

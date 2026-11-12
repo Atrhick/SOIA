@@ -8,6 +8,7 @@ export function accountReadyEmail(p: {
   signInUrl: string
   /** e.g. "Coach program, $99.00 (one time) · Nov 14, 2026"; null for free roles. */
   receipt: string | null
+  prospectId?: string | null
 }): Mail {
   return {
     subject: `Welcome to the NowTransformed team, ${p.firstName}`,
@@ -19,6 +20,8 @@ export function accountReadyEmail(p: {
        </div>
        <p style="${P}">Your first step: share your own Get Involved link with one person today. That's One-A-Day.</p>`,
       { label: 'Sign in', url: p.signInUrl },
+      '',
+      { prospectId: p.prospectId },
     ),
   }
 }
@@ -30,6 +33,8 @@ export function inviterJoinedEmail(p: { inviterFirst: string; prospectName: stri
       `<p style="${P}">Great news, ${esc(p.inviterFirst)}: <strong>${esc(p.prospectName)}</strong> just joined NowTransformed as a ${esc(p.roleLabel)}. They're on your team now, and it counts on the One-A-Day leaderboard.</p>
        <p style="${P}">A quick welcome from you means a lot in the first week.</p>`,
       { label: 'See my team', url: p.teamUrl },
+      '',
+      { audience: 'team' },
     ),
   }
 }

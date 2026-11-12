@@ -12,6 +12,7 @@ import { journeyLink, refreshJourneyToken } from './journey'
 import { prospectRoleConfig } from './roles'
 import { assessmentInviteEmail, assessmentReminderEmail } from './emails/assessment'
 import { orientationReminderEmail } from './emails/orientation'
+import { primeEmailFooter } from './emails/footer-settings'
 
 const DAY = 86400_000
 
@@ -40,9 +41,10 @@ export async function sendAssessmentInvite(prospectId: string): Promise<{ ok: tr
     const cfg = await prospectRoleConfig(p)
     if (!cfg) return { ok: false, error: 'No role chosen.' }
     // A (re)sent link gets a new token, so any older link stops working.
+    await primeEmailFooter()
     const token = await refreshJourneyToken(prisma, p.id)
     const url = journeyLink(token, 'assessment')
-    await toProspectAndParent(p, (parentFirst) => assessmentInviteEmail({ firstName: p.firstName, roleLabel: cfg.label, questions: questionTexts(cfg), url, parentFirst }))
+    await toProspectAndParent(p, (parentFirst) => assessmentInviteEmail({ firstName: p.firstName, roleLabel: cfg.label, questions: questionTexts(cfg), url, parentFirst, prospectId: p.id }))
     await prisma.prospect.update({ where: { id: p.id }, data: { assessmentSentAt: new Date(), assessmentReminderSentAt: null } })
     return { ok: true }
   } catch (e) {
@@ -59,7 +61,8 @@ export async function sendAssessmentInvite(prospectId: string): Promise<{ ok: tr
 async function assessmentReminders(now: Date): Promise<number> {
   const due = await prisma.prospect.findMany({
     where: {
-      status: 'ASSESSMENT_PENDING', journeyToken: { not: null }, assessmentSubmittedAt: null, assessmentReminderSentAt: null,
+      // Automatic reminder: skipped after "Stop emails about this".
+      status: 'ASSESSMENT_PENDING', journeyToken: { not: null }, assessmentSubmittedAt: null, assessmentReminderSentAt: null, emailOptOutAt: null,
       assessmentSentAt: { lte: new Date(now.getTime() - ASSESSMENT_REMINDER_DAYS * DAY) },
     },
     take: 200,
@@ -74,7 +77,7 @@ async function assessmentReminders(now: Date): Promise<number> {
     const cfg = await prospectRoleConfig(p)
     if (!cfg) continue
     const url = journeyLink(p.journeyToken!, 'assessment')
-    await toProspectAndParent(p, (parentFirst) => assessmentReminderEmail({ firstName: p.firstName, roleLabel: cfg.label, questions: questionTexts(cfg), url, parentFirst }))
+    await toProspectAndParent(p, (parentFirst) => assessmentReminderEmail({ firstName: p.firstName, roleLabel: cfg.label, questions: questionTexts(cfg), url, parentFirst, prospectId: p.id }))
     sent++
   }
   return sent
@@ -92,7 +95,7 @@ async function orientationReminders(now: Date): Promise<number> {
   const repeatCutoff = new Date(now.getTime() - ORIENTATION_REPEAT_DAYS * DAY)
   const rows = await prisma.prospect.findMany({
     where: {
-      status: { in: ['ASSESSMENT_COMPLETED', 'ORIENTATION_SCHEDULED'] }, journeyToken: { not: null }, orientationWatchedAt: null,
+      status: { in: ['ASSESSMENT_COMPLETED', 'ORIENTATION_SCHEDULED'] }, journeyToken: { not: null }, orientationWatchedAt: null, emailOptOutAt: null,
       OR: [
         { orientationRemindAt: { lte: now } },
         { orientationRemindAt: null, orientationReminderSentAt: null, assessmentSubmittedAt: { lte: repeatCutoff } },
@@ -121,7 +124,7 @@ async function orientationReminders(now: Date): Promise<number> {
     const cfg = await prospectRoleConfig(p)
     if (!cfg) continue
     const watchUrl = journeyLink(p.journeyToken!, 'orientation')
-    await toProspectAndParent(p, (parentFirst) => orientationReminderEmail({ firstName: p.firstName, roleLabel: cfg.label, minutes: cfg.orientationMinutes, watchUrl, kind, parentFirst }))
+    await toProspectAndParent(p, (parentFirst) => orientationReminderEmail({ firstName: p.firstName, roleLabel: cfg.label, minutes: cfg.orientationMinutes, watchUrl, kind, parentFirst, prospectId: p.id }))
     sent++
   }
   return sent
@@ -130,6 +133,7 @@ async function orientationReminders(now: Date): Promise<number> {
 /** Both reminder kinds; errors in one kind do not stop the other. */
 export async function runJourneyReminders(now = new Date()): Promise<{ assessment: number; orientation: number }> {
   let assessment = 0, orientation = 0
+  await primeEmailFooter()
   try { assessment = await assessmentReminders(now) } catch (e) { console.error('[CRON] assessment reminders failed', e) }
   try { orientation = await orientationReminders(now) } catch (e) { console.error('[CRON] orientation reminders failed', e) }
   return { assessment, orientation }

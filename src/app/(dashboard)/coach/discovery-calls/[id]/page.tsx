@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { CallRecordClient } from '../../../admin/discovery-calls/[id]/call-record-client'
-import { loadCallRecord, staffTimeZone } from '../../../admin/discovery-calls/call-data'
+import { loadCallOrigin, loadCallRecord, staffTimeZone } from '../../../admin/discovery-calls/call-data'
+import { CallOriginCards } from '../../../admin/discovery-calls/[id]/call-origin'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,7 @@ export default async function CoachCallRecordPage({ params }: { params: { id: st
   const data = await loadCallRecord(params.id, { tz, admin: false })
   if (!data || data.hostId !== session.user.id) notFound()
   const { hostId: _hostId, ...record } = data
+  const origin = await loadCallOrigin(params.id, tz)
 
   return (
     <div className="space-y-5 max-w-6xl">
@@ -27,7 +29,9 @@ export default async function CoachCallRecordPage({ params }: { params: { id: st
       {record.call.status === 'BOOKED' && new Date(record.call.startsAt) > new Date() && (
         <p className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">Can&apos;t make this time? Ask an admin to move the call, or choose &quot;Reschedule&quot; below so {record.prospect.firstName} can pick a new time.</p>
       )}
-      <CallRecordClient data={record} now={new Date().toISOString()} />
+      <CallRecordClient data={record} now={new Date().toISOString()}>
+        {origin && <CallOriginCards o={origin} />}
+      </CallRecordClient>
     </div>
   )
 }

@@ -14,6 +14,7 @@ import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
+import { primeEmailFooter } from '@/lib/get-involved/emails/footer-settings'
 import {
   AgeRangeValue, CALL_MINUTES, ageRangeLabel, canProspectChange, generateSlots, journeyOpen, linkStillValid, pickHost,
 } from '@/lib/get-involved/core'
@@ -25,27 +26,55 @@ import {
 } from '@/lib/get-involved/server'
 import { programForSignup } from '@/lib/get-involved/program-welcome-server'
 import { sendFreshJourneyLink } from '@/lib/get-involved/journey'
+import { getSignupOffer, smsEnabled } from '@/lib/get-involved/offer'
+import { bookViewFor } from '@/app/(public)/discovery/[token]/book-view'
+import type { BookView } from '@/components/get-involved/signup/booking'
 
-type Result = { success: true; message?: string } | { error: string }
+/** `field` names the form field the error belongs to, so the page can mark that input. */
+type Result = { success: true; message?: string } | { error: string; field?: string }
 
 const AGE = z.enum(['UNDER_18', 'AGE_18_24', 'AGE_25_55', 'AGE_56_PLUS'])
 const trimmed = (max: number) => z.string().trim().max(max)
+
+/** Share-link channels (?via=), stored uppercased in Prospect.inviteChannel. Anything else is ignored. */
+const CHANNELS = ['text', 'whatsapp', 'email', 'dm', 'post', 'parent'] as const
+function channelFrom(v: unknown): string | null {
+  const c = String(v ?? '').trim().toLowerCase()
+  return (CHANNELS as readonly string[]).includes(c) ? c.toUpperCase() : null
+}
+
+/** The teen's answer to "They are my", mapped to the consent wording (the parent confirms it on the consent page). */
+const TEEN_RELATIONSHIP: Record<string, string | null> = { Mother: 'Parent', Father: 'Parent', Guardian: 'Legal guardian', Other: null }
+
+const phoneDigits = (v: string) => v.replace(/\D/g, '').length
 
 const intakeSchema = z
   .object({
     firstName: trimmed(60).min(1, 'Please enter a first name'),
     lastName: trimmed(60).min(1, 'Please enter a last name'),
     email: z.string().trim().toLowerCase().email('Please enter a valid email').max(200),
+    // "+1 (702) 555-0123" from PhoneInput (dial code + national number) and the ISO country of the dial code.
     phone: trimmed(40).optional().default(''),
+    phoneCountryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional().catch(undefined),
+    smsConsent: z.string().optional(),
     city: trimmed(100).optional().default(''),
     ageRange: AGE,
     consent: z.literal('on', { message: 'Please agree to be contacted so we can follow up' }),
     parentName: trimmed(120).optional().default(''),
     parentEmail: z.string().trim().toLowerCase().max(200).optional().default(''),
     parentPhone: trimmed(40).optional().default(''),
+    parentRelationship: z.enum(['Mother', 'Father', 'Guardian', 'Other']).optional().catch(undefined),
     note: trimmed(1000).optional().default(''),
+    via: z.string().optional(),
+    waitlist: z.string().optional(),
   })
   .superRefine((d, ctx) => {
+    // Adults must give a mobile number (hosts call or text before the call); 17 and under may leave it out.
+    if (d.phone) {
+      if (!/^[+\d\s().-]+$/.test(d.phone) || phoneDigits(d.phone) < 7 || phoneDigits(d.phone) > 16) ctx.addIssue({ code: 'custom', path: ['phone'], message: 'Please check your mobile number' })
+    } else if (d.ageRange !== 'UNDER_18') {
+      ctx.addIssue({ code: 'custom', path: ['phone'], message: 'Please enter a mobile number so your host can reach you' })
+    }
     if (d.ageRange === 'UNDER_18') {
       if (!d.parentName) ctx.addIssue({ code: 'custom', path: ['parentName'], message: "Please enter a parent or guardian's name" })
       if (!z.string().email().safeParse(d.parentEmail).success) ctx.addIssue({ code: 'custom', path: ['parentEmail'], message: "Please enter a parent or guardian's email" })
@@ -56,10 +85,25 @@ const intakeSchema = z
 function formObject(fd: FormData) {
   const o: Record<string, string> = {}
   fd.forEach((v, k) => { if (typeof v === 'string') o[k] = v })
+  // The public form asks for "First and last name" in one box.
+  if (o.fullName !== undefined && o.firstName === undefined) {
+    const parts = o.fullName.trim().split(/\s+/).filter(Boolean)
+    o.firstName = parts[0] ?? ''
+    o.lastName = parts.slice(1).join(' ')
+  }
   return o
 }
 
-type IntakeOutcome = 'created' | 'exists-mine' | 'exists' | 'limited'
+/** First zod issue as { error, field }; name errors from the one-box name field point at it. */
+function firstIssue(e: z.ZodError, fd: FormData): { error: string; field?: string } {
+  const i = e.issues[0]
+  const path0 = typeof i?.path[0] === 'string' ? i.path[0] : undefined
+  const oneBox = fd.get('fullName') !== null && (path0 === 'firstName' || path0 === 'lastName')
+  if (oneBox) return { error: 'Please enter your first and last name', field: 'fullName' }
+  return { error: i?.message ?? 'Please check the form', field: path0 }
+}
+
+type IntakeOutcome = { kind: 'created'; prospectId: string; journeyToken: string } | { kind: 'exists-mine' } | { kind: 'exists' } | { kind: 'limited' }
 
 /**
  * Shared by the public form and an inviter's "Add someone I talked to".
@@ -70,14 +114,14 @@ type IntakeOutcome = 'created' | 'exists-mine' | 'exists' | 'limited'
 async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: string | null, source: 'INVITE_LINK' | 'INVITER_ADDED', programSlug: string | null = null): Promise<IntakeOutcome> {
   // Cap emails per address, whatever the source, so neither path can be used to flood an inbox.
   const flood = rateLimited(`gi-to:${data.email}`, 3, 60 * 60_000) || (data.parentEmail ? rateLimited(`gi-to:${data.parentEmail}`, 3, 60 * 60_000) : false)
-  if (flood) return 'limited'
+  if (flood) return { kind: 'limited' }
   // Case-insensitive: older paths stored emails as typed, and the unique index is case-sensitive.
   const existing = await prisma.prospect.findFirst({ where: { email: emailEquals(data.email) }, select: { id: true, invitedById: true } })
   if (existing) {
     // Don't reveal it. On the public form, send the person a fresh link to their current step, but
     // only while their journey is open (never after Not a fit, a pause or once they have a login).
     if (source === 'INVITE_LINK') await sendFreshJourneyLink(data.email)
-    return inviterId && existing.invitedById === inviterId ? 'exists-mine' : 'exists'
+    return { kind: inviterId && existing.invitedById === inviterId ? 'exists-mine' : 'exists' }
   }
 
   const minor = data.ageRange === 'UNDER_18'
@@ -95,7 +139,11 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
           lastName: data.lastName,
           email: data.email,
           phone: data.phone || null,
+          phoneCountryCode: data.phone && data.phoneCountryCode ? data.phoneCountryCode : undefined,
+          // Text reminders only when the feature is on, a number was given and the box was ticked.
+          smsConsentAt: smsEnabled() && data.phone && data.smsConsent === 'on' ? now : null,
           city: data.city || null,
+          inviteChannel: channelFrom(data.via),
           ageRange: data.ageRange,
           contactConsentAt: now,
           invitedById: inviterId,
@@ -107,6 +155,7 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
           parentName: minor ? data.parentName : null,
           parentEmail: minor ? data.parentEmail : null,
           parentPhone: minor ? data.parentPhone || null : null,
+          parentRelationship: minor && data.parentRelationship ? TEEN_RELATIONSHIP[data.parentRelationship] : null,
           parentConsentToken,
           parentConsentRequestedAt: minor ? now : null,
           status: minor ? 'AWAITING_PARENT_CONSENT' : 'FORM_SUBMITTED',
@@ -117,39 +166,76 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
       return p.id
     })
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return 'exists'
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return { kind: 'exists' }
     throw e
   }
 
   const inviter = inviterId ? await userDisplayName(inviterId) : null
   const programMail = program?.note ? { name: program.name, company: program.company, note: program.note } : null
+  // Adults: no welcome email now. They usually book on the sign-up page; the reminders cron sends the
+  // welcome (with the booking link) ~20 minutes later only if no call was booked (welcomeEmailSentAt
+  // stays null until then). Parents of 17 and under are asked for consent at once.
   if (minor) {
-    await sendEmail({ to: data.parentEmail, ...mail.parentConsentEmail({ parentName: data.parentName, childFirst: data.firstName, inviterName: inviter?.full ?? null, consentUrl: consentUrl(parentConsentToken!), program: programMail }) })
-  } else {
-    await sendEmail({ to: data.email, ...mail.welcomeEmail({ firstName: data.firstName, inviterName: inviter?.full ?? null, bookUrl: journeyUrl(journeyToken), program: programMail }) })
+    await primeEmailFooter()
+    await sendEmail({ to: data.parentEmail, ...mail.parentConsentEmail({ parentName: data.parentName, childFirst: data.firstName, inviterName: inviter?.full ?? null, consentUrl: consentUrl(parentConsentToken!), program: programMail, prospectId }) })
   }
   if (inviterId && source === 'INVITE_LINK') await emailInviterNewLead(inviterId, { name: `${data.firstName} ${data.lastName}`, ageRange: data.ageRange, city: data.city || null })
   await notifyAdmins('New Get Involved form', `${data.firstName} ${data.lastName} (${ageRangeLabel(data.ageRange)})${inviter ? ` was invited by ${inviter.full}` : ''}.`, prospectId).catch(() => {})
-  return 'created'
+  // "Join the waiting list" (sponsored seats full): only when this program really has an offer.
+  if (source === 'INVITE_LINK' && data.waitlist === 'on' && program) {
+    await addToSeatWaitlist(prospectId, `${data.firstName} ${data.lastName}`, program.id, program.name).catch((e) => console.error('[GET-INVOLVED] waitlist failed', e))
+  }
+  return { kind: 'created', prospectId, journeyToken }
 }
 
+/** Sponsored seats are full: record a SEAT_WAITLIST request (once) and tell the admins. */
+async function addToSeatWaitlist(prospectId: string, name: string, programId: string, programName: string) {
+  const offer = await getSignupOffer(programId)
+  if (!offer) return
+  const open = await prisma.discoverySlotRequest.findFirst({ where: { prospectId, kind: 'SEAT_WAITLIST', handledAt: null }, select: { id: true } })
+  if (open) return
+  await prisma.discoverySlotRequest.create({ data: { prospectId, kind: 'SEAT_WAITLIST' } })
+  await notifyAdmins('Sponsored seat waiting list', `${name} joined the waiting list for a sponsored seat in ${programName}.`, prospectId)
+}
+
+/**
+ * What the sign-up page shows next:
+ * - 'book': a NEW adult sign-up; `token` is their own journey token so they can book on the same screen.
+ * - 'parent': a new 17-and-under sign-up; the parent was emailed.
+ * - 'check-email': anything else (email already signed up, rate limited, honeypot). Never shows
+ *   details about an existing person; an open journey gets a fresh link by email.
+ */
+export type SignupResult =
+  | { success: true; next: 'book'; token: string; firstName: string }
+  | { success: true; next: 'parent'; firstName: string; parentFirst: string }
+  | { success: true; next: 'check-email'; firstName: string }
+  | { error: string; field?: string }
+
 /** Public form at /join/[slug]. */
-export async function submitGetInvolved(slug: string, formData: FormData): Promise<Result> {
+export async function submitGetInvolved(slug: string, formData: FormData): Promise<SignupResult> {
   // Honeypot: real people never fill the hidden "website" field.
-  if (String(formData.get('website') ?? '').trim()) return { success: true }
+  if (String(formData.get('website') ?? '').trim()) return { success: true, next: 'check-email', firstName: '' }
   if (rateLimited(`gi:${await clientIp()}`, 8, 10 * 60_000)) return { error: 'Too many attempts. Please wait a few minutes and try again.' }
 
   const inviter = await inviterBySlug(String(slug ?? ''))
   if (!inviter) return { error: 'This invite link is not active.' }
 
-  const parsed = intakeSchema.safeParse(formObject(formData))
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form' }
+  // The page says how details are used right under the button ("We use your details only to set up
+  // your call..."), so sending the form is the contact consent.
+  const obj = formObject(formData)
+  obj.consent = 'on'
+  const parsed = intakeSchema.safeParse(obj)
+  if (!parsed.success) return firstIssue(parsed.error, formData)
 
   try {
     const programSlug = String(formData.get('program') ?? '').trim().slice(0, 120) || null
-    await createIntake({ ...parsed.data, note: '' }, inviter.id, 'INVITE_LINK', programSlug)
-    // Same answer whether the email was new or not, so nobody can probe for members.
-    return { success: true }
+    const r = await createIntake({ ...parsed.data, note: '' }, inviter.id, 'INVITE_LINK', programSlug)
+    const firstName = parsed.data.firstName
+    if (r.kind === 'created') {
+      if (parsed.data.ageRange === 'UNDER_18') return { success: true, next: 'parent', firstName, parentFirst: parsed.data.parentName.split(' ')[0] || 'your parent' }
+      return { success: true, next: 'book', token: r.journeyToken, firstName }
+    }
+    return { success: true, next: 'check-email', firstName }
   } catch (e) {
     console.error('[GET-INVOLVED] submit failed', e)
     return { error: 'Something went wrong. Please try again.' }
@@ -165,15 +251,15 @@ export async function addPersonAsInviter(formData: FormData): Promise<Result> {
   if (session.user.isImpersonating) return { error: 'Switch back to your own account to add people.' }
 
   const parsed = intakeSchema.safeParse(formObject(formData))
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check the form' }
+  if (!parsed.success) return firstIssue(parsed.error, formData)
   // Per inviter: keeps the leaderboard honest and stops this from emailing arbitrary addresses at volume.
   if (rateLimited(`gi-add:${session.user.id}`, ADD_PER_DAY, 24 * 60 * 60_000)) {
     return { error: `You can add up to ${ADD_PER_DAY} people a day here. Please try again tomorrow, or share your invite link.` }
   }
 
   try {
-    const r = await createIntake(parsed.data, session.user.id, 'INVITER_ADDED')
-    if (r === 'exists-mine') return { error: `${parsed.data.firstName} is already on your list. No duplicate was created.` }
+    const r = await createIntake({ ...parsed.data, waitlist: undefined }, session.user.id, 'INVITER_ADDED')
+    if (r.kind === 'exists-mine') return { error: `${parsed.data.firstName} is already on your list. No duplicate was created.` }
     revalidatePath('/coach/one-a-day')
     revalidatePath('/ambassador/one-a-day')
     // Same answer whether the person was new or already known to someone else, so this can't be used
@@ -219,7 +305,8 @@ export async function giveParentConsent(token: string, formData: FormData): Prom
     return again?.parentConsentAt ? { success: true, bookPath: again.journeyToken ? `/discovery/${again.journeyToken}` : null } : { error: INVALID }
   }
   const url = journeyUrl(journeyToken)
-  await sendEmail({ to: p.email, ...mail.thanksAfterConsentEmail({ firstName: p.firstName, bookUrl: url }) })
+  await primeEmailFooter()
+  await sendEmail({ to: p.email, ...mail.thanksAfterConsentEmail({ firstName: p.firstName, bookUrl: url, prospectId: p.id }) })
   await emailInviter(p.invitedById, `${p.firstName} ${p.lastName}`, "has their parent's consent and can now book a call")
   return { success: true, bookPath: `/discovery/${journeyToken}` }
 }
@@ -253,7 +340,9 @@ async function lockBooking(tx: Prisma.TransactionClient) {
  * Book, or move an existing booking to, a new time. The host is chosen on the
  * server from the hosts free at that time.
  */
-export async function bookDiscoveryCall(token: string, input: { startsAt: string; timezone: string; parentWillAttend: boolean }): Promise<Result> {
+export type BookedCall = { startsAt: string; endsAt: string; timezone: string; hostName: string; meetingUrl: string | null }
+
+export async function bookDiscoveryCall(token: string, input: { startsAt: string; timezone: string; parentWillAttend: boolean }): Promise<{ success: true; call: BookedCall } | { error: string }> {
   if (rateLimited(`book:${await clientIp()}`, 20, 10 * 60_000)) return { error: 'Too many attempts. Please wait a few minutes.' }
   const parsed = bookSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please pick a time' }
@@ -288,7 +377,7 @@ export async function bookDiscoveryCall(token: string, input: { startsAt: string
       // Keep the same host when moving a call, if they're free at the new time.
       const hostId = existing?.hostId && slot.hostIds.includes(existing.hostId) ? existing.hostId : pickHost(slot.hostIds, await upcomingCounts(slot.hostIds, now))
       const host = hosts.find((h) => h.userId === hostId)!
-      const data = { hostId, startsAt, endsAt: new Date(startsAt.getTime() + CALL_MINUTES * 60_000), timezone: parsed.data.timezone, meetingUrl: host.meetingUrl, parentWillAttend: minor ? true : parsed.data.parentWillAttend, reminder24hSentAt: null, reminder1hSentAt: null }
+      const data = { hostId, startsAt, endsAt: new Date(startsAt.getTime() + CALL_MINUTES * 60_000), timezone: parsed.data.timezone, meetingUrl: host.meetingUrl, parentWillAttend: minor ? true : parsed.data.parentWillAttend, reminder24hSentAt: null, reminder1hSentAt: null, reminder3dSentAt: null, attendanceConfirmedAt: null }
       const c = existing
         ? await tx.discoveryCall.update({ where: { id: existing.id }, data: { ...data, rescheduleCount: { increment: 1 } } })
         : await tx.discoveryCall.create({ data: { ...data, prospectId: p.id } })
@@ -306,7 +395,17 @@ export async function bookDiscoveryCall(token: string, input: { startsAt: string
 
   await sendCallEmails(p, call, existing ? existing.startsAt : null, existing?.hostId ?? null)
   revalidatePath('/admin/discovery-calls')
-  return { success: true }
+  const hostRow = call.hostId ? await prisma.discoveryHost.findUnique({ where: { userId: call.hostId }, select: { displayName: true } }).catch(() => null) : null
+  return {
+    success: true,
+    call: {
+      startsAt: call.startsAt.toISOString(),
+      endsAt: new Date(call.startsAt.getTime() + CALL_MINUTES * 60_000).toISOString(),
+      timezone: parsed.data.timezone,
+      hostName: hostRow?.displayName ?? 'our team',
+      meetingUrl: call.meetingUrl,
+    },
+  }
 }
 
 async function sendCallEmails(
@@ -321,7 +420,8 @@ async function sendCallEmails(
   const hostName = host?.full ?? 'our team'
   const manageUrl = journeyUrl(p.journeyToken!)
   const minor = p.ageRange === 'UNDER_18'
-  const base = { firstName: p.firstName, startsAt: call.startsAt, tz, hostName, meetingUrl: call.meetingUrl, manageUrl }
+  const base = { firstName: p.firstName, startsAt: call.startsAt, tz, hostName, meetingUrl: call.meetingUrl, manageUrl, prospectId: p.id }
+  await primeEmailFooter()
   const m = oldStartsAt ? mail.rescheduledEmail({ ...base, oldStartsAt }) : mail.bookedEmail(base)
   await sendEmail({ to: p.email, ...m })
   if (minor && p.parentEmail) {
@@ -376,6 +476,7 @@ export async function cancelDiscoveryCall(token: string, input: { reason?: strin
     throw e
   }
   if (!done) return { success: true }
+  await primeEmailFooter()
   await afterCancelEmails(p, call, { byHost: false })
   revalidatePath('/admin/discovery-calls')
   return { success: true }
@@ -396,3 +497,50 @@ export async function requestNewLink(formData: FormData): Promise<Result> {
   return { success: true }
 }
 
+
+// ---------- sign-up page: book on the same screen, "what would you like help with?" ----------
+
+/** The booking step for a token the person was just given by submitGetInvolved. */
+export async function signupBookingView(token: string): Promise<{ view: BookView } | { error: string }> {
+  if (rateLimited(`signup-view:${await clientIp()}`, 30, 10 * 60_000)) return { error: 'Too many attempts. Please wait a few minutes.' }
+  const t = z.string().min(16).max(200).safeParse(token)
+  if (!t.success) return { error: 'Please use the link in your email to book.' }
+  const p = await prospectByJourneyToken(t.data)
+  const now = new Date()
+  if (!p || !journeyUsable(p, now) || !journeyOpen(p.status) || p.ageRange === 'UNDER_18') return { error: 'Please use the link in your email to book.' }
+  return { view: await bookViewFor(p, now) }
+}
+
+const helpSchema = z.object({ token: z.string().min(16).max(200), text: z.string().trim().max(1000, 'Please keep it under 1000 characters') })
+
+/** Booked screen: "Optional: what would you most like help with?" Read by the host before the call. */
+export async function saveHelpWith(token: string, text: string): Promise<Result> {
+  if (rateLimited(`helpwith:${await clientIp()}`, 20, 10 * 60_000)) return { error: 'Too many attempts. Please wait a few minutes.' }
+  const parsed = helpSchema.safeParse({ token, text })
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Please check what you typed' }
+  const p = await prospectByJourneyToken(parsed.data.token)
+  if (!p || !journeyUsable(p, new Date()) || !journeyOpen(p.status)) return { error: 'This link has expired.' }
+  await prisma.prospect.update({ where: { id: p.id }, data: { helpWith: parsed.data.text || null } })
+  return { success: true, message: 'Saved. Your host will read this before the call.' }
+}
+
+/**
+ * "None of these work? Ask us to contact you" on the pick-a-time step. Unlike requestSlotHelp (no
+ * times open at all), this works while times are open. One open request per person; admins told once.
+ */
+export async function askToBeContacted(token: string): Promise<Result> {
+  if (rateLimited(`contactme:${await clientIp()}`, 10, 10 * 60_000)) return { error: 'Too many attempts. Please wait a few minutes.' }
+  const t = z.string().min(16).max(200).safeParse(token)
+  if (!t.success) return { error: 'Please reload the page and try again.' }
+  const p = await prospectByJourneyToken(t.data)
+  if (!p || !journeyUsable(p, new Date()) || !journeyOpen(p.status)) return { error: 'This link has expired.' }
+  if (p.ageRange === 'UNDER_18' && !p.parentConsentAt) return { error: 'We need your parent or guardian to give consent first.' }
+  const open = await prisma.discoverySlotRequest.findFirst({ where: { prospectId: p.id, kind: 'REACH_OUT', handledAt: null }, select: { id: true } })
+  if (!open) {
+    await prisma.discoverySlotRequest.create({ data: { prospectId: p.id, kind: 'REACH_OUT' } })
+    const name = `${p.firstName} ${p.lastName}`
+    await notifyAdmins('Prospect asked us to reach out', `${name} (${ageRangeLabel(p.ageRange)}) couldn't find a call time that works and asked for someone to contact them. Email ${p.email}${p.phone ? `, phone ${p.phone}` : ''}.`, p.id)
+    await emailInviter(p.invitedById, name, "couldn't find a call time that works and asked us to reach out. A quick message from you could help")
+  }
+  return { success: true, message: 'Done. Someone from our team will contact you.' }
+}

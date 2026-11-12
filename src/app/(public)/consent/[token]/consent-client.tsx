@@ -2,13 +2,28 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import { declineParentConsent, giveParentConsent } from '@/lib/actions/get-involved'
 
-const input = 'w-full h-11 rounded-lg border border-gray-300 px-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-primary-500'
+const focusRing = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
+const input = 'w-full h-12 rounded-[10px] border border-gray-400 px-3.5 text-base bg-white focus:outline-none focus:ring-2 focus:ring-primary-500'
+const btn = `w-full h-[52px] rounded-xl bg-primary-700 hover:bg-primary-800 text-white font-bold text-base flex items-center justify-center gap-2 disabled:opacity-60 ${focusRing}`
 
-export function ConsentClient(props: { token: string; childFirst: string; parentName: string; inviterName: string | null; alreadyGiven: boolean; bookPath: string | null }) {
-  const { token, childFirst, parentName, inviterName } = props
+/** Screen 8B: the parent's page, from the consent email. */
+export function ConsentClient(props: {
+  token: string
+  childFirst: string
+  parentName: string
+  relationship: 'Parent' | 'Legal guardian'
+  inviter: { name: string; photoUrl: string | null; initials: string; line: string } | null
+  programName: string | null
+  offer: { sponsoredPrice: string; fullPrice: string | null } | null
+  alreadyGiven: boolean
+  bookPath: string | null
+}) {
+  const { token, childFirst, parentName, inviter, programName, offer } = props
+  const router = useRouter()
   // Giving consent issues a new booking link, so use the one the action returns.
   const [bookPath, setBookPath] = useState<string | null>(props.bookPath)
   const [state, setState] = useState<'form' | 'given' | 'declined'>(props.alreadyGiven ? 'given' : 'form')
@@ -20,12 +35,13 @@ export function ConsentClient(props: { token: string; childFirst: string; parent
     e.preventDefault()
     setBusy('yes'); setError(null)
     const r = await giveParentConsent(token, new FormData(e.currentTarget))
+    if ('error' in r) { setBusy(null); setError(r.error); return }
+    const next = r.bookPath !== undefined ? r.bookPath : bookPath
+    setBookPath(next)
+    // "I agree: pick a call time" goes straight to the booking page.
+    if (next) { router.push(next); return }
     setBusy(null)
-    if ('error' in r) setError(r.error)
-    else {
-      if (r.bookPath !== undefined) setBookPath(r.bookPath)
-      setState('given')
-    }
+    setState('given')
   }
 
   async function onDecline() {
@@ -38,17 +54,17 @@ export function ConsentClient(props: { token: string; childFirst: string; parent
 
   if (state === 'given') {
     return (
-      <div className="max-w-xl mx-auto bg-white border border-gray-200 rounded-2xl p-8 space-y-4" role="status">
+      <div className="max-w-xl mx-auto bg-white border border-gray-200 rounded-2xl p-6 md:p-8 space-y-4" role="status">
         <CheckCircle2 className="h-10 w-10 text-green-600" aria-hidden />
         <h1 className="text-2xl font-bold text-gray-900">Thank you. Consent received.</h1>
-        <p className="text-gray-700">Next, book {childFirst}&apos;s discovery call. <strong>You need to be on the call too</strong>, so pick a time that works for you both. We&apos;ve also emailed {childFirst} the link.</p>
-        {bookPath && <Link href={bookPath} className="inline-flex h-12 px-6 rounded-xl bg-primary-700 hover:bg-primary-800 text-white font-semibold items-center">Book the call now</Link>}
+        <p className="text-gray-700">Next, pick a time for {childFirst}&apos;s call. <strong>You need to be on the call too</strong>, so choose a time that works for you both. We&apos;ve also emailed {childFirst} the link.</p>
+        {bookPath && <Link href={bookPath} className={`${btn} sm:w-auto sm:px-6 inline-flex`}>Pick a call time</Link>}
       </div>
     )
   }
   if (state === 'declined') {
     return (
-      <div className="max-w-xl mx-auto bg-white border border-gray-200 rounded-2xl p-8 space-y-3" role="status">
+      <div className="max-w-xl mx-auto bg-white border border-gray-200 rounded-2xl p-6 md:p-8 space-y-3" role="status">
         <h1 className="text-2xl font-bold text-gray-900">Understood</h1>
         <p className="text-gray-700">We&apos;ve deleted {childFirst}&apos;s details. Thank you for letting us know.</p>
       </div>
@@ -56,50 +72,59 @@ export function ConsentClient(props: { token: string; childFirst: string; parent
   }
 
   return (
-    <div className="max-w-2xl mx-auto bg-white border border-gray-200 rounded-2xl p-6 md:p-8 space-y-5">
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{childFirst} wants to join NowTransformed</h1>
-      <p className="text-gray-700">Hi {parentName || 'there'}. {childFirst} filled out our Get Involved form{inviterName ? ` after hearing about us from ${inviterName}` : ''}. Before anything else, we need your okay.</p>
-      <section className="space-y-1.5">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-primary-800">What it is</h2>
-        <p className="text-gray-700">NowTransformed&apos;s youth ambassador program helps young people grow as leaders and give back to their community. It&apos;s free.</p>
-      </section>
-      <section className="space-y-1.5">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-primary-800">If you say yes</h2>
-        <ul className="list-disc pl-5 text-gray-700 space-y-1">
-          <li>You and {childFirst} book a 30-minute video call with our team. <strong>A parent or guardian must be on the call</strong>; we won&apos;t hold it without you.</li>
-          <li>We store {childFirst}&apos;s name, email and phone to contact them about the program, and copy you on our emails.</li>
-          <li>You can withdraw consent at any time by replying to any of our emails.</li>
-        </ul>
-      </section>
-      <form onSubmit={onSubmit} className="space-y-4 border-t border-gray-100 pt-5">
+    <div className="max-w-xl mx-auto bg-white border border-gray-200 rounded-2xl p-5 md:p-8 space-y-4">
+      <h1 className="text-[22px] md:text-2xl leading-snug font-extrabold text-gray-900">{childFirst} would like to join {programName ?? 'NowTransformed'}</h1>
+      {parentName && <p className="text-gray-700">Hi {parentName.split(' ')[0]}. Before anything else, we need your okay.</p>}
+      {inviter && (
+        <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
+          {inviter.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={inviter.photoUrl} alt={`Photo of ${inviter.name}`} className="w-12 h-12 rounded-full object-cover flex-none" />
+          ) : (
+            <div role="img" aria-label={`Initials of ${inviter.name}`} className="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center font-bold text-sky-800 flex-none">{inviter.initials}</div>
+          )}
+          <p className="text-sm leading-snug text-gray-700">{childFirst} was invited by <strong className="text-gray-900">{inviter.name}</strong>, {inviter.line}.</p>
+        </div>
+      )}
+      <ul className="list-disc pl-5 text-sm leading-7 text-gray-700">
+        <li>First step: a free 30-minute video call. You join it with {childFirst}.</li>
+        {offer && <li>Sponsored seat: <strong>{offer.sponsoredPrice}</strong>{offer.fullPrice ? ` instead of ${offer.fullPrice}` : ''}.</li>}
+        <li>We use {childFirst}&apos;s details only for this. You can ask us to delete them any time.</li>
+      </ul>
+
+      <form onSubmit={onSubmit} className="space-y-4 border-t border-gray-100 pt-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="rel" className="block text-sm font-semibold text-gray-700 mb-1.5">Your relationship to {childFirst}</label>
-            <select id="rel" name="relationship" className={input} defaultValue="Parent"><option>Parent</option><option>Legal guardian</option></select>
+            <label htmlFor="rel" className="block text-sm font-semibold text-gray-900 mb-1.5">Your relationship to {childFirst}</label>
+            <select id="rel" name="relationship" className={input} defaultValue={props.relationship}><option>Parent</option><option>Legal guardian</option></select>
           </div>
           <div>
-            <label htmlFor="sig" className="block text-sm font-semibold text-gray-700 mb-1.5">Type your full name to sign</label>
-            <input id="sig" name="signature" required maxLength={120} defaultValue={parentName} className={input} />
+            <label htmlFor="sig" className="block text-sm font-semibold text-gray-900 mb-1.5">Type your full name to sign</label>
+            <input id="sig" name="signature" required maxLength={120} defaultValue={parentName} autoComplete="name" className={input} aria-describedby={error ? 'consent-err' : undefined} />
           </div>
         </div>
-        <label className="flex gap-2.5 items-start text-sm text-gray-700">
-          <input type="checkbox" name="confirm" required className="mt-0.5 h-[18px] w-[18px] accent-primary-700" />
-          I am {childFirst}&apos;s parent or legal guardian and I agree to their taking part, including being on the discovery call.
+        <label className="flex gap-2.5 items-start text-sm leading-snug text-gray-800">
+          <input type="checkbox" name="confirm" required className="mt-0.5 h-5 w-5 flex-none accent-primary-700" aria-describedby={error ? 'consent-err' : undefined} />
+          I&apos;m {childFirst}&apos;s parent or guardian, I agree, and I&apos;ll be on the call.
         </label>
-        {error && <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button type="submit" disabled={busy !== null} className="h-12 rounded-xl bg-primary-700 hover:bg-primary-800 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
-            {busy === 'yes' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}I give consent
-          </button>
-          {!confirmDecline ? (
-            <button type="button" onClick={() => setConfirmDecline(true)} className="h-12 rounded-xl border border-gray-300 text-gray-800 font-semibold hover:bg-gray-50">I don&apos;t consent</button>
-          ) : (
-            <button type="button" onClick={onDecline} disabled={busy !== null} className="h-12 rounded-xl border border-red-300 text-red-700 font-semibold hover:bg-red-50 flex items-center justify-center gap-2">
-              {busy === 'no' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Yes, delete {childFirst}&apos;s details
-            </button>
-          )}
-        </div>
-        <p className="text-sm text-gray-500">If you don&apos;t consent, we delete {childFirst}&apos;s details and only tell the person who invited them that {childFirst} won&apos;t be continuing.</p>
+        <p className="text-[13px] text-gray-600">You&apos;ll get the confirmation and every reminder too.</p>
+        {error && <p id="consent-err" role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+        <button type="submit" disabled={busy !== null} className={btn}>
+          {busy === 'yes' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}I agree: pick a call time
+        </button>
+        {!confirmDecline ? (
+          <button type="button" onClick={() => setConfirmDecline(true)} className={`w-full min-h-[44px] text-sm font-semibold text-primary-700 underline rounded ${focusRing}`}>No thanks (we&apos;ll delete {childFirst}&apos;s details)</button>
+        ) : (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2" role="group" aria-label="Confirm you don't consent">
+            <p className="text-sm text-red-900">We&apos;ll delete {childFirst}&apos;s details and only tell the person who invited them that {childFirst} won&apos;t be continuing.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={onDecline} disabled={busy !== null} className={`h-11 px-4 rounded-xl border border-red-300 bg-white text-red-700 font-semibold hover:bg-red-50 inline-flex items-center gap-2 ${focusRing}`}>
+                {busy === 'no' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Yes, delete {childFirst}&apos;s details
+              </button>
+              <button type="button" onClick={() => setConfirmDecline(false)} className={`h-11 px-4 rounded-xl border border-gray-300 bg-white text-gray-800 font-semibold ${focusRing}`}>Go back</button>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   )

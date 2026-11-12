@@ -4,6 +4,7 @@
  * - Invite profile per inviter (photo, "why I do this", which program the main link shares).
  * - Site-wide outreach settings (mailing address, reply promise) stored in FeatureConfig 'GET_INVOLVED'.
  */
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 
 // ---------- sponsored-seat offer ----------
@@ -121,3 +122,52 @@ export async function saveOutreachSettings(next: OutreachSettings): Promise<void
 
 /** Text reminders are designed but off until an SMS provider is connected. */
 export const smsEnabled = () => process.env.SMS_ENABLED === 'true'
+
+// ---------- admin: offer settings list ----------
+
+export interface OfferProgramRow {
+  id: string
+  name: string
+  slug: string
+  organization: string
+  ownerName: string | null
+  ownerRole: 'COACH' | 'AMBASSADOR' | null
+  /** The owner's main invite slug, for a "Preview sign-up page" link (/join/[ownerSlug]/[programSlug]). */
+  ownerInviteSlug: string | null
+  fullPrice: string
+  sponsoredPrice: string
+  reason: string
+  seatsPerMonth: number | null
+  usedThisMonth: number
+}
+
+/** Live programs (published, with a snapshot) with their offer settings and this month's seat use. */
+export async function listOfferPrograms(now = new Date()): Promise<OfferProgramRow[]> {
+  const rows = await prisma.coachProgram.findMany({
+    where: { status: 'PUBLISHED', NOT: { publishedSnapshot: { equals: Prisma.DbNull } } },
+    orderBy: { name: 'asc' },
+    select: {
+      id: true, name: true, slug: true, organization: true,
+      offerFullPrice: true, offerSponsoredPrice: true, offerReason: true, sponsoredSeatsPerMonth: true,
+      coach: { select: { firstName: true, lastName: true, user: { select: { inviteSlug: true } } } },
+      ambassador: { select: { firstName: true, lastName: true, user: { select: { inviteSlug: true } } } },
+    },
+  })
+  return Promise.all(rows.map(async (p) => {
+    const owner = p.coach ?? p.ambassador
+    return {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      organization: p.organization,
+      ownerName: owner ? `${owner.firstName} ${owner.lastName}`.trim() : null,
+      ownerRole: p.coach ? 'COACH' as const : p.ambassador ? 'AMBASSADOR' as const : null,
+      ownerInviteSlug: owner?.user?.inviteSlug ?? null,
+      fullPrice: p.offerFullPrice ?? '',
+      sponsoredPrice: p.offerSponsoredPrice ?? '',
+      reason: p.offerReason ?? '',
+      seatsPerMonth: p.sponsoredSeatsPerMonth,
+      usedThisMonth: await seatsUsedThisMonth(p.id, now),
+    }
+  }))
+}

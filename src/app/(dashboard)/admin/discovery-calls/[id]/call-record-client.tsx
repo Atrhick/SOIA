@@ -51,7 +51,8 @@ function FieldError({ id, msg }: { id: string; msg?: string }) {
   return msg ? <p id={id} role="alert" className="mt-1.5 text-sm text-red-700">{msg}</p> : null
 }
 
-export function CallRecordClient({ data, now }: { data: CallRecordData; now: string }) {
+/** `children` (server-rendered, e.g. the "Where they came from" and call guide cards) shows under the header card. */
+export function CallRecordClient({ data, now, children }: { data: CallRecordData; now: string; children?: React.ReactNode }) {
   const { call, prospect: p } = data
   const started = new Date(call.startsAt).getTime() <= new Date(now).getTime()
   const today = sameDay(new Date(call.startsAt), new Date(now), data.tz)
@@ -86,6 +87,8 @@ export function CallRecordClient({ data, now }: { data: CallRecordData; now: str
           </div>
         </div>
       </div>
+
+      {children}
 
       {/* Journey */}
       <div className={card}>

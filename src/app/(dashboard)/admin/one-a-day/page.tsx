@@ -4,6 +4,9 @@ import { Download } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { adminBoardTotals, adminLeaderboard, firstInviteAt } from '@/lib/get-involved/leaderboard-extra'
 import { ADMIN_BOARDS, boardHref, memberKindLabel, parseBoard, parsePeriod, periodOptions } from '@/lib/get-involved/leaderboard-period'
+import { adminGroups, programStats } from '@/lib/get-involved/outreach-stats'
+import { ProgramFunnel } from './program-funnel'
+import { GroupsClient } from './groups-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,10 +18,12 @@ export default async function AdminOneADayPage({ searchParams }: { searchParams:
   const now = new Date()
   const board = parseBoard(searchParams.role)
   const period = parsePeriod(searchParams.period, now)
-  const [rows, totals, earliest] = await Promise.all([
+  const [rows, totals, earliest, program, groups] = await Promise.all([
     adminLeaderboard({ period, board, now }),
     adminBoardTotals(period, now),
     firstInviteAt(),
+    programStats(period),
+    adminGroups(period, now),
   ])
   const options = periodOptions(earliest, now, 24, period)
   const boardLabel = ADMIN_BOARDS.find((b) => b.value === board)!.label
@@ -56,6 +61,9 @@ export default async function AdminOneADayPage({ searchParams }: { searchParams:
           </a>
         )}
       </div>
+
+      <ProgramFunnel stats={program} periodLabel={period.key === 'all' ? 'all time' : period.current ? 'this month' : period.label} />
+      <GroupsClient data={groups} canAct={!session.user.isImpersonating} />
 
       <nav aria-label="Leaderboard boards" className="flex flex-wrap gap-2">
         {ADMIN_BOARDS.map((b) => (

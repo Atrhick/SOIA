@@ -4,7 +4,7 @@
  */
 import { Mail, P, SMALL, esc, layout } from '../emails'
 
-export function timesOpenEmail(p: { firstName: string; bookUrl: string; parent?: { first: string } | null }): Mail {
+export function timesOpenEmail(p: { firstName: string; bookUrl: string; parent?: { first: string } | null; prospectId?: string | null }): Mail {
   return {
     subject: 'Discovery call times are open',
     html: layout(
@@ -12,6 +12,8 @@ export function timesOpenEmail(p: { firstName: string; bookUrl: string; parent?:
        <p style="${P}">Hi ${esc(p.firstName)}, good news: new times just opened for your free 30-minute discovery call.</p>
        <p style="${SMALL}">Times go fast, so pick one that works for you soon.</p>`,
       { label: 'Pick a time', url: p.bookUrl },
+      '',
+      { prospectId: p.prospectId },
     ),
   }
 }

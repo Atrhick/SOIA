@@ -8,6 +8,8 @@ interface AssessmentMailInput {
   url: string
   /** Set when this copy goes to a parent of someone 17 and under. */
   parentFirst?: string | null
+  /** For the footer's stop/delete links. */
+  prospectId?: string | null
 }
 
 function questionBox(roleLabel: string, questions: string[]): string {
@@ -32,6 +34,7 @@ export function assessmentInviteEmail(p: AssessmentMailInput): Mail {
        ${questionBox(p.roleLabel, p.questions)}`,
       { label: 'Answer the 3 questions', url: p.url },
       `<p style="${SMALL}">This link works for 14 days. If it expires, open it anyway and we'll send you a fresh one.</p>`,
+      { prospectId: p.prospectId },
     ),
   }
 }
@@ -44,6 +47,8 @@ export function assessmentReminderEmail(p: AssessmentMailInput): Mail {
        <p style="${P}">Hi ${esc(p.firstName)}, a friendly nudge: your <strong>${esc(p.roleLabel)}</strong> questions take about 5 minutes, and they help us prepare your orientation.</p>
        ${questionBox(p.roleLabel, p.questions)}`,
       { label: 'Answer the 3 questions', url: p.url },
+      '',
+      { prospectId: p.prospectId },
     ),
   }
 }

@@ -31,6 +31,7 @@ export function teamJoinedEmail(p: {
        </div>`,
       { label: `Say welcome to ${p.prospectFirst}`, url: p.teamUrl },
       `<p style="${SMALL}">Only people who finish the journey count as joined.</p>`,
+      { audience: 'team' },
     ),
   }
 }

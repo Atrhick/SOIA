@@ -12,6 +12,8 @@ import { listRoleConfigs } from '@/lib/get-involved/roles'
 import { userDisplayName } from '@/lib/get-involved/server'
 import { bookedCallsOnDays } from '@/lib/get-involved/discovery-slots'
 import { STAFF_DEFAULT_TZ, zoneLabel, zoneOffset } from '@/lib/get-involved/time-zones'
+import { getSignupOffer } from '@/lib/get-involved/offer'
+import { channelLabel } from '@/lib/get-involved/outreach-stats'
 import type { CallRow } from './calls-client'
 import type { CallRecordData } from './[id]/call-record-client'
 import type { BlockedDay } from './availability/blocked-dates-client'
@@ -132,5 +134,68 @@ export async function loadBlockedDays(host: { id: string; userId: string; timezo
       note: r.note,
       calls: calls.filter((c) => c.day === r.day).map((c) => ({ id: c.id, name: `${c.prospect.firstName} ${c.prospect.lastName}`, startsAt: c.startsAt.toISOString() })),
     })),
+  }
+}
+
+/** "Where <first> came from" on the call record (H13): inviter, program, offer, channel, times, confirmation, what they wrote. */
+export interface CallOrigin {
+  firstName: string
+  inviter: { name: string; first: string; role: string } | null
+  program: string | null
+  /** e.g. "Sponsored seat: $49 (full $199)"; null when the program has no offer (or there's no program). */
+  offer: string | null
+  hasOffer: boolean
+  channel: string
+  age: string
+  minor: boolean
+  /** The call time in the prospect's zone and the viewer's. */
+  theirTime: string
+  yourTime: string
+  sameZone: boolean
+  confirmed: string
+  helpWith: string | null
+  parent: { name: string; attended: boolean | null } | null
+}
+
+export async function loadCallOrigin(callId: string, viewerTz: string): Promise<CallOrigin | null> {
+  const call = await prisma.discoveryCall.findUnique({
+    where: { id: callId },
+    select: {
+      startsAt: true, timezone: true, attendanceConfirmedAt: true, status: true, parentAttended: true, parentAttendeeName: true,
+      prospect: { select: { firstName: true, ageRange: true, invitedById: true, inviteChannel: true, helpWith: true, parentName: true, programId: true, program: { select: { name: true } } } },
+    },
+  })
+  if (!call) return null
+  const p = call.prospect
+  const [inviter, offer] = await Promise.all([
+    p.invitedById ? userDisplayName(p.invitedById) : null,
+    getSignupOffer(p.programId),
+  ])
+  const timeIn = (tz: string) => {
+    try {
+      return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' }).format(call.startsAt)
+    } catch { return '' }
+  }
+  const theirTz = call.timezone || viewerTz
+  const sameZone = timeIn(theirTz) === timeIn(viewerTz)
+  const roleWord = (r: string) => (r === 'COACH' ? 'coach' : r === 'AMBASSADOR' ? 'ambassador' : r === 'ADMIN' ? 'admin' : r.toLowerCase().replace(/_/g, ' '))
+  const minor = p.ageRange === 'UNDER_18'
+  return {
+    firstName: p.firstName,
+    inviter: inviter ? { name: inviter.full, first: inviter.first, role: roleWord(inviter.role) } : null,
+    program: p.program?.name ?? null,
+    offer: offer && offer.sponsoredPrice
+      ? `Sponsored seat: ${offer.sponsoredPrice}${offer.fullPrice ? ` (full ${offer.fullPrice})` : ''}`
+      : null,
+    hasOffer: !!offer?.sponsoredPrice,
+    channel: p.inviteChannel ? channelLabel(p.inviteChannel) : 'Unknown',
+    age: ageRangeLabel(p.ageRange),
+    minor,
+    theirTime: `${timeIn(theirTz)} ${zoneLabel(theirTz)}`,
+    yourTime: `${timeIn(viewerTz)} ${zoneLabel(viewerTz)}`,
+    sameZone,
+    confirmed: call.attendanceConfirmedAt ? 'Yes, from the 3-day reminder' : 'Not yet',
+    helpWith: p.helpWith?.trim() || null,
+    parent: minor ? { name: call.parentAttendeeName || p.parentName || 'Not given', attended: call.parentAttended } : null,
   }
 }

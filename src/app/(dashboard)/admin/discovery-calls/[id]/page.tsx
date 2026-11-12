@@ -3,7 +3,8 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { CallRecordClient } from './call-record-client'
 import { MoveCall } from '../move-call'
-import { loadCallRecord, staffTimeZone } from '../call-data'
+import { loadCallOrigin, loadCallRecord, staffTimeZone } from '../call-data'
+import { CallOriginCards } from './call-origin'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export default async function CallRecordPage({ params }: { params: { id: string 
   const session = await auth()
   if (!session || session.user.role !== 'ADMIN') redirect('/login')
   const tz = await staffTimeZone(session.user.id)
-  const data = await loadCallRecord(params.id, { tz, admin: true })
+  const [data, origin] = await Promise.all([loadCallRecord(params.id, { tz, admin: true }), loadCallOrigin(params.id, tz)])
   if (!data) notFound()
 
   return (
@@ -29,7 +30,9 @@ export default async function CallRecordPage({ params }: { params: { id: string 
           <MoveCall callId={data.call.id} name={data.prospect.name} tz={tz} />
         </div>
       )}
-      <CallRecordClient data={data} now={new Date().toISOString()} />
+      <CallRecordClient data={data} now={new Date().toISOString()}>
+        {origin && <CallOriginCards o={origin} />}
+      </CallRecordClient>
     </div>
   )
 }

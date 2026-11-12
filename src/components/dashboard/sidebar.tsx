@@ -17,6 +17,8 @@ import {
   MessageSquare,
   Settings,
   BarChart3,
+  ListChecks,
+  MessageSquareText,
   FileText,
   Lightbulb,
   ClipboardList,
@@ -45,6 +47,8 @@ import {
   UsersRound,
   SlidersHorizontal,
   Wallet,
+  Contact,
+  Gift,
 } from 'lucide-react'
 import { ASSOCIATE_LABELS, isAssociateRole, type AssociateRole } from '@/lib/roles'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
@@ -73,6 +77,9 @@ const ambassadorNavSections: NavSection[] = [
     icon: Sparkles,
     items: [
       { href: '/ambassador/one-a-day', label: 'One-A-Day', icon: Sparkles },
+      { href: '/ambassador/one-a-day/results', label: 'My results', icon: BarChart3 },
+      { href: '/ambassador/one-a-day/follow-ups', label: 'Follow-ups due', icon: ListChecks },
+      { href: '/ambassador/invite-profile', label: 'Invite profile', icon: Contact },
       { href: '/ambassador/my-team', label: 'My Team', icon: UsersRound },
     ],
   },
@@ -127,6 +134,9 @@ const coachNavSections: NavSection[] = [
     icon: Users,
     items: [
       { href: '/coach/one-a-day', label: 'One-A-Day', icon: Sparkles },
+      { href: '/coach/one-a-day/results', label: 'My results', icon: BarChart3 },
+      { href: '/coach/one-a-day/follow-ups', label: 'Follow-ups due', icon: ListChecks },
+      { href: '/coach/invite-profile', label: 'Invite profile', icon: Contact },
       { href: '/coach/my-team', label: 'My Team', icon: UsersRound },
       { href: '/coach/discovery-calls', label: 'Discovery Calls', icon: PhoneCall },
       { href: '/coach/ambassadors', label: 'Ambassadors', icon: Users },
@@ -205,6 +215,8 @@ const adminNavSections: NavSection[] = [
       { href: '/admin/ambassadors', label: 'Ambassadors', icon: Users },
       { href: '/admin/associates', label: 'Associates', icon: Handshake },
       { href: '/admin/role-settings', label: 'Role Settings', icon: SlidersHorizontal },
+      { href: '/admin/outreach-settings', label: 'Outreach settings', icon: Gift },
+      { href: '/admin/outreach-templates', label: 'Message templates', icon: MessageSquareText },
       { href: '/admin/journey-payments', label: 'Journey Payments', icon: Wallet },
     ],
   },
@@ -315,14 +327,16 @@ function NavSectionComponent({
       <div
         className={cn(
           'overflow-hidden transition-all duration-200',
-          isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          isOpen ? 'max-h-[40rem] opacity-100' : 'max-h-0 opacity-0'
         )}
       >
         <ul className="mt-1 ml-3 space-y-0.5 border-l-2 border-gray-100 pl-3">
           {section.items.map((item) => {
+            const matches = (href: string) => pathname === href || (href !== basePath && pathname.startsWith(href))
+            // A more specific sibling (e.g. One-A-Day > My results) wins over its parent link.
             const isActive =
-              pathname === item.href ||
-              (item.href !== basePath && pathname.startsWith(item.href))
+              matches(item.href) &&
+              !section.items.some((o) => o.href !== item.href && o.href.length > item.href.length && o.href.startsWith(item.href) && matches(o.href))
             const Icon = item.icon
 
             return (

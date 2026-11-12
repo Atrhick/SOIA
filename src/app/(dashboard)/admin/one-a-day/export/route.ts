@@ -8,6 +8,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { adminLeaderboard } from '@/lib/get-involved/leaderboard-extra'
 import { ADMIN_BOARDS, boardToCsv, parseBoard, parsePeriod } from '@/lib/get-involved/leaderboard-period'
+import { shareCountsByUser } from '@/lib/get-involved/outreach-stats'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,8 @@ export async function GET(req: NextRequest) {
   const now = new Date()
   const board = parseBoard(req.nextUrl.searchParams.get('role'))
   const period = parsePeriod(req.nextUrl.searchParams.get('period'), now)
-  const rows = await adminLeaderboard({ period, board, now })
+  const [board_, shares] = await Promise.all([adminLeaderboard({ period, board, now }), shareCountsByUser(period)])
+  const rows = board_.map((r) => ({ ...r, messagesSent: shares.get(r.userId)?.sent ?? 0, saidYes: shares.get(r.userId)?.saidYes ?? 0 }))
   await prisma.auditLog.create({
     data: {
       userId: session.user.id, action: 'EXPORT_LEADERBOARD_CSV', entityType: 'Leaderboard',

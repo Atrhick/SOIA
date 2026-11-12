@@ -87,3 +87,23 @@ export function checkWelcomeNote(note: string): string | null {
   if (/\[[^\]]*\]/.test(note)) return 'Please replace the parts in [brackets] with your own words.'
   return null
 }
+
+/**
+ * Preview of the E9 welcome (emails/welcome.ts `welcomeCallEmail`), which is what is sent now
+ * (by the cron, only when the person left the sign-up page without booking). Keep the two in step.
+ */
+export function welcomeCallParts(p: { firstName: string; inviterName: string | null; programName: string; companyName?: string | null; note: string }): WelcomeParts {
+  const inviterFirst = (p.inviterName ?? '').trim().split(/\s+/)[0] || null
+  const company = companyFor(p.programName, p.companyName)
+  const named: Seg[] = company ? [{ text: p.programName, bold: true }, { text: ' from ' }, { text: company, bold: true }] : [{ text: p.programName, bold: true }]
+  return {
+    subject: `${p.firstName}, pick a time for your free call with NowTransformed`,
+    paragraphs: [
+      [{ text: `Hi ${p.firstName},` }],
+      [{ text: 'Thanks for your interest in ' }, ...named, { text: `.${inviterFirst ? ` ${inviterFirst} shared it with you because they thought it could help.` : ''}` }],
+      [{ text: p.note.trim() }],
+      [{ text: 'The next step is a free 30-minute call. Times start as soon as tomorrow.' }],
+    ],
+    cta: 'Pick a call time',
+  }
+}

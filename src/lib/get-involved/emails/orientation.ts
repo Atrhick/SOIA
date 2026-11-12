@@ -9,6 +9,7 @@ export function orientationReminderEmail(p: {
   /** 'planned' = the time they picked; 'repeat' = still not watched a few days later; 'nudge' = never picked a time. */
   kind: 'planned' | 'repeat' | 'nudge'
   parentFirst?: string | null
+  prospectId?: string | null
 }): Mail {
   const role = p.roleLabel.toLowerCase()
   const length = p.minutes ? `It's about ${p.minutes} minutes, and you can pause any time.` : 'You can pause any time.'
@@ -26,6 +27,7 @@ export function orientationReminderEmail(p: {
       `${parent}<p style="${P}">Hi ${esc(p.firstName)}, ${opener} ${length}</p>`,
       { label: 'Watch orientation', url: p.watchUrl },
       `<p style="${SMALL}">Not a good time? <a href="${esc(p.watchUrl)}?later=1" style="color:#0369a1">Pick another time</a>.</p>`,
+      { prospectId: p.prospectId },
     ),
   }
 }

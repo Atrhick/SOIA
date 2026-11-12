@@ -164,18 +164,26 @@ export interface AdminBoardRow {
   callsKept: number
   streak: number
   teamSize: number
+  /** Outreach round 2 (share kit): FIRST shares in the period. Optional; the CSV adds the columns when set. */
+  messagesSent?: number
+  /** Shares in the period with outcome YES or kind AFTER_YES. */
+  saidYes?: number
 }
 
 export const BOARD_CSV_HEADERS = ['Rank', 'Name', 'Role', 'Joined', 'Forms', 'Calls kept', 'Streak (days)', 'Team size']
+export const BOARD_CSV_SHARE_HEADERS = ['Messages sent', 'Said yes']
 
 /** CSV with every cell quoted and formula-looking cells defused (csvCell), CRLF and a BOM for Excel. */
 export function boardToCsv(rows: AdminBoardRow[], periodLabel: string, boardLabel: string): string {
+  const shares = rows.some((r) => r.messagesSent !== undefined || r.saidYes !== undefined)
   const lines = [
     [`One-A-Day leaderboard`, boardLabel, periodLabel].map(csvCell).join(','),
-    BOARD_CSV_HEADERS.map(csvCell).join(','),
+    [...BOARD_CSV_HEADERS, ...(shares ? BOARD_CSV_SHARE_HEADERS : [])].map(csvCell).join(','),
   ]
   for (const r of rows) {
-    lines.push([r.rank, r.name, memberKindLabel(r.kind), r.joined, r.forms, r.callsKept, r.streak, r.teamSize].map(csvCell).join(','))
+    const cells: (string | number)[] = [r.rank, r.name, memberKindLabel(r.kind), r.joined, r.forms, r.callsKept, r.streak, r.teamSize]
+    if (shares) cells.push(r.messagesSent ?? 0, r.saidYes ?? 0)
+    lines.push(cells.map(csvCell).join(','))
   }
   return '﻿' + lines.join('\r\n') + '\r\n'
 }

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Copy, Loader2, Mail, Pencil, Sparkles } from 'lucide-react'
 import { draftWelcomeNote, saveWelcomeNote, stopWelcomeNote, type WelcomePanelData } from '@/lib/actions/program-welcome'
-import { SAMPLE_WELCOME_NOTE, WELCOME_NOTE_MAX, cleanWelcomeNote, companyFor, exampleWelcomeNote, programWelcomeParts } from '@/lib/get-involved/program-welcome'
+import { SAMPLE_WELCOME_NOTE, WELCOME_NOTE_MAX, cleanWelcomeNote, companyFor, exampleWelcomeNote, welcomeCallParts } from '@/lib/get-involved/program-welcome'
 import { EDIT_NAMES_EVENT } from './events'
 
 const btn = 'h-10 px-4 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
@@ -38,7 +38,7 @@ export function WelcomeEmailPanel({ data }: { data: WelcomePanelData }) {
   }
 
   const preview = useMemo(
-    () => programWelcomeParts({ firstName: 'Jordan', inviterName: data.ownerName ?? 'Your name', programName: data.programName, companyName: data.companyName, note: note || '(Your paragraph about the program goes here.)' }),
+    () => welcomeCallParts({ firstName: 'Jordan', inviterName: data.ownerName ?? 'Your name', programName: data.programName, companyName: data.companyName, note: note || '(Your paragraph about the program goes here.)' }),
     [note, data.ownerName, data.programName, data.companyName],
   )
 

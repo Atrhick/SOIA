@@ -55,6 +55,8 @@ model User {
   invitePhoto         String?         @db.Text // small JPEG data URL from the invite profile
   inviteWhy           String?         // one line, "why I do this"
   inviteProgramId     String?         // program their main link shares (null = latest approved)
+  outreachShares      OutreachShare[]
+  outreachGroups      OutreachGroupMember[]
   invitedProspects    Prospect[]      @relation("ProspectInviter")
   discoveryHost       DiscoveryHost?
   hostedDiscoveryCalls DiscoveryCall[] @relation("DiscoveryCallHost")
@@ -2190,6 +2192,7 @@ model Prospect {
   checkInSentAt         DateTime?
   emailOptOutAt         DateTime?           // "Stop emails about this"
   helpWith              String?             @db.Text // "what would you most like help with?" (booked screen)
+  inviteChannel         String?             // ?via= on the share link: TEXT | WHATSAPP | EMAIL | DM | POST | PARENT
   noShowCount           Int                 @default(0)
   discoveryCalls        DiscoveryCall[]
   discoverySlotRequests DiscoverySlotRequest[]
@@ -3015,4 +3018,54 @@ model InvoWebhookEvent {
   outcome        String?
 
   @@map("invo_webhook_events")
+}
+
+// ---------- Outreach round 2 (2026-11-12): share kit log, templates, monthly groups ----------
+
+/// One "I sent it" / "I posted it" / "I sent the link" from the share kit.
+model OutreachShare {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName   String?   // who they invited (null for a social post)
+  channel     String    // TEXT | WHATSAPP | EMAIL | DM | POST | PARENT
+  kind        String    @default("FIRST") // FIRST | AFTER_YES
+  programId   String?
+  sentAt      DateTime  @default(now())
+  outcome     String?   // YES | NO (said no: removed for good) | DONE
+  outcomeAt   DateTime?
+  nudgedAt    DateTime? // day 3-4 nudge copied
+  closedAt    DateTime? // day 10-14 close copied
+
+  @@index([userId, sentAt])
+  @@map("outreach_shares")
+}
+
+/// Admin-edited share-kit wording. No row = the default in code.
+model OutreachTemplate {
+  id          String   @id @default(cuid())
+  key         String   // TEXT | WHATSAPP | EMAIL | DM | POST | PARENT | AFTER_YES | NUDGE | CLOSE | FORM_NO_CALL
+  audience    String   @default("ALL") // ALL | COACH | AMBASSADOR
+  subject     String?
+  body        String   @db.Text
+  status      String   @default("LIVE") // LIVE | DRAFT
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  @@unique([key, audience])
+  @@map("outreach_templates")
+}
+
+/// Monthly small groups of 5 (members only see their own group).
+model OutreachGroupMember {
+  id        String   @id @default(cuid())
+  month     String   // YYYY-MM
+  groupNo   Int
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([month, userId])
+  @@index([month, groupNo])
+  @@map("outreach_group_members")
 }

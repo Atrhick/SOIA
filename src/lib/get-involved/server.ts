@@ -13,6 +13,7 @@ import {
   linkStillValid, slugifyName,
 } from './core'
 import * as mail from './emails'
+import { primeEmailFooter } from './emails/footer-settings'
 
 export const newToken = () => crypto.randomBytes(24).toString('base64url')
 
@@ -237,12 +238,13 @@ export async function emailInviterNewLead(inviterId: string, p: { name: string; 
 
 /** Emails after a cancel, by the prospect or by staff. Used by the public and admin actions. */
 export async function afterCancelEmails(
-  p: { firstName: string; lastName: string; email: string; ageRange: string | null; parentEmail: string | null; journeyToken: string | null; invitedById: string | null },
+  p: { id?: string; firstName: string; lastName: string; email: string; ageRange: string | null; parentEmail: string | null; journeyToken: string | null; invitedById: string | null },
   call: { startsAt: Date; hostId: string | null; timezone?: string },
   opts: { byHost: boolean; noParent?: boolean },
 ) {
   const tz = call.timezone ?? 'America/Chicago'
-  const m = mail.cancelledEmail({ firstName: p.firstName, startsAt: call.startsAt, tz, bookUrl: journeyUrl(p.journeyToken!), byHost: opts.byHost, noParent: opts.noParent })
+  await primeEmailFooter()
+  const m = mail.cancelledEmail({ firstName: p.firstName, startsAt: call.startsAt, tz, bookUrl: journeyUrl(p.journeyToken!), byHost: opts.byHost, noParent: opts.noParent, prospectId: p.id ?? null })
   await sendEmail({ to: p.email, ...m })
   if (p.ageRange === 'UNDER_18' && p.parentEmail) await sendEmail({ to: p.parentEmail, ...m })
   if (!opts.byHost && call.hostId) {

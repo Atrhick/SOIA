@@ -1,10 +1,16 @@
 /**
- * Sends discovery-call reminders: about 24 hours and 1 hour before.
- * Meant to be hit every 15 minutes by Cloud Scheduler with the header
- * `x-cron-secret: $CRON_SECRET`. Safe to run often or twice at once: each
- * reminder is claimed with a conditional update before it is sent.
- * Also deletes under-18 sign-ups whose parent never answered within 14 days, and sends the
- * journey reminders (assessment after 2 days; orientation at the time the prospect picked).
+ * Get Involved scheduled emails. Meant to be hit every 15 minutes by Cloud Scheduler with the header
+ * `x-cron-secret: $CRON_SECRET`. Safe to run often or twice at once: every email is claimed with a
+ * conditional update before it is sent.
+ * - Discovery-call reminders to the prospect (parent copied for 17 and under): 3 days before (E10, only
+ *   for calls booked 3+ days ahead; in nudges.ts), the day before (E10 copy, from 24h down to 3h before;
+ *   skipped for calls booked less than 3h out) and 1 hour before. Hosts get the day-before and 1-hour ones.
+ * - Outreach (nudges.ts): the E9 welcome ~20 min after an adult's sign-up if no call was booked, nudges
+ *   on day 2 and day 7, the "Maybe later" check-in.
+ * - Deletes under-18 sign-ups whose parent never answered within 14 days.
+ * - Journey reminders (assessment after 2 days; orientation at the time the prospect picked).
+ * Opted-out prospects (emailOptOutAt) get none of the automatic emails EXCEPT the day-before and
+ * 1-hour reminders for a call they booked themselves.
  */
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
@@ -14,6 +20,9 @@ import * as mail from '@/lib/get-involved/emails'
 import { LINK_VALID_DAYS } from '@/lib/get-involved/core'
 import { journeyUrl, userDisplayName } from '@/lib/get-involved/server'
 import { runJourneyReminders } from '@/lib/get-involved/journey-steps'
+import { runOutreachEmails } from '@/lib/get-involved/nudges'
+import { primeEmailFooter } from '@/lib/get-involved/emails/footer-settings'
+import { dayBeforeReminderEmail } from '@/lib/get-involved/emails/reminders'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,12 +61,19 @@ async function run() {
     if (claim.count === 0) continue
     const p = c.prospect
     const host = c.hostId ? await userDisplayName(c.hostId) : null
-    const base = { firstName: p.firstName, startsAt: c.startsAt, tz: c.timezone, hostName: host?.full ?? 'our team', meetingUrl: c.meetingUrl, manageUrl: journeyUrl(p.journeyToken!), soon }
-    await sendEmail({ to: p.email, ...mail.reminderEmail(base) })
-    if (p.ageRange === 'UNDER_18' && p.parentEmail) {
-      await sendEmail({ to: p.parentEmail, ...mail.reminderEmail({ ...base, parent: { first: (p.parentName ?? '').split(' ')[0] || 'Hi' } }) })
-    }
-    if (host) await sendEmail({ to: host.email, ...mail.reminderEmail({ ...base, firstName: host.first, hostName: `${p.firstName} ${p.lastName}` }) })
+    const base = { firstName: p.firstName, startsAt: c.startsAt, tz: c.timezone, hostName: host?.full ?? 'our team', meetingUrl: c.meetingUrl, manageUrl: journeyUrl(p.journeyToken!), soon, prospectId: p.id }
+    // Deliberately NOT skipped for emailOptOutAt: an opted-out person who booked a call asked for that
+    // call, so they still get the day-before and 1-hour reminders (but not the 3-day one or any nudge).
+    const parent = p.ageRange === 'UNDER_18' && p.parentEmail ? { first: (p.parentName ?? '').split(' ')[0] || 'Hi' } : null
+    const build = (par: { first: string } | null) => soon
+      ? mail.reminderEmail({ ...base, parent: par })
+      : dayBeforeReminderEmail({ ...base, endsAt: c.endsAt, hostFirst: host?.first ?? null, parent: par })
+    await sendEmail({ to: p.email, ...build(null) })
+    if (parent) await sendEmail({ to: p.parentEmail!, ...build(parent) })
+    // TODO(SMS): day-before text ("NowTransformed: Hi <first>, your call with <host> is tomorrow at <time>.
+    // Link in your email. Reply STOP to opt out.") goes here when smsEnabled() (offer.ts) && p.smsConsentAt
+    // && p.phone && !soon, only between 8 AM and 8 PM in c.timezone. No SMS provider is connected yet.
+    if (host) await sendEmail({ to: host.email, ...mail.reminderEmail({ ...base, firstName: host.first, hostName: `${p.firstName} ${p.lastName}`, prospectId: null, toHost: true }) })
     sent++
   }
   return sent
@@ -73,10 +89,12 @@ async function sweepUnansweredConsent() {
 export async function POST(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
+    await primeEmailFooter()
     const sent = await run()
     const deleted = await sweepUnansweredConsent()
     const journey = await runJourneyReminders()
-    return NextResponse.json({ ok: true, sent, deleted, journey })
+    const outreach = await runOutreachEmails()
+    return NextResponse.json({ ok: true, sent, deleted, journey, outreach })
   } catch (e) {
     console.error('[CRON] discovery reminders failed', e)
     return NextResponse.json({ ok: false }, { status: 500 })
