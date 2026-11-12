@@ -78,10 +78,7 @@ export function layout(body: string, cta?: { label: string; url: string }, after
   return `
 <div style="background:#f3f4f6;padding:24px 12px;font-family:Inter,Segoe UI,Arial,sans-serif">
   <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:28px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
-      <span style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:9px;background:#0369a1;color:#fff;font-weight:700;font-size:14px">NT</span>
-      <span style="font-weight:600;font-size:15px;color:#111827;margin-left:8px">NowTransformed</span>
-    </div>
+    <div style="margin-bottom:18px"><img src="${esc(appUrl('/brand/nowtransformed-logo.png'))}" width="240" height="60" alt="NowTransformed" style="display:block;border:0;height:60px;width:240px" /></div>
     ${body}
     ${cta ? button(cta) : ''}
     ${after}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
@@ -574,14 +575,7 @@ export function Sidebar({ role }: SidebarProps) {
             <X className="h-5 w-5" />
           </button>
           <Link href={getHomeLink()} className="flex items-center gap-3">
-            <div className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center shadow-sm",
-              role === 'AMBASSADOR'
-                ? 'bg-gradient-to-br from-amber-500 to-amber-600'
-                : 'bg-gradient-to-br from-primary-500 to-primary-600'
-            )}>
-              <span className="text-lg font-bold text-white">NT</span>
-            </div>
+            <Image src="/brand/nowtransformed-mark.png" alt="" width={40} height={40} className="w-10 h-10" />
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-gray-900">NowTransformed</span>
               <span className="text-xs text-gray-500">{getPortalLabel()}</span>

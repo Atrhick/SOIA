@@ -3,6 +3,7 @@
  * Not a 'use server' module: nothing here is callable from the browser.
  * Public entry points live in src/lib/actions/get-involved.ts.
  */
+import { sendPushToUser } from '@/lib/push'
 import crypto from 'crypto'
 import { headers } from 'next/headers'
 import { Prisma, ProspectStatus } from '@prisma/client'
@@ -215,7 +216,7 @@ export async function emailInviter(inviterId: string | null, prospectName: strin
     const name = await userDisplayName(inviterId)
     if (!u || u.status !== 'ACTIVE' || !name) return
     const m = mail.inviterCallUpdateEmail({ inviterFirst: name.first, prospectName, what, dashUrl: mail.appUrl(dashboardPathFor(u.role)) })
-    await sendEmail({ to: name.email, ...m })
+    await Promise.all([sendEmail({ to: name.email, ...m }), sendPushToUser(inviterId, { title: prospectName, body: what, url: dashboardPathFor(u.role), tag: 'inviter-call' })])
   } catch (e) {
     console.error('[GET-INVOLVED] inviter email failed', e)
   }
@@ -230,7 +231,7 @@ export async function emailInviterNewLead(inviterId: string, p: { name: string; 
     const recent = await prisma.prospect.findMany({ where: { invitedById: inviterId, createdAt: { gte: new Date(Date.now() - 400 * 86400_000) } }, select: { createdAt: true } })
     const { streak } = computeStreak(recent.map((r) => r.createdAt), new Date())
     const m = mail.inviterNewLeadEmail({ inviterFirst: name.first, prospectName: p.name, ageLabel: ageRangeLabel(p.ageRange), city: p.city, minor: p.ageRange === 'UNDER_18', streak, dashUrl: mail.appUrl(dashboardPathFor(u.role)) })
-    await sendEmail({ to: name.email, ...m })
+    await Promise.all([sendEmail({ to: name.email, ...m }), sendPushToUser(inviterId, { title: `${p.name} filled out your form`, body: p.ageRange === 'UNDER_18' ? 'Under 18: a parent says yes first.' : "Open Today's invite to see them.", url: dashboardPathFor(u.role), tag: 'inviter-lead' })])
   } catch (e) {
     console.error('[GET-INVOLVED] inviter email failed', e)
   }

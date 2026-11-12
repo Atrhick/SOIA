@@ -1,7 +1,8 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
+import { ServiceWorkerRegistration } from '@/components/pwa/install-prompt'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -12,6 +13,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'NowTransformed Back Office',
   description: 'Coach and Administrator portal for NowTransformed',
+  applicationName: 'NowTransformed',
+  appleWebApp: { capable: true, title: 'NowTransformed', statusBarStyle: 'default' },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#ffffff',
 }
 
 export default function RootLayout({
@@ -23,6 +30,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <Providers>{children}</Providers>
+        <ServiceWorkerRegistration />
       </body>
     </html>
   )

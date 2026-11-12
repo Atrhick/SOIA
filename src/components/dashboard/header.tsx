@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
-import { LogOut, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu } from 'lucide-react'
+import { LogOut, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu, Smartphone, Bell, BellOff } from 'lucide-react'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +19,8 @@ import {
 import { getUsersForImpersonation, getImpersonationData } from '@/lib/actions/impersonation'
 import { useRouter } from 'next/navigation'
 import { NotificationBell } from '@/components/notifications/notification-bell'
+import { OPEN_INSTALL_EVENT, isInstalled } from '@/components/pwa/install-prompt'
+import { pushState, turnOnPush, turnOffPush, type PushState } from '@/components/pwa/push-client'
 
 interface HeaderProps {
   user: {
@@ -45,6 +47,18 @@ export function Header({ user }: HeaderProps) {
   const mobileNav = useMobileNav()
   const [users, setUsers] = useState<ImpersonationUser[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  // Hidden once the app runs from the home screen.
+  const [canInstall, setCanInstall] = useState(false)
+  useEffect(() => { setCanInstall(!isInstalled()) }, [])
+  const [push, setPush] = useState<PushState>('unsupported')
+  const [pushBusy, setPushBusy] = useState(false)
+  useEffect(() => { pushState().then(setPush).catch(() => {}) }, [])
+  const togglePush = async () => {
+    if (push === 'needs-install') { window.dispatchEvent(new Event(OPEN_INSTALL_EVENT)); return }
+    setPushBusy(true)
+    try { setPush(push === 'on' ? await turnOffPush() : await turnOnPush()) } catch { setPush(await pushState()) }
+    setPushBusy(false)
+  }
 
   const loadUsers = async () => {
     if (user.role !== 'ADMIN' || user.isImpersonating) return
@@ -228,6 +242,29 @@ export function Header({ user }: HeaderProps) {
                   </>
                 )}
 
+                {(push === 'on' || push === 'off' || push === 'needs-install' || push === 'blocked') && (
+                  <DropdownMenuItem
+                    onSelect={(e) => { e.preventDefault(); if (push !== 'blocked' && !pushBusy) void togglePush() }}
+                    className="cursor-pointer"
+                    disabled={push === 'blocked'}
+                  >
+                    {push === 'on' ? <Bell className="mr-2 h-4 w-4 text-primary-700" /> : <BellOff className="mr-2 h-4 w-4" />}
+                    <span className="flex-1">
+                      {push === 'blocked' ? 'Notifications blocked in browser settings'
+                        : push === 'needs-install' ? 'Notifications: add to home screen first'
+                        : pushBusy ? 'Notifications…' : `Notifications on this device: ${push === 'on' ? 'On' : 'Off'}`}
+                    </span>
+                  </DropdownMenuItem>
+                )}
+                {canInstall && (
+                  <DropdownMenuItem
+                    onClick={() => window.dispatchEvent(new Event(OPEN_INSTALL_EVENT))}
+                    className="cursor-pointer"
+                  >
+                    <Smartphone className="mr-2 h-4 w-4" />
+                    <span>Add to home screen</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => signOut({ callbackUrl: '/login' })}
                   className="text-red-600 cursor-pointer"

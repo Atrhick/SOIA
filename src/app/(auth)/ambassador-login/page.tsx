@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react'
 
 export default function AmbassadorLoginPage() {
   const router = useRouter()
@@ -48,9 +49,7 @@ export default function AmbassadorLoginPage() {
         <div className="relative px-8 pt-10 pb-8 text-center">
           {/* Animated logo */}
           <div className="animate-slide-up">
-            <div className="mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30 transform hover:scale-105 transition-transform duration-300">
-              <Sparkles className="w-10 h-10 text-white" />
-            </div>
+            <Image src="/brand/nowtransformed-logo.png" alt="NowTransformed" width={800} height={201} priority className="mx-auto mb-6 h-20 w-auto" />
           </div>
 
           <h1 className="text-2xl font-bold text-gray-900 animate-slide-up animation-delay-100">

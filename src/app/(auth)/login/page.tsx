@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react'
 
 export default function LoginPage() {
@@ -48,9 +49,7 @@ export default function LoginPage() {
         <div className="relative px-8 pt-10 pb-8 text-center">
           {/* Animated logo */}
           <div className="animate-slide-up">
-            <div className="mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/30 transform hover:scale-105 transition-transform duration-300">
-              <span className="text-3xl font-bold text-white">S1</span>
-            </div>
+            <Image src="/brand/nowtransformed-logo.png" alt="NowTransformed" width={800} height={201} priority className="mx-auto mb-6 h-20 w-auto" />
           </div>
 
           <h1 className="text-2xl font-bold text-gray-900 animate-slide-up animation-delay-100">

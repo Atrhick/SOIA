@@ -1,3 +1,4 @@
+import Image from 'next/image'
 export default function PublicLayout({
   children,
 }: {
@@ -9,11 +10,7 @@ export default function PublicLayout({
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-center">
-            {/* Text logo: there is no /public/logo.png in the repo, so the old image never loaded. */}
-            <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-lg bg-primary-700 text-white font-bold text-sm flex items-center justify-center" aria-hidden="true">NT</span>
-              <span className="font-semibold text-gray-900">NowTransformed</span>
-            </div>
+            <Image src="/brand/nowtransformed-logo.png" alt="NowTransformed" width={800} height={201} priority className="h-14 sm:h-16 w-auto" />
           </div>
         </div>
       </header>

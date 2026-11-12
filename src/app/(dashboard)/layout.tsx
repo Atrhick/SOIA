@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { Header } from '@/components/dashboard/header'
 import { MobileNavProvider } from '@/components/dashboard/mobile-nav'
+import { InstallPrompt } from '@/components/pwa/install-prompt'
+import { NotificationsCard } from '@/components/pwa/notifications-card'
 import { prisma } from '@/lib/prisma'
 import { isAssociateRole, type AssociateRole } from '@/lib/roles'
 
@@ -63,6 +65,8 @@ export default async function DashboardLayout({
       <main className={`lg:ml-64 ${isImpersonating ? 'pt-24' : 'pt-16'} px-4 pb-6 sm:px-6`}>
         {children}
       </main>
+      <InstallPrompt />
+      <NotificationsCard />
     </div>
     </MobileNavProvider>
   )

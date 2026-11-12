@@ -57,6 +57,7 @@ model User {
   inviteProgramId     String?         // program their main link shares (null = latest approved)
   outreachShares      OutreachShare[]
   outreachGroups      OutreachGroupMember[]
+  pushSubscriptions PushSubscription[]
   invitedProspects    Prospect[]      @relation("ProspectInviter")
   discoveryHost       DiscoveryHost?
   hostedDiscoveryCalls DiscoveryCall[] @relation("DiscoveryCallHost")
@@ -3068,4 +3069,20 @@ model OutreachGroupMember {
   @@unique([month, userId])
   @@index([month, groupNo])
   @@map("outreach_group_members")
+}
+
+/// One browser/phone that turned on notifications (Web Push). Removed when the push service says it expired.
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSentAt DateTime?
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
