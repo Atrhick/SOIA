@@ -52,6 +52,9 @@ model User {
 
   // Get Involved / One-A-Day
   inviteSlug          String?         @unique
+  invitePhoto         String?         @db.Text // small JPEG data URL from the invite profile
+  inviteWhy           String?         // one line, "why I do this"
+  inviteProgramId     String?         // program their main link shares (null = latest approved)
   invitedProspects    Prospect[]      @relation("ProspectInviter")
   discoveryHost       DiscoveryHost?
   hostedDiscoveryCalls DiscoveryCall[] @relation("DiscoveryCallHost")
@@ -2178,6 +2181,15 @@ model Prospect {
   parentConsentSignature String?
   parentRelationship    String?
   parentConsentDeclinedAt DateTime?
+  // Outreach round 1 (2026-11-12)
+  smsConsentAt          DateTime?           // ticked "text me reminders" (sending needs SMS_ENABLED + a provider)
+  welcomeEmailSentAt    DateTime?           // welcome goes out only if they leave the sign-up page without booking
+  nudge1SentAt          DateTime?           // day 2, no call booked
+  nudge2SentAt          DateTime?           // day 7, last automatic nudge
+  checkInAt             DateTime?           // "Maybe later": one check-in email on this date
+  checkInSentAt         DateTime?
+  emailOptOutAt         DateTime?           // "Stop emails about this"
+  helpWith              String?             @db.Text // "what would you most like help with?" (booked screen)
   noShowCount           Int                 @default(0)
   discoveryCalls        DiscoveryCall[]
   discoverySlotRequests DiscoverySlotRequest[]
@@ -2306,6 +2318,8 @@ model DiscoveryCall {
   cancelReason      String?
   reminder24hSentAt DateTime?
   reminder1hSentAt  DateTime?
+  reminder3dSentAt  DateTime?
+  attendanceConfirmedAt DateTime?         // "Yes, I'll be there" from the 3-day reminder
   outcomeAt         DateTime?
   outcomeById       String?
   notes             String?             @db.Text
@@ -2740,6 +2754,11 @@ model CoachProgram {
   welcomeNoteDraftedAt  DateTime?
   welcomeNoteApprovedAt DateTime?
   welcomeNoteApprovedBy String?
+  // Sponsored-seat offer (admin-set; coaches can't change it). Shown only when sponsoredSeatsPerMonth > 0.
+  offerFullPrice         String?
+  offerSponsoredPrice    String?
+  offerReason            String?       @db.Text
+  sponsoredSeatsPerMonth Int?
   // Get Involved prospects who came in through this program's share link.
   prospects           Prospect[]
 
