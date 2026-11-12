@@ -33,7 +33,7 @@ const DAY = 24 * HOUR
 /** Only prospects created after this deploy get the cron welcome and the nudges. */
 // OUTREACH_EMAILS_SINCE (ISO date) overrides it, e.g. for local end-to-end tests that back-date sign-ups.
 const cutoffEnv = process.env.OUTREACH_EMAILS_SINCE ? new Date(process.env.OUTREACH_EMAILS_SINCE) : null
-export const WELCOME_CUTOFF = cutoffEnv && !Number.isNaN(cutoffEnv.getTime()) ? cutoffEnv : new Date('2026-11-12T00:00:00Z')
+export const WELCOME_CUTOFF = cutoffEnv && !Number.isNaN(cutoffEnv.getTime()) ? cutoffEnv : new Date('2026-11-12T13:00:00Z')
 export const WELCOME_DELAY_MS = 20 * MIN
 export const NUDGE1_AFTER_MS = 2 * DAY
 export const NUDGE2_AFTER_MS = 7 * DAY
