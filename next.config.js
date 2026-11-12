@@ -16,6 +16,18 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
   },
+  // People who open the old Cloud Run address land on the real domain. /api is left alone so the
+  // reminder job (Cloud Scheduler calls run.app) and webhooks keep working; /_next for assets.
+  async redirects() {
+    return [
+      {
+        source: '/:path((?!api/|_next/).*)',
+        has: [{ type: 'host', value: 'soia-816056420126.us-central1.run.app' }],
+        destination: 'https://www.nowtransformedleadership.com/:path',
+        permanent: false,
+      },
+    ]
+  },
   async headers() {
     return [
       {
