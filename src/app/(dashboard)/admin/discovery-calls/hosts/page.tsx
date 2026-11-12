@@ -6,7 +6,7 @@ import { HostsClient } from './hosts-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function HostsPage() {
+export default async function HostsPage({ searchParams }: { searchParams: { edit?: string } }) {
   const session = await auth()
   if (!session || session.user.role !== 'ADMIN') redirect('/login')
   // Admins and coaches can host (both have a calls page). Existing hosts stay listed even if their account changed.
@@ -24,6 +24,7 @@ export default async function HostsPage() {
     <div className="space-y-6">
       <DiscoveryTabs active="/admin/discovery-calls/hosts" />
       <HostsClient
+        initialOpen={searchParams.edit ?? null}
         people={people.map((a) => ({
           userId: a.id,
           email: a.email,

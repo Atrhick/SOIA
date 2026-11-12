@@ -27,10 +27,15 @@ const ageOrder = (v: string) => AGE_RANGES.findIndex((a) => a.value === v)
 const andList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`)
 const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((x) => (x?.[0] || '?').toUpperCase()).join('') || '?'
 
-export function HostsClient({ people }: { people: Person[] }) {
+export function HostsClient({ people, initialOpen = null }: { people: Person[]; initialOpen?: string | null }) {
   const hosts = people.filter((p) => p.host)
   const others = people.filter((p) => !p.host)
-  const [open, setOpen] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(people.some((p) => p.host && p.userId === initialOpen) ? initialOpen : null)
+  // Opened from another page (?edit=): bring that host's form into view.
+  useEffect(() => {
+    if (open && open === initialOpen) document.getElementById(`host-${open}`)?.scrollIntoView({ block: 'center' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [adding, setAdding] = useState(false)
 
   const bookable = hosts.filter((h) => hostStatus(h.host!) === 'BOOKABLE')
