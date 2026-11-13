@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import type { UserRole } from '@prisma/client'
+import { loadRoleView } from './role-view'
 
 declare module 'next-auth' {
   interface User {
@@ -181,16 +182,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
-      // Handle session updates (for impersonation)
+      // Session updates come from the browser, so nothing in `session` is trusted: who may do what, and
+      // the role and profile ids that end up in the token, are all checked against the database here.
       if (trigger === 'update' && session) {
         if (session.impersonate) {
-          token.originalAdminId = token.id
-          token.id = session.impersonate.id
-          token.role = session.impersonate.role
-          token.ambassadorId = session.impersonate.ambassadorId
-          token.coachId = session.impersonate.coachId
-          token.isImpersonating = true
-          token.impersonatingAt = Date.now() // SEC-5: Record start time
+          // Only an admin (in the admin view, not already viewing as someone) may view as a coach or ambassador.
+          const targetId = typeof session.impersonate.id === 'string' ? session.impersonate.id : ''
+          const target = token.role === 'ADMIN' && !token.isImpersonating && targetId
+            ? await prisma.user.findUnique({ where: { id: targetId }, select: { role: true } })
+            : null
+          const view = target && (target.role === 'COACH' || target.role === 'AMBASSADOR') ? await loadRoleView(targetId, target.role) : null
+          if (view) {
+            token.originalAdminId = token.id
+            token.id = view.id
+            token.role = view.role
+            token.ambassadorId = view.ambassadorId
+            token.coachId = view.coachId
+            token.isImpersonating = true
+            token.impersonatingAt = Date.now() // SEC-5: Record start time
+          }
         }
         if (session.stopImpersonating && token.originalAdminId) {
           token.id = token.originalAdminId
@@ -200,6 +210,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.isImpersonating = false
           token.originalAdminId = undefined
           token.impersonatingAt = undefined
+        }
+        // Switch between the roles this login holds (admin, coach, ambassador view).
+        if (typeof session.switchRole === 'string' && !token.isImpersonating) {
+          const view = await loadRoleView(token.id, session.switchRole)
+          if (view) {
+            token.role = view.role
+            token.ambassadorId = view.ambassadorId
+            token.coachId = view.coachId
+          }
         }
       }
       return token

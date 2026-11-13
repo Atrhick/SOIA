@@ -80,7 +80,7 @@ export function TemplatesClient({ rows, builtIn }: { rows: GeneralScriptRow[]; b
   const status = statusOf(key)
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[320px_1fr]">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[320px_1fr]">
       <nav aria-label="Situations" className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
         {groups.map(({ g, items }) => (
           <div key={g}>

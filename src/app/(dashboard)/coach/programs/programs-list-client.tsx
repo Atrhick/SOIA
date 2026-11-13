@@ -66,7 +66,7 @@ export function ProgramsListClient({
   return (
     <div className="space-y-6">
       <Header />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {programs.map((p) => {
           const meta = STATUS_META[p.status] ?? { label: p.status, variant: 'outline' as const }
           return (

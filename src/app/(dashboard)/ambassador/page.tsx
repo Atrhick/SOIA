@@ -105,7 +105,7 @@ export default async function AmbassadorDashboardPage() {
       <div className="relative overflow-hidden bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+PC9nPjwvc3ZnPg==')] opacity-50"></div>
         <div className="relative">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold">
                 {getGreeting()}, {ambassador.firstName}!
@@ -305,7 +305,7 @@ export default async function AmbassadorDashboardPage() {
           <SectionHeader title="Quick Actions" />
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Link href="/ambassador/onboarding" className="quick-action group">
               <ClipboardList className="h-6 w-6 text-gray-400 quick-action-icon mb-2 group-hover:text-amber-600" />
               <span className="text-sm font-medium text-gray-700 group-hover:text-amber-700">

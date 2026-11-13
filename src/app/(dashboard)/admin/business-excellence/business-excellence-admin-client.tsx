@@ -230,23 +230,23 @@ export function BusinessExcellenceAdminClient({ coaches }: BusinessExcellenceAdm
                 onClick={() => setSelectedCoach(coach)}
               >
                 <CardContent className="py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-4">
                       <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                         <span className="text-sm font-semibold text-gray-600">
                           {(coach.firstName?.[0] || '?').toUpperCase()}
                           {(coach.lastName?.[0] || '?').toUpperCase()}
                         </span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h3 className="font-semibold text-gray-900">
                           {coach.firstName} {coach.lastName}
                         </h3>
-                        <p className="text-sm text-gray-500">{coach.email}</p>
+                        <p className="truncate text-sm text-gray-500">{coach.email}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                       {/* CRM Status */}
                       <div className="flex items-center gap-2">
                         {coach.crm?.crmActivated ? (

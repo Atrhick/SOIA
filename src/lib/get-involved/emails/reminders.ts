@@ -71,7 +71,7 @@ export function dayBeforeReminderEmail(p: ReminderBase, now = new Date()): Mail 
       `${p.parent ? parentNote(p.parent.first, p.firstName) : ''}
        <p style="${P}">Hi ${esc(p.firstName)}, ${greet}</p>
        ${box(`<strong>${esc(callRange(p.startsAt, p.endsAt, p.tz))}</strong>${p.meetingUrl ? `<br>Join here: <a href="${esc(p.meetingUrl)}" style="color:#0369a1">${esc(p.meetingUrl.replace(/^https?:\/\//, ''))}</a>` : ''}`)}
-       <p style="${P}">To get the most from 30 minutes, think about one thing you'd like help with. That's all you need to prepare.</p>
+       <p style="${P}">To get the most from 15 minutes, think about one thing you'd like help with. That's all you need to prepare.</p>
        <p style="${SMALL};font-size:14px;color:#4b5563">Can't make it? <a href="${esc(p.manageUrl)}" style="color:#0369a1">Pick another time</a> so someone else can have this one.</p>`,
       undefined,
       '',

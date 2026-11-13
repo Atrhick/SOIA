@@ -64,7 +64,7 @@ export function PageHeader({
         </div>
 
         {actions && (
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             {actions}
           </div>
         )}
@@ -124,7 +124,7 @@ export function WelcomeHeader({
         </div>
 
         {actions && (
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             {actions}
           </div>
         )}
@@ -152,8 +152,8 @@ export function SectionHeader({
   className,
 }: SectionHeaderProps) {
   return (
-    <div className={cn('flex items-center justify-between', className)}>
-      <div className="flex items-center gap-2">
+    <div className={cn('flex flex-wrap items-center justify-between gap-3', className)}>
+      <div className="flex min-w-0 items-center gap-2">
         {Icon && <Icon className={cn('h-5 w-5 text-gray-400', iconClassName)} />}
         <div>
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>

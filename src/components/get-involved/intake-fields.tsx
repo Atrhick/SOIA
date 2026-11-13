@@ -21,7 +21,7 @@ export function IntakeFields({ forInviter = false }: { forInviter?: boolean }) {
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 overflow-hidden">
         <label>Website<input type="text" name="website" tabIndex={-1} autoComplete="off" /></label>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div><label className={label} htmlFor="gi-fn">First name</label><input id="gi-fn" name="firstName" required maxLength={60} autoComplete="given-name" className={input} /></div>
         <div><label className={label} htmlFor="gi-ln">Last name</label><input id="gi-ln" name="lastName" required maxLength={60} autoComplete="family-name" className={input} /></div>
         <div><label className={label} htmlFor="gi-em">Email</label><input id="gi-em" name="email" type="email" required maxLength={200} autoComplete="email" placeholder="name@example.com" className={input} /></div>
@@ -52,7 +52,7 @@ export function IntakeFields({ forInviter = false }: { forInviter?: boolean }) {
       {minor && (
         <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
           <p className="text-xs font-bold uppercase tracking-wide text-primary-800">Parent or guardian</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div><label className={label} htmlFor="gi-pn">Their full name</label><input id="gi-pn" name="parentName" required maxLength={120} className={input} /></div>
             <div><label className={label} htmlFor="gi-pe">Their email</label><input id="gi-pe" name="parentEmail" type="email" required maxLength={200} placeholder="name@example.com" className={input} /></div>
             <div><label className={label} htmlFor="gi-pp">Their phone (optional)</label><input id="gi-pp" name="parentPhone" type="tel" maxLength={40} className={input} /></div>

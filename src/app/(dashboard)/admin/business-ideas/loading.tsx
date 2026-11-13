@@ -5,7 +5,7 @@ export default function BusinessIdeasLoading() {
         <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
         <div className="h-4 w-72 bg-gray-100 rounded animate-pulse mt-2" />
       </div>
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="bg-white rounded-lg border p-4">
             <div className="h-6 w-12 bg-gray-200 rounded animate-pulse" />

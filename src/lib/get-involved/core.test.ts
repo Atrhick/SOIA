@@ -15,10 +15,16 @@ const CT = 'America/Chicago'
 const NOW = new Date('2026-11-09T14:00:00Z')
 
 describe('generateSlots', () => {
+  it('offers 15-minute calls by default', () => {
+    const host = { id: 'h', timezone: 'America/Chicago', availability: [{ dayOfWeek: 4, startMinute: 14 * 60, endMinute: 15 * 60 }] }
+    const starts = generateSlots([host], [], NOW, { days: 7 }).map((s) => s.startsAt.getTime())
+    expect(starts.length).toBeGreaterThan(0)
+    expect(starts[1] - starts[0]).toBe(15 * 60_000)
+  })
   const lina = { id: 'lina', timezone: CT, availability: [{ dayOfWeek: 4, startMinute: 14 * 60, endMinute: 15 * 60 }] } // Thu 2-3 PM CT
 
   it('builds slots in the host timezone', () => {
-    const slots = generateSlots([lina], [], NOW, { days: 7 })
+    const slots = generateSlots([lina], [], NOW, { days: 7, minutes: 30 })
     expect(slots.map((s) => s.startsAt.toISOString())).toEqual([
       '2026-11-12T20:00:00.000Z', // 2:00 PM CST
       '2026-11-12T20:30:00.000Z', // 2:30 PM CST
@@ -27,41 +33,41 @@ describe('generateSlots', () => {
 
   it('handles the DST change (CDT is UTC-5 in October)', () => {
     const oct = new Date('2026-10-26T14:00:00Z') // Mon Oct 26
-    const slots = generateSlots([lina], [], oct, { days: 4 })
+    const slots = generateSlots([lina], [], oct, { days: 4, minutes: 30 })
     expect(slots[0].startsAt.toISOString()).toBe('2026-10-29T19:00:00.000Z') // 2:00 PM CDT
   })
 
   it('skips busy times and slots inside the minimum notice', () => {
     const busy = [{ hostId: 'lina', startsAt: new Date('2026-11-12T20:00:00Z'), endsAt: new Date('2026-11-12T20:30:00Z') }]
-    expect(generateSlots([lina], busy, NOW, { days: 7 }).map((s) => s.startsAt.toISOString())).toEqual(['2026-11-12T20:30:00.000Z'])
+    expect(generateSlots([lina], busy, NOW, { days: 7, minutes: 30 }).map((s) => s.startsAt.toISOString())).toEqual(['2026-11-12T20:30:00.000Z'])
     // 2:00 PM Thu is 6 hours away at 8 AM Thu, inside the 12 h notice
     expect(generateSlots([lina], [], new Date('2026-11-12T14:00:00Z'), { days: 1 })).toEqual([])
   })
 
   it('merges hosts offering the same time', () => {
     const eliz = { id: 'eliz', timezone: 'America/New_York', availability: [{ dayOfWeek: 4, startMinute: 15 * 60, endMinute: 15 * 60 + 30 }] } // 3 PM ET = 2 PM CT
-    const slots = generateSlots([lina, eliz], [], NOW, { days: 7 })
+    const slots = generateSlots([lina, eliz], [], NOW, { days: 7, minutes: 30 })
     expect(slots[0]).toEqual({ startsAt: new Date('2026-11-12T20:00:00Z'), hostIds: ['eliz', 'lina'] })
     expect(slots[1].hostIds).toEqual(['lina'])
   })
 
   it('skips a host\'s blocked days (in the host timezone) but keeps other hosts and other weeks', () => {
     const blocked = { ...lina, blockedDays: ['2026-11-12'] }
-    expect(generateSlots([blocked], [], NOW, { days: 7 })).toEqual([])
-    expect(generateSlots([blocked], [], NOW, { days: 10 }).map((s) => s.startsAt.toISOString())).toEqual([])
-    expect(generateSlots([blocked], [], NOW, { days: 14 }).map((s) => s.startsAt.toISOString())).toEqual([
+    expect(generateSlots([blocked], [], NOW, { days: 7, minutes: 30 })).toEqual([])
+    expect(generateSlots([blocked], [], NOW, { days: 10, minutes: 30 }).map((s) => s.startsAt.toISOString())).toEqual([])
+    expect(generateSlots([blocked], [], NOW, { days: 14, minutes: 30 }).map((s) => s.startsAt.toISOString())).toEqual([
       '2026-11-19T20:00:00.000Z', '2026-11-19T20:30:00.000Z',
     ])
     const eliz = { id: 'eliz', timezone: 'America/New_York', availability: [{ dayOfWeek: 4, startMinute: 15 * 60, endMinute: 15 * 60 + 30 }] }
-    expect(generateSlots([blocked, eliz], [], NOW, { days: 7 })).toEqual([{ startsAt: new Date('2026-11-12T20:00:00Z'), hostIds: ['eliz'] }])
+    expect(generateSlots([blocked, eliz], [], NOW, { days: 7, minutes: 30 })).toEqual([{ startsAt: new Date('2026-11-12T20:00:00Z'), hostIds: ['eliz'] }])
   })
 
   it('reads the blocked day in the host timezone, not UTC', () => {
     // Thu 7:00-7:30 PM Central is already Friday in UTC; blocking Thursday must hide it.
     const late = { id: 'late', timezone: CT, availability: [{ dayOfWeek: 4, startMinute: 19 * 60, endMinute: 19 * 60 + 30 }] }
-    expect(generateSlots([late], [], NOW, { days: 7 }).map((s) => s.startsAt.toISOString())).toEqual(['2026-11-13T01:00:00.000Z'])
-    expect(generateSlots([{ ...late, blockedDays: ['2026-11-13'] }], [], NOW, { days: 7 })).toHaveLength(1)
-    expect(generateSlots([{ ...late, blockedDays: ['2026-11-12'] }], [], NOW, { days: 7 })).toEqual([])
+    expect(generateSlots([late], [], NOW, { days: 7, minutes: 30 }).map((s) => s.startsAt.toISOString())).toEqual(['2026-11-13T01:00:00.000Z'])
+    expect(generateSlots([{ ...late, blockedDays: ['2026-11-13'] }], [], NOW, { days: 7, minutes: 30 })).toHaveLength(1)
+    expect(generateSlots([{ ...late, blockedDays: ['2026-11-12'] }], [], NOW, { days: 7, minutes: 30 })).toEqual([])
   })
 })
 

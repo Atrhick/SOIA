@@ -312,7 +312,7 @@ export function ProgramEditorClient({
                 runs it. The welcome email uses both as soon as you save; your public page changes after
                 an admin approves.
               </p>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field label="Program name" htmlFor="name" hint="For example: Health & Stress Management">
                   <Input id="name" ref={nameRef} value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={150} />
                 </Field>
@@ -635,7 +635,7 @@ export function ProgramEditorClient({
                 These came from your original program sheet. You can change them; an admin approves
                 the change before it appears publicly.
               </p>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field label="Target market" htmlFor="targetMarket">
                   <Input
                     id="targetMarket"
@@ -846,7 +846,7 @@ function QuestionEditor({
       )}
 
       {question.type === 'LIKERT' && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Input
             value={question.likert?.minLabel ?? ''}
             onChange={(e) =>

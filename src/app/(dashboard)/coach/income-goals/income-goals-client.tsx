@@ -166,7 +166,7 @@ export function IncomeGoalsClient({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="py-4">
             <div className="flex items-center gap-4">
@@ -308,7 +308,7 @@ export function IncomeGoalsClient({
                     placeholder="e.g., Make 10 sales calls"
                     required
                   />
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Input
                       name="targetValue"
                       label="Target Value"
@@ -489,7 +489,7 @@ export function IncomeGoalsClient({
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleIncomeSubmit} className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Input
                       name="date"
                       label="Date"

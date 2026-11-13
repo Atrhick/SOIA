@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Check, Copy, Loader2, Send } from 'lucide-react'
+import { ArrowRight, Check, Copy, Loader2, Plus, Send } from 'lucide-react'
 import { markClosed, markFormFollowUpDone, markNudged, setShareOutcome } from '@/lib/actions/outreach-share'
 import { undoFormFollowUpDone, undoShareOutcome } from '@/lib/actions/follow-up-undo'
 import { APP_WORDS, followUpTarget } from '@/lib/get-involved/follow-up-links'
 import { useToast } from '@/components/ui/kit/toast'
 import { HelpTip } from '@/components/ui/kit/help-tip'
 import { kit } from '@/components/ui/kit/styles'
+import { hasBlank, lineLabelFor, lineSlotFor, splitOnSlot, withoutLineSlot } from '@/lib/get-involved/scripts'
+import { ideasFor } from '@/lib/get-involved/line-ideas'
+import { LineIdeasPicker } from '@/components/get-involved/invite/line-ideas-picker'
 
 export interface FollowUpCard {
   /** OutreachShare id (SHARE) or prospect id (FORM). */
@@ -90,21 +93,62 @@ function isPhone(): boolean {
   try { return window.matchMedia('(pointer: coarse)').matches } catch { return false }
 }
 
+/** The message with the member's own line put in its spot, or the empty spot taken out. */
+function withLine(body: string, slot: string, line: string): string {
+  return line.trim() ? body.split(slot).join(line.trim()) : withoutLineSlot(body)
+}
+
+/** The box for the member's own line: says where it goes, with tap-to-use ideas. */
+function LineBox({ id, scenario, value, onChange }: { id: string; scenario: string; value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  // Closed until tapped, so a long list stays easy to scroll; the highlighted spot in the message shows it's there.
+  const [open, setOpen] = useState(false)
+  if (!open) {
+    return (
+      <button type="button" onClick={() => { setOpen(true); setTimeout(() => ref.current?.focus(), 0) }} aria-expanded={false} aria-controls={id} className={kit.quiet}>
+        <Plus className="h-4 w-4" aria-hidden />Add {lineLabelFor(scenario).toLowerCase()} (optional)
+      </button>
+    )
+  }
+  return (
+    <div>
+      <label htmlFor={id} className={kit.label}>{lineLabelFor(scenario)} <span className="font-normal text-gray-600">(optional)</span></label>
+      <p className="mb-1.5 text-sm text-gray-700">It goes into the message below, where it says <strong className="font-semibold text-gray-900">{lineSlotFor(scenario)}</strong>. Leave it empty and that spot is left out.</p>
+      <textarea id={id} ref={ref} value={value} onChange={(e) => onChange(e.target.value)} rows={2} maxLength={200} placeholder="Write your own, or tap an idea below" className={kit.textarea} />
+      <LineIdeasPicker id={`${id}-ideas`} ideas={ideasFor(scenario, null)} target={ref} onPick={(l) => onChange(l.slice(0, 200))} />
+    </div>
+  )
+}
+
+/** A read-only message with the empty spot highlighted. */
+function Shown({ body, slot, line, className }: { body: string; slot: string; line: string; className: string }) {
+  const text = line.trim() ? body.split(slot).join(line.trim()) : body
+  return <p className={className}>{splitOnSlot(text, slot).map((x, j) => x.slot ? <mark key={j} className="rounded bg-amber-100 px-1 font-semibold text-amber-900">{x.text}</mark> : x.text)}</p>
+}
+
 function Card({ card, state, setState }: { card: FollowUpCard; state: CardState; setState: (s: CardState) => void }) {
   const toast = useToast()
   const router = useRouter()
   const [busy, setBusy] = useState<'send' | 'yes' | 'stop' | null>(null)
+  const [line, setLine] = useState('')
+  const [yesLine, setYesLine] = useState('')
+  const slot = lineSlotFor(card.scenario)
+  const yesSlot = lineSlotFor('YES')
+  const message = { subject: card.message.subject, body: withLine(card.message.body, slot, line) }
+  const yes = card.yes ? { subject: card.yes.subject, body: withLine(card.yes.body, yesSlot, yesLine) } : null
+  const blank = (l: string) => { if (!hasBlank(l)) return false; toast.error('Change the part in [brackets] in your line to your own words first.'); return true }
   // Known only in the browser (after the first render, so server and client HTML match).
   const [mobile, setMobile] = useState<boolean | null>(null)
   useEffect(() => setMobile(isPhone()), [])
-  const target = mobile === null ? null : followUpTarget(card.channel, card, card.message, mobile)
+  const target = mobile === null ? null : followUpTarget(card.channel, card, message, mobile)
   const words = target ? APP_WORDS[target.app] : null
 
   /** Copy, open the app with the message filled in, and log the follow-up. */
   async function send() {
-    const copying = copyText(card.message.body)
+    if (blank(line)) return
+    const copying = copyText(message.body)
     // Open straight away, inside the tap, so phones don't block it.
-    const t = followUpTarget(card.channel, card, card.message, isPhone())
+    const t = followUpTarget(card.channel, card, message, isPhone())
     if (t) {
       if (t.app === 'WHATSAPP') window.open(t.href, '_blank', 'noopener')
       else window.location.href = t.href
@@ -150,9 +194,9 @@ function Card({ card, state, setState }: { card: FollowUpCard; state: CardState;
   }
 
   async function copyYes() {
-    if (!card.yes) return
-    const t = followUpTarget(card.channel, card, card.yes, isPhone())
-    const copying = copyText(card.yes.body)
+    if (!yes || blank(yesLine)) return
+    const t = followUpTarget(card.channel, card, yes, isPhone())
+    const copying = copyText(yes.body)
     if (t) {
       if (t.app === 'WHATSAPP') window.open(t.href, '_blank', 'noopener')
       else window.location.href = t.href
@@ -174,14 +218,16 @@ function Card({ card, state, setState }: { card: FollowUpCard; state: CardState;
       {state === 'yes' && card.yes ? (
         <div className="space-y-3 rounded-xl border border-green-200 bg-green-50 p-3">
           <p className="text-base font-semibold text-green-900">{card.name} said yes. Send them the link:</p>
-          <p className="whitespace-pre-line break-words text-base leading-relaxed text-gray-900">{card.yes.body}</p>
+          {card.yes.body.includes(yesSlot) && <LineBox id={`fu-${card.id}-yes`} scenario="YES" value={yesLine} onChange={setYesLine} />}
+          <Shown body={card.yes.body} slot={yesSlot} line={yesLine} className="whitespace-pre-line break-words text-base leading-relaxed text-gray-900" />
           <button type="button" className={kit.primaryBlock} onClick={copyYes}><Copy className="h-5 w-5" aria-hidden />Copy the link message</button>
         </div>
       ) : (
         <>
-          <p className="whitespace-pre-line break-words rounded-xl bg-slate-50 px-3.5 py-3 text-base leading-relaxed text-gray-900">{card.message.body}</p>
+          {state !== 'sent' && card.message.body.includes(slot) && <LineBox id={`fu-${card.id}`} scenario={card.scenario} value={line} onChange={setLine} />}
+          <Shown body={card.message.body} slot={slot} line={line} className="whitespace-pre-line break-words rounded-xl bg-slate-50 px-3.5 py-3 text-base leading-relaxed text-gray-900" />
           {state === 'sent' ? (
-            <button type="button" className={kit.secondary} onClick={async () => { if (await copyText(card.message.body)) toast.success('Copied again.'); else toast.error('Your phone blocked copying. Press and hold the message to copy it.') }}>
+            <button type="button" className={kit.secondary} onClick={async () => { if (await copyText(message.body)) toast.success('Copied again.'); else toast.error('Your phone blocked copying. Press and hold the message to copy it.') }}>
               <Copy className="h-5 w-5" aria-hidden />Copy again
             </button>
           ) : (

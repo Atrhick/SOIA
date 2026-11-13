@@ -1024,8 +1024,8 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-4">
           <Link href="/admin/calendars">
             <button className="p-2 hover:bg-gray-100 rounded-lg">
               <ArrowLeft className="h-5 w-5" />
@@ -1046,7 +1046,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {calendar.type === 'BOOKING' && (
             <button
               onClick={() => setShowAddSlotModal(true)}
@@ -1068,7 +1068,7 @@ export function CalendarDetailClient({ calendar, bookings: initialBookings, even
 
       {/* View Controls & Navigation */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Navigation */}
           <div className="flex items-center gap-2">
             <button

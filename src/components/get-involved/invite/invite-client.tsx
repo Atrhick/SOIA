@@ -48,7 +48,7 @@ export function InviteClient({ data, profileHref }: { data: InvitePageData; prof
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {choices.map((c) => (
           <button key={c.key} type="button" aria-pressed={mode === c.key} aria-controls="invite-panel" onClick={() => choose(c.key)} className={`${kit.choice} min-h-[88px]`}>
             <span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-primary-100 text-primary-800">{c.icon}</span>

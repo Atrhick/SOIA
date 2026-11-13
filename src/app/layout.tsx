@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
 import { ServiceWorkerRegistration } from '@/components/pwa/install-prompt'
+import { AppUpdateWatcher } from '@/components/pwa/app-update'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>{children}</Providers>
         <ServiceWorkerRegistration />
+        <AppUpdateWatcher />
       </body>
     </html>
   )

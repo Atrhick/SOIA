@@ -107,7 +107,7 @@ export default async function AdminOneADayPage({ searchParams }: { searchParams:
         </details>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ChannelTable stats={program} />
         <GroupsClient data={groups} canAct={!session.user.isImpersonating} />
       </div>

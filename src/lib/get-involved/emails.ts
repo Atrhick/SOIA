@@ -3,7 +3,7 @@
  * { subject, html }; sending is done by the caller with sendEmail().
  * Every value that came from a person is escaped.
  */
-import { formatCallTime } from './core'
+import { CALL_MINUTES, formatCallTime } from './core'
 
 import { type Seg, programParentLine, programWelcomeParts } from './program-welcome'
 import { emailActionPath } from './email-links'
@@ -97,7 +97,7 @@ export function button(cta: { label: string; url: string }, secondary = false): 
 export function callBox(when: Date, tz: string, withWhom: string, meetingUrl?: string | null): string {
   return `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin:0 0 14px">
     <div style="font-weight:700;color:#111827;font-size:15px">${esc(formatCallTime(when, tz))}</div>
-    <div style="${SMALL};margin:4px 0 0">Discovery call with ${esc(withWhom)} · 30 minutes${meetingUrl ? ` · <a href="${esc(meetingUrl)}" style="color:#0369a1">Join link</a>` : ''}</div>
+    <div style="${SMALL};margin:4px 0 0">Discovery call with ${esc(withWhom)} · ${CALL_MINUTES} minutes${meetingUrl ? ` · <a href="${esc(meetingUrl)}" style="color:#0369a1">Join link</a>` : ''}</div>
   </div>`
 }
 
@@ -126,7 +126,7 @@ export function welcomeEmail(p: { firstName: string; inviterName: string | null;
     html: layout(
       `<p style="${P}">Hi ${esc(p.firstName)}, ${by}</p>
        <p style="${P}">NowTransformed helps young people and adults grow, lead and build community. People get involved as coaches, mentors and service providers, ambassadors, volunteers, business affiliates and sponsors.</p>
-       <p style="${P}">The first step is a free 30-minute discovery call, so we can learn your goals and show you where you'd fit.</p>`,
+       <p style="${P}">The first step is a free 15-minute discovery call, so we can learn your goals and show you where you'd fit.</p>`,
       { label: 'Book my discovery call', url: p.bookUrl },
       '',
       { prospectId: p.prospectId },

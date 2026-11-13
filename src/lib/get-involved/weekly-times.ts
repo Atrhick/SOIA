@@ -7,7 +7,7 @@ export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'
 export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]
 export const WEEKDAYS = [1, 2, 3, 4, 5]
 export const DAY_END = 24 * 60
-export const MIN_BLOCK = 30
+export const MIN_BLOCK = 15
 
 export function timeLabel(m: number): string {
   if (m === DAY_END) return '12:00 AM (midnight)'
@@ -21,7 +21,7 @@ const sortKey = (a: Win, b: Win) => a.dayOfWeek - b.dayOfWeek || a.startMinute -
 export function windowErrors(list: Win[]): Record<number, string> {
   const errors: Record<number, string> = {}
   list.forEach((w, i) => {
-    if (w.endMinute - w.startMinute < MIN_BLOCK) errors[i] = 'Must end at least 30 minutes after it starts.'
+    if (w.endMinute - w.startMinute < MIN_BLOCK) errors[i] = 'Must end at least 15 minutes after it starts.'
   })
   for (const day of Array.from(new Set(list.map((w) => w.dayOfWeek)))) {
     const rows = list.map((w, i) => ({ w, i })).filter((x) => x.w.dayOfWeek === day).sort((a, b) => a.w.startMinute - b.w.startMinute)
@@ -54,7 +54,7 @@ export function preset(days: number[], startMinute: number, endMinute: number): 
   return days.map((d) => ({ dayOfWeek: d, startMinute, endMinute }))
 }
 
-/** Bookable 30-minute slots per week (overlaps counted once). */
+/** Bookable 15-minute slots per week (overlaps counted once). */
 export function weeklySlots(list: Win[]): number {
   let n = 0
   for (const day of Array.from(new Set(list.map((w) => w.dayOfWeek)))) {
@@ -88,6 +88,6 @@ export function daysSummary(list: Win[]): string {
 /** One line for a host list: "Mon–Fri · 40 h a week", or null with no times. */
 export function weekSummary(list: Win[]): string | null {
   if (!list.length) return null
-  const h = weeklySlots(list) / 2
+  const h = (weeklySlots(list) * MIN_BLOCK) / 60
   return `${daysSummary(list)} · ${Number.isInteger(h) ? h : h.toFixed(1)} h a week`
 }

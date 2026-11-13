@@ -70,8 +70,8 @@ export function AmbassadorDetail({ ambassador }: AmbassadorDetailProps) {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-4">
           <Link href="/coach/ambassadors">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
@@ -81,7 +81,7 @@ export function AmbassadorDetail({ ambassador }: AmbassadorDetailProps) {
             <h1 className="text-2xl font-bold text-gray-900">
               {ambassador.firstName} {ambassador.lastName}
             </h1>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <Badge variant={statusVariants[ambassador.status]}>
                 {ambassador.status}
               </Badge>
@@ -126,7 +126,7 @@ export function AmbassadorDetail({ ambassador }: AmbassadorDetailProps) {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Input
                   id="firstName"
                   name="firstName"
@@ -143,7 +143,7 @@ export function AmbassadorDetail({ ambassador }: AmbassadorDetailProps) {
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Input
                   id="email"
                   name="email"
@@ -204,7 +204,7 @@ export function AmbassadorDetail({ ambassador }: AmbassadorDetailProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <Mail className="h-5 w-5 text-gray-400" />
                   <div>
@@ -247,7 +247,7 @@ export function AmbassadorDetail({ ambassador }: AmbassadorDetailProps) {
               <CardTitle>Status Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="p-4 border rounded-lg">
                   <p className="text-sm text-gray-500 mb-2">Ambassador Status</p>
                   <Badge variant={statusVariants[ambassador.status]} className="text-sm">

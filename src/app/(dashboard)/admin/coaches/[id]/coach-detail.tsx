@@ -172,21 +172,21 @@ export function CoachDetail({ coach, onboardingTasks }: CoachDetailProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-4">
           <Link href="/admin/coaches">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-gray-900">
               {coach.firstName} {coach.lastName}
             </h1>
-            <p className="text-gray-600">{coach.user.email}</p>
+            <p className="break-all text-gray-600">{coach.user.email}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant={userStatusVariants[coach.user.status]}>
             {coach.user.status}
           </Badge>
@@ -240,7 +240,7 @@ export function CoachDetail({ coach, onboardingTasks }: CoachDetailProps) {
 
       {/* Info Tab */}
       {activeTab === 'info' && (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Profile Card */}
           <Card className="lg:col-span-2">
             <CardHeader>
@@ -256,7 +256,7 @@ export function CoachDetail({ coach, onboardingTasks }: CoachDetailProps) {
             <CardContent>
               {isEditing ? (
                 <form onSubmit={handleUpdateProfile} className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Input
                       id="firstName"
                       name="firstName"
@@ -290,7 +290,7 @@ export function CoachDetail({ coach, onboardingTasks }: CoachDetailProps) {
                     label="Phone"
                     defaultValue={coach.phone || ''}
                   />
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Input id="city" name="city" label="City" defaultValue={coach.city || ''} />
                     <Input id="region" name="region" label="Region" defaultValue={coach.region || ''} />
                     <Input id="country" name="country" label="Country" defaultValue={coach.country || ''} />
@@ -380,7 +380,7 @@ export function CoachDetail({ coach, onboardingTasks }: CoachDetailProps) {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <CardTitle>Onboarding Progress</CardTitle>
                   <CardDescription>
@@ -451,7 +451,7 @@ export function CoachDetail({ coach, onboardingTasks }: CoachDetailProps) {
 
       {/* Security Tab */}
       {activeTab === 'security' && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

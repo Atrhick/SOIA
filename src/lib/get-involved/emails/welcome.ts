@@ -72,7 +72,7 @@ export function welcomeCallEmail(p: {
        <p style="${P}">Hi ${esc(p.firstName)},</p>
        <p style="${P}">Thanks for your interest in ${what}.${shared}</p>
        ${note}
-       <p style="${P}">The next step is a free 30-minute call. Times start as soon as tomorrow.</p>
+       <p style="${P}">The next step is a free 15-minute call. Times start as soon as tomorrow.</p>
        ${button({ label: 'Pick a call time', url: p.bookUrl })}
        ${seatLine(p.offer)}`,
       undefined,

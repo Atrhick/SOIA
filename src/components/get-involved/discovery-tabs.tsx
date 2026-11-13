@@ -13,7 +13,7 @@ export function DiscoveryTabs({ active, base = '/admin/discovery-calls', admin =
         <h1 className="text-2xl font-bold text-gray-900">Discovery Calls</h1>
         <p className="text-gray-600 mt-1">
           {admin
-            ? 'The first 30-minute call with each Get Involved prospect.'
+            ? 'The first 15-minute call with each Get Involved prospect.'
             : 'The first call with each Get Involved prospect. Set the times you can take calls, then record what happened after each one.'}
           {tzNote ? ` Times are shown in ${tzNote}.` : ''}
         </p>

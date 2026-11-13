@@ -119,7 +119,7 @@ export function SponsorshipClient({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sponsorship Requests</h1>
           <p className="text-gray-600">Submit and track sponsorship requests</p>
@@ -131,7 +131,7 @@ export function SponsorshipClient({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="py-4">
             <div className="flex items-center gap-4">
@@ -273,7 +273,7 @@ export function SponsorshipClient({
               )}
 
               {/* Amount */}
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Input
                   name="amountRequested"
                   label="Amount Requested ($)"
@@ -385,7 +385,7 @@ export function SponsorshipClient({
                       </Badge>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-3 text-sm">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3 text-sm">
                       <div>
                         <span className="text-gray-500">Requested:</span>{' '}
                         <span className="font-medium text-green-600">

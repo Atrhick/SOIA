@@ -60,7 +60,7 @@ export function CoachEventsClient({
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="py-4">
             <div className="flex items-center gap-4">

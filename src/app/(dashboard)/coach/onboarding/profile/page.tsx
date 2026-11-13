@@ -141,7 +141,7 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Input
                 id="firstName"
                 name="firstName"
@@ -179,7 +179,7 @@ export default function ProfilePage() {
               placeholder="+1 (555) 123-4567"
             />
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Input
                 id="city"
                 name="city"

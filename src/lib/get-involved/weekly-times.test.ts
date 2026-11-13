@@ -5,10 +5,10 @@ const w = (d: number, s: number, e: number) => ({ dayOfWeek: d, startMinute: s *
 
 describe('weekly times', () => {
   it('flags overlaps and too-short blocks per row', () => {
-    const list = [w(1, 9, 12), w(1, 11, 13), w(2, 9, 9.25), w(3, 9, 10), w(3, 10, 11)]
+    const list = [w(1, 9, 12), w(1, 11, 13), { dayOfWeek: 2, startMinute: 540, endMinute: 550 }, w(3, 9, 10), w(3, 10, 11)]
     const e = windowErrors(list)
     expect(e[1]).toMatch(/Overlaps 9:00 AM–12:00 PM/)
-    expect(e[2]).toMatch(/30 minutes/)
+    expect(e[2]).toMatch(/15 minutes/)
     expect(e[0]).toBeUndefined()
     expect(e[3]).toBeUndefined(); expect(e[4]).toBeUndefined() // touching is fine
   })
@@ -26,8 +26,8 @@ describe('weekly times', () => {
     expect(out.filter((x) => x.dayOfWeek === 1)).toHaveLength(2)
   })
   it('counts slots and compares lists', () => {
-    expect(weeklySlots(preset([1, 2, 3, 4, 5], 9 * 60, 17 * 60))).toBe(80)
-    expect(weeklySlots([w(1, 9, 12), w(1, 11, 13)])).toBe(8)
+    expect(weeklySlots(preset([1, 2, 3, 4, 5], 9 * 60, 17 * 60))).toBe(160)
+    expect(weeklySlots([w(1, 9, 12), w(1, 11, 13)])).toBe(16)
     expect(sameWindows([w(1, 9, 12), w(2, 9, 12)], [w(2, 9, 12), w(1, 9, 12)])).toBe(true)
     expect(sameWindows([w(1, 9, 12)], [w(1, 9, 13)])).toBe(false)
   })

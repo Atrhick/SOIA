@@ -558,8 +558,8 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <Link
             href="/admin/lms"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-2"
@@ -567,7 +567,7 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
             <ArrowLeft className="h-4 w-4" />
             Back to Courses
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900">{course.title}</h1>
             {getStatusBadge()}
           </div>
@@ -575,7 +575,7 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
             {course.modules.length} modules · {totalLessons} lessons · {totalContent} content blocks
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowSettings(true)}
             className="flex items-center gap-2 px-3 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"

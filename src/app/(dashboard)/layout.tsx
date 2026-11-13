@@ -6,7 +6,7 @@ import { MobileNavProvider } from '@/components/dashboard/mobile-nav'
 import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { NotificationsCard } from '@/components/pwa/notifications-card'
 import { prisma } from '@/lib/prisma'
-import { isAssociateRole, type AssociateRole } from '@/lib/roles'
+import { isAssociateRole, isSwitchableRole, rolesOf, type AssociateRole } from '@/lib/roles'
 
 export default async function DashboardLayout({
   children,
@@ -56,6 +56,15 @@ export default async function DashboardLayout({
     ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { email: true } }))?.email ?? null
     : null
 
+  // The views this login can switch to (only roles it has a profile for). Not offered while viewing as someone.
+  const me = isImpersonating ? null : await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, extraRoles: true, coachProfile: { select: { id: true } }, ambassadorProfile: { select: { id: true } } },
+  })
+  const views = me
+    ? rolesOf(me).filter((r) => isSwitchableRole(r) && (r !== 'COACH' || me.coachProfile) && (r !== 'AMBASSADOR' || me.ambassadorProfile))
+    : []
+
   return (
     <MobileNavProvider>
     <div className="min-h-screen bg-gray-50">
@@ -65,7 +74,8 @@ export default async function DashboardLayout({
         role: session.user.role,
         name: profileName,
         isImpersonating,
-        originalAdminId: session.user.originalAdminId
+        originalAdminId: session.user.originalAdminId,
+        views,
       }} />
       <main className={`lg:ml-64 ${isImpersonating ? 'pt-24' : 'pt-16'} px-4 pb-6 sm:px-6`}>
         {children}

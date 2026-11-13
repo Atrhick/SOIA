@@ -155,7 +155,7 @@ export function Book({ token, v, card, variant = 'manage' }: { token: string; v:
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
           <p className="font-bold text-gray-900">{longWhen(c.startsAt, c.timezone)}</p>
           <p className="text-sm text-gray-600 mt-1">
-            Discovery call with <strong className="text-gray-900">{c.hostName}</strong> · 30 minutes
+            Discovery call with <strong className="text-gray-900">{c.hostName}</strong> · {Math.round((new Date(c.endsAt).getTime() - new Date(c.startsAt).getTime()) / 60_000)} minutes
             {c.meetingUrl && <> · <a className={`text-primary-700 underline rounded ${focusRing}`} href={c.meetingUrl} target="_blank" rel="noreferrer">Join link<span className="sr-only"> (opens in a new tab)</span></a></>}
           </p>
         </div>
@@ -196,7 +196,7 @@ export function Book({ token, v, card, variant = 'manage' }: { token: string; v:
           </p>
           <div>
             <p className="text-sm text-gray-600">Step 2 of 2</p>
-            <h1 ref={headingRef} tabIndex={-1} className={`mt-1 ${h1}`}>Pick a time for your free 30-minute call</h1>
+            <h1 ref={headingRef} tabIndex={-1} className={`mt-1 ${h1}`}>Pick a time for your free 15-minute call</h1>
             <p className="mt-2 text-gray-700">A friendly chat with a NowTransformed host about {v.programName ?? 'the ways you can get involved'} and whether it fits you.</p>
           </div>
         </>
@@ -204,7 +204,7 @@ export function Book({ token, v, card, variant = 'manage' }: { token: string; v:
         <>
           <h1 ref={headingRef} tabIndex={-1} className={h1}>{v.call ? 'Pick a new time' : `Book your discovery call${hostFirst ? ` with ${hostFirst}` : ''}`}</h1>
           {v.call && <p className="text-sm text-gray-600">Now: <strong className="text-gray-900">{longWhen(v.call.startsAt, tz)}</strong> with {v.call.hostName}</p>}
-          <p className="text-gray-700">A free 30-minute video call to learn your goals and show you where you&apos;d fit.</p>
+          <p className="text-gray-700">A free 15-minute video call to learn your goals and show you where you&apos;d fit.</p>
         </>
       )}
       {v.minor && <p className="rounded-xl border border-orange-300 bg-orange-50 p-3 text-sm text-orange-900"><strong>A parent or guardian must be on this call.</strong> Pick a time that works for both of you. {firstParent} gets the invite and reminders too.</p>}
@@ -313,7 +313,7 @@ function CalendarButtons({ token, call, minor, stacked = false }: { token: strin
     startsAt: call.startsAt,
     endsAt: call.endsAt,
     details: [
-      `Your free 30-minute discovery call with ${call.hostName}.`,
+      `Your free ${Math.round((new Date(call.endsAt).getTime() - new Date(call.startsAt).getTime()) / 60_000)}-minute discovery call with ${call.hostName}.`,
       call.meetingUrl ? `Join: ${call.meetingUrl}` : 'The join link is in your confirmation email.',
       minor ? 'A parent or guardian must be on this call.' : null,
       manage ? `Change or cancel (up to 2 hours before): ${manage}` : null,

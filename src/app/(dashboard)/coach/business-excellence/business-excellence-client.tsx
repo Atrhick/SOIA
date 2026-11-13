@@ -275,7 +275,7 @@ export function BusinessExcellenceClient({
               </button>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-600">CRM Activated</span>
@@ -344,7 +344,7 @@ export function BusinessExcellenceClient({
               />
             </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {websiteItems.map((item) => (
               <div
                 key={item.label}
@@ -521,7 +521,7 @@ export function BusinessExcellenceClient({
           {/* Weekly Progress */}
           <div className="mb-6">
             <h3 className="font-medium mb-3">Weekly Progress</h3>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {weeklyProgress.map((item) => {
                 const Icon = item.icon
                 return (

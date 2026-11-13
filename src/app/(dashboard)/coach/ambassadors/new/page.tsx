@@ -61,7 +61,7 @@ export default function NewAmbassadorPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Input
                 id="firstName"
                 name="firstName"
@@ -78,7 +78,7 @@ export default function NewAmbassadorPage() {
               />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Input
                 id="email"
                 name="email"

@@ -159,7 +159,7 @@ export function KnowledgeBaseAdminClient({
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -218,7 +218,7 @@ export function KnowledgeBaseAdminClient({
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         {/* Categories Sidebar */}
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between pb-2">

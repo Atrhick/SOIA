@@ -164,7 +164,7 @@ export function withoutClosingQuestion(body: string): string {
 
 // ---------- the invitation's words (shared by the email and the page's live preview) ----------
 
-export const INVITE_BUTTON = "See if it's a fit: book a free 30-minute call"
+export const INVITE_BUTTON = "See if it's a fit: book a free 15-minute call"
 /** Used only when a program has no email message for the situation yet. */
 export const FALLBACK_SUBJECT = '{first name}, thought of you'
 

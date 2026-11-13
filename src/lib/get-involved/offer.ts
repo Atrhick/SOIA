@@ -81,6 +81,13 @@ export function canUndoSeatOffer(offeredAt: Date | null | undefined, now = new D
   return !!offeredAt && offeredAt >= monthStart(now) && offeredAt < nextMonthStart(now)
 }
 
+/** Each program's regular price as its owner set it (programs with no price are left out). */
+export async function getRegularPrices(programIds: string[]): Promise<Map<string, string>> {
+  if (!programIds.length) return new Map()
+  const rows = await prisma.coachProgram.findMany({ where: { id: { in: programIds } }, select: { id: true, offerFullPrice: true } })
+  return new Map(rows.filter((r) => r.offerFullPrice?.trim()).map((r) => [r.id, r.offerFullPrice!.trim()]))
+}
+
 /** The offer for a program, or null when the admin hasn't set one (seats 0 / unset): then no offer is shown anywhere. */
 export async function getSignupOffer(programId: string | null | undefined, now = new Date()): Promise<SignupOffer | null> {
   if (!programId) return null

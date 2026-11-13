@@ -11,7 +11,7 @@ import prisma from '@/lib/prisma'
 import { appUrl } from '@/lib/get-involved/emails'
 import { getOutreachStreak } from '@/lib/get-involved/outreach-streak'
 import { ensureInviteSlug, userDisplayName } from '@/lib/get-involved/server'
-import { getInviteProfile, getOutreachSettings, getSignupOffer } from '@/lib/get-involved/offer'
+import { getInviteProfile, getOutreachSettings, getRegularPrices, getSignupOffer } from '@/lib/get-involved/offer'
 import { invitePrograms, programDisplay } from '@/lib/get-involved/program-welcome-server'
 import { getOutreachTemplates } from '@/lib/get-involved/outreach-templates-server'
 import { MAIN_LINK_PROGRAM, descriptionFromHeadline, type TemplateKey, type TemplateText } from '@/lib/get-involved/outreach-templates'
@@ -38,6 +38,8 @@ export interface InviteProgramOption {
   programLine: string
   /** Sponsored seats left this month: {sponsor line} renders. */
   sponsorship: boolean
+  /** The owner's regular price for {regular price} (empty = a blank to fill). */
+  regularPrice?: string
   /** Every message for this program, resolved (owner > program default > general). */
   scripts: ScriptMap
   /** Ideas for the "why you thought of them" line (null = use the general ones). */
@@ -108,6 +110,7 @@ export async function loadInvitePage(userId: string, role: 'COACH' | 'AMBASSADOR
   ])
   // General messages include the admin's edits from Message templates.
   const [pitches, general] = await Promise.all([loadProgramPitches(programs.map((p) => p.id)), getGeneralScripts()])
+  const prices = await getRegularPrices(programs.map((p) => p.id))
   const list: InviteProgramOption[] = await Promise.all(programs.map(async (p) => {
     const pitch = pitches.get(p.id)
     const offer = await getSignupOffer(p.id, now).catch(() => null)
@@ -120,6 +123,7 @@ export async function loadInvitePage(userId: string, role: 'COACH' | 'AMBASSADOR
       program: pitch?.program ?? p.name,
       programLine: pitch?.programLine ?? 'a NowTransformed program',
       sponsorship: !!offer && offer.seatsLeft > 0,
+      regularPrice: prices.get(p.id) ?? '',
       scripts: resolveAllScripts(pitch?.rows ?? [], general),
       lineIdeas: pitch?.lineIdeas ?? null,
     }

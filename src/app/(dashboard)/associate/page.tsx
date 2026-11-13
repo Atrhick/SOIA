@@ -55,7 +55,7 @@ export default async function AssociateDashboardPage() {
       <Card>
         <CardContent className="pt-6">
           <h2 className="font-semibold text-gray-900 mb-4">Your details</h2>
-          <dl className="grid gap-4 sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Detail label="Name" value={`${p.firstName} ${p.lastName}`} />
             <Detail label="Email" value={p.email} />
             <Detail label="Association" value={roleLabel} />

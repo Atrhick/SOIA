@@ -14,7 +14,7 @@ export function JoinShell({ rail, children }: {
 }) {
   if (!rail) return <div className="max-w-2xl mx-auto">{children}</div>
   return (
-    <div className="grid gap-4 md:gap-6 md:grid-cols-[240px_minmax(0,1fr)] items-start">
+    <div className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-[240px_minmax(0,1fr)] items-start">
       <JourneyRail stage={rail.stage} role={rail.role} ageRange={rail.ageRange} roleLabel={rail.roleLabel} />
       <div className="min-w-0">{children}</div>
     </div>

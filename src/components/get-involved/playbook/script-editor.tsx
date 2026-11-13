@@ -20,6 +20,7 @@ const FILL_IN_HELP: Record<(typeof SCRIPT_FILL_INS)[number], string> = {
   '{program line}': 'One line on what the program does.',
   '{link}': 'The sign-up link.',
   '{sponsor line}': '"Families who are a good fit may qualify for a NowTransformed sponsored seat." Left out when the program has no sponsored seats.',
+  '{regular price}': "The program's regular price, as the owner set it on the program page. If no price is set, it shows [your regular price] and must be filled in before sending.",
 }
 
 /**

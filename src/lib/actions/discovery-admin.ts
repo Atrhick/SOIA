@@ -126,7 +126,7 @@ const windowSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
   startMinute: z.number().int().min(0).max(24 * 60),
   endMinute: z.number().int().min(0).max(24 * 60),
-}).refine((w) => w.endMinute - w.startMinute >= 30, 'Each time block must be at least 30 minutes')
+}).refine((w) => w.endMinute - w.startMinute >= 15, 'Each time block must be at least 15 minutes')
 
 /** Replace a host's weekly availability. Admins can edit anyone's; a coach host edits their own. */
 export async function saveAvailability(hostUserId: string, windows: z.input<typeof windowSchema>[]): Promise<Result> {

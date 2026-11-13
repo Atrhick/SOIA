@@ -415,7 +415,7 @@ export function CollaborationAdminClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Collaboration Management</h1>
           <p className="text-gray-600">
@@ -429,7 +429,7 @@ export function CollaborationAdminClient({
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -486,7 +486,7 @@ export function CollaborationAdminClient({
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Channels List */}
         <Card>
           <CardHeader>
@@ -646,7 +646,7 @@ export function CollaborationAdminClient({
               <p className="text-gray-500 text-sm">No documents uploaded</p>
             </div>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {documents.map((doc) => (
                 <div
                   key={doc.id}

@@ -16,7 +16,7 @@ import { sendEmail } from '@/lib/email'
 import { appUrl } from '@/lib/get-involved/emails'
 import { primeEmailFooter } from '@/lib/get-involved/emails/footer-settings'
 import { inviteEmail } from '@/lib/get-involved/emails/invite'
-import { getInviteProfile, getSignupOffer } from '@/lib/get-involved/offer'
+import { getInviteProfile, getRegularPrices, getSignupOffer } from '@/lib/get-involved/offer'
 import { invitePrograms } from '@/lib/get-involved/program-welcome-server'
 import { ensureInviteSlug, rateLimited, userDisplayName } from '@/lib/get-involved/server'
 import { getGeneralScripts, loadProgramPitches } from '@/lib/get-involved/scripts-server'
@@ -86,6 +86,7 @@ export async function sendInvites(input: unknown): Promise<Response> {
       programLine: pitch?.programLine ?? MAIN_LINK_PROGRAM.description,
       link: '',
       sponsorship: !!offer && offer.seatsLeft > 0,
+      regularPrice: program ? (await getRegularPrices([program.id])).get(program.id) ?? '' : '',
       // Members only share their own programs here; no program = the main link ("I'm part of NowTransformed...").
       owns: !!program,
       mainLink: !program,

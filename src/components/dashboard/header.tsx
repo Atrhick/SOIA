@@ -19,6 +19,8 @@ import { useRouter } from 'next/navigation'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { OPEN_INSTALL_EVENT, isInstalled } from '@/components/pwa/install-prompt'
 import { pushState, turnOnPush, turnOffPush, type PushState } from '@/components/pwa/push-client'
+import { ROLE_VIEW_NAMES, homeForRole, isSwitchableRole } from '@/lib/roles'
+import { useToast } from '@/components/ui/kit/toast'
 
 interface HeaderProps {
   user: {
@@ -27,6 +29,8 @@ interface HeaderProps {
     name?: string | null
     isImpersonating?: boolean
     originalAdminId?: string
+    /** The roles this login can switch between (admin, coach, ambassador). */
+    views?: string[]
   }
 }
 
@@ -88,6 +92,17 @@ export function Header({ user }: HeaderProps) {
       }
       router.refresh()
     }
+  }
+
+  const toast = useToast()
+  const [switching, setSwitching] = useState(false)
+  const otherViews = (user.views ?? []).filter((r) => r !== user.role && isSwitchableRole(r))
+  const handleSwitchView = async (role: string) => {
+    setSwitching(true)
+    const s = await update({ switchRole: role })
+    if (s?.user?.role !== role) { setSwitching(false); toast.error('We couldn’t switch your view. Sign out and back in, then try again.'); return }
+    // A full load, so every part of the page is drawn for the new view.
+    window.location.assign(homeForRole(role))
   }
 
   const handleStopImpersonating = async () => {
@@ -182,6 +197,22 @@ export function Header({ user }: HeaderProps) {
                       <ArrowLeftRight className="mr-2 h-4 w-4" />
                       <span>Switch Back to Admin</span>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
+                {/* Switch between the roles this login holds */}
+                {otherViews.length > 0 && (
+                  <>
+                    <DropdownMenuLabel className="text-xs font-normal text-gray-500">
+                      You’re in the {ROLE_VIEW_NAMES[user.role as keyof typeof ROLE_VIEW_NAMES] ?? user.role.toLowerCase()} view
+                    </DropdownMenuLabel>
+                    {otherViews.map((r) => (
+                      <DropdownMenuItem key={r} onSelect={() => { void handleSwitchView(r) }} disabled={switching} className="cursor-pointer">
+                        <ArrowLeftRight className="mr-2 h-4 w-4" />
+                        <span>Switch to {ROLE_VIEW_NAMES[r as keyof typeof ROLE_VIEW_NAMES]} view</span>
+                      </DropdownMenuItem>
+                    ))}
                     <DropdownMenuSeparator />
                   </>
                 )}

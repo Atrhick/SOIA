@@ -21,7 +21,7 @@ export function JourneyStepFrame({ stage, role, ageRange, roleLabel, invitedBy, 
   return (
     <div className="space-y-4">
       {invitedBy && <p className="text-sm text-gray-600 md:text-right">Invited by <strong className="text-gray-900">{invitedBy}</strong></p>}
-      <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 md:items-start">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 md:items-start">
         <JourneyRail stage={stage} role={role} ageRange={ageRange} roleLabel={roleLabel} />
         <div className="min-w-0">{children}</div>
       </div>

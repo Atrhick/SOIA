@@ -229,7 +229,7 @@ export function SignupPage(props: SignupPageProps) {
       )}
 
       {!minor && (
-        <p className="flex items-center gap-2 text-base text-gray-700"><Check className="h-[18px] w-[18px] text-green-700 flex-none" strokeWidth={2.4} aria-hidden />Free 30-minute call first. No obligation.</p>
+        <p className="flex items-center gap-2 text-base text-gray-700"><Check className="h-[18px] w-[18px] text-green-700 flex-none" strokeWidth={2.4} aria-hidden />Free 15-minute call first. No obligation.</p>
       )}
 
       {(

@@ -125,7 +125,7 @@ export function isPlaybookGuide(v: unknown): v is PlaybookGuide {
 
 // ---------- fill-ins and rendering ----------
 
-export const SCRIPT_FILL_INS = ['{intro}', '{first name}', '{personal line}', '{my name}', '{business}', '{program}', '{program line}', '{link}', '{sponsor line}'] as const
+export const SCRIPT_FILL_INS = ['{intro}', '{first name}', '{personal line}', '{my name}', '{business}', '{program}', '{program line}', '{link}', '{sponsor line}', '{regular price}'] as const
 
 export interface ScriptValues {
   firstName: string
@@ -137,6 +137,8 @@ export interface ScriptValues {
   link: string
   /** The program offers sponsored seats this month (seats > 0). */
   sponsorship: boolean
+  /** The program's regular price as the owner set it (empty = a [blank] the sender must fill). */
+  regularPrice?: string
   /** The sender owns the program. Default true. */
   owns?: boolean
   /** Sharing the main NowTransformed link, not a program. */
@@ -163,6 +165,61 @@ export function introLine(v: Pick<ScriptValues, 'business' | 'program' | 'progra
   return sameName ? `I run ${what}` : `I run ${business}, and one of our programs is ${what}`
 }
 
+/**
+ * Every message type has a spot for one line of the member's own ({personal line}). The box is labelled
+ * for the situation, and while it's empty the message shows "[label]" where the line will go, so it's
+ * clear the line belongs in the message and where. The first four types need the line (the [bracket]
+ * blocks sending); on the rest it's optional and an empty spot is taken out (withoutLineSlot).
+ */
+const WHY = 'Why you thought of them'
+const TOLD = 'Something from what they told you'
+const NOTE = 'A personal note'
+const LINE_LABELS: Record<string, string> = {
+  KNOW: WHY, INTRO: WHY, GROUP: WHY, PARENT: WHY,
+  NEW: 'How you came across them',
+  ORG: 'Why you thought of this group',
+  POST: 'Why this matters to you',
+  YES: TOLD, ASK_PRICE: TOLD, ASK_TIME: TOLD, ASK_TEEN: TOLD, ASK_LEGIT: TOLD, ASK_INFO: TOLD,
+  FOLLOW_UP: 'Something new for them',
+  LAST: NOTE, NO_CALL: NOTE, THANKS: NOTE,
+}
+/** Types where the line is required before sending. */
+export const LINE_REQUIRED = ['KNOW', 'INTRO', 'GROUP', 'PARENT']
+
+export const lineLabelFor = (scenario: string | null | undefined): string => LINE_LABELS[scenario ?? 'KNOW'] ?? WHY
+export const lineSlotFor = (scenario: string | null | undefined): string => `[${lineLabelFor(scenario)}]`
+/** The marker for the four "people you know" types (also used by "Email them for me"). */
+export const LINE_SLOT = lineSlotFor('KNOW')
+const ALL_SLOTS = Array.from(new Set(Object.values(LINE_LABELS))).map((l) => `[${l}]`)
+
+/** The message with any unused line marker taken out and the spacing tidied. */
+export function withoutLineSlot(text: string): string {
+  const slots = ALL_SLOTS.filter((s) => text.includes(s))
+  if (!slots.length) return text
+  const out: string[] = []
+  for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
+    const hit = slots.filter((s) => line.includes(s))
+    if (!hit.length) { out.push(line); continue }
+    const rest = hit.reduce((l, s) => l.split(s).join(''), line).replace(/[ \t]{2,}/g, ' ').replace(/ +([.,?!:;])/g, '$1').trim()
+    if (rest) out.push(rest)
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/** A message with the marker shown in a highlight, for read-only previews. */
+export function splitOnSlot(text: string, slot: string): { text: string; slot: boolean }[] {
+  if (!text.includes(slot)) return [{ text, slot: false }]
+  return text.split(slot).flatMap((t, i) => (i ? [{ text: slot, slot: true }, { text: t, slot: false }] : [{ text: t, slot: false }]))
+}
+
+/** Shown for {regular price} when the owner hasn't set a price: a [bracket], so sending is blocked until it's filled. */
+export const PRICE_BLANK = '[your regular price]'
+
+/** Guide text with {regular price} filled in (guides are read, not sent, but the same rule applies). */
+export function fillPrice(text: string, price: string | null | undefined): string {
+  return text.split('{regular price}').join(price?.trim() || PRICE_BLANK)
+}
+
 export const SPONSOR_LINE = 'Families who are a good fit may qualify for a NowTransformed sponsored seat.'
 
 const TOKEN_RE = /\{[^{}\n]{1,40}\}/g
@@ -178,6 +235,7 @@ function fill(token: string, v: ScriptValues): string {
     case '{program line}': return v.programLine.trim()
     case '{link}': return v.link.trim()
     case '{sponsor line}': return v.sponsorship ? SPONSOR_LINE : ''
+    case '{regular price}': return v.regularPrice?.trim() || PRICE_BLANK
     default: return token
   }
 }

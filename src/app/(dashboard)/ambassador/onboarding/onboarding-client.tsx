@@ -182,8 +182,8 @@ export function AmbassadorOnboardingClient({
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
                           <TaskIcon className={`w-5 h-5 ${statusConfig.iconColor}`} />
                           <h3 className="font-semibold text-gray-900">
                             {p.task.label}
@@ -198,7 +198,7 @@ export function AmbassadorOnboardingClient({
                           </p>
                         )}
                       </div>
-                      <Badge className={statusConfig.color}>
+                      <Badge className={`shrink-0 ${statusConfig.color}`}>
                         {p.status.replace('_', ' ')}
                       </Badge>
                     </div>

@@ -44,7 +44,7 @@ export function ResultsView({ data, role }: { data: ResultsData; role: 'COACH' |
         <Link href={hrefs[next.to]} className={kit.primary}>{next.button}<ArrowRight className="h-5 w-5" aria-hidden /></Link>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section aria-labelledby="days-h" className={kit.card}>
           <h2 id="days-h" className="flex items-center gap-1 text-lg font-bold text-gray-900">
             Days in a row
@@ -98,7 +98,7 @@ export function ResultsView({ data, role }: { data: ResultsData; role: 'COACH' |
       {data.channels.length > 0 && (
         <section aria-labelledby="channel-h" className={kit.card}>
           <h2 id="channel-h" className="text-lg font-bold text-gray-900">How you reached people</h2>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {data.channels.map((r) => (
               <li key={r.channel} className="rounded-xl border border-gray-200 px-3.5 py-3">
                 <p className="text-base font-semibold text-gray-900">{channelLabel(r.channel)}</p>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { introLine, renderScript } from './scripts'
+import { LINE_SLOT, PRICE_BLANK, lineLabelFor, lineSlotFor, splitOnSlot, fillPrice, hasBlank, introLine, renderScript, withoutLineSlot } from './scripts'
 
 describe('introLine / {intro}', () => {
   const base = { business: 'DreamIt LiveIt', program: 'Vision Development', programLine: 'a 4-week online program for teens in foster care' }
@@ -47,5 +47,46 @@ describe('endsWithQuestion', () => {
     expect(endsWithQuestion('Hi\nWant the details?\nThanks', 'SHORT')).toBe(false)
     expect(endsWithQuestion('Hi\n\nWant the details?\n\nThanks,\n{my name}', 'EMAIL')).toBe(true)
     expect(endsWithQuestion('Hi\n\nWant the details?\n\nThis is a much longer closing paragraph that is not a sign-off', 'EMAIL')).toBe(false)
+  })
+})
+
+describe('{regular price}', () => {
+  const base = { firstName: 'Maria', personalLine: '', myName: 'Ben', business: 'B', program: 'P', programLine: '', link: '', sponsorship: false }
+  it('fills the owner price, or leaves a blank that blocks sending', () => {
+    expect(renderScript('The regular price is {regular price}.', { ...base, regularPrice: '$200' })).toBe('The regular price is $200.')
+    const blank = renderScript('The regular price is {regular price}.', base)
+    expect(blank).toBe(`The regular price is ${PRICE_BLANK}.`)
+    expect(hasBlank(blank)).toBe(true)
+  })
+  it('fills guide text too', () => {
+    expect(fillPrice('It is {regular price} a month.', '$40')).toBe('It is $40 a month.')
+    expect(fillPrice('It is {regular price}.', '  ')).toBe(`It is ${PRICE_BLANK}.`)
+  })
+})
+
+describe('the "Why you thought of them" slot', () => {
+  const base = { firstName: 'Maria', personalLine: LINE_SLOT, myName: 'Pervis', business: 'Verily Academy', program: 'Verily Academy', programLine: '', link: '', sponsorship: false }
+  it('shows where the line goes while it is empty, and blocks sending as a blank', () => {
+    const shown = renderScript('Hi {first name},\n\n{personal line}\n\nI run {program}.', base)
+    expect(shown).toBe(`Hi Maria,\n\n${LINE_SLOT}\n\nI run Verily Academy.`)
+    expect(hasBlank(shown)).toBe(true)
+  })
+  it('is taken out cleanly when the line is optional', () => {
+    expect(withoutLineSlot(`Hi Maria,\n\n${LINE_SLOT}\n\nI run Verily Academy.`)).toBe('Hi Maria,\n\nI run Verily Academy.')
+    expect(withoutLineSlot(`Hi Maria,\n\nI'm Pervis. ${LINE_SLOT}\n\nI run it.`)).toBe("Hi Maria,\n\nI'm Pervis.\n\nI run it.")
+    expect(withoutLineSlot('No slot here.')).toBe('No slot here.')
+  })
+})
+
+describe('a line of your own in every message type', () => {
+  it('labels the spot for the situation', () => {
+    expect(lineSlotFor('KNOW')).toBe(LINE_SLOT)
+    expect(lineLabelFor('NEW')).toBe('How you came across them')
+    expect(lineLabelFor('ASK_PRICE')).toBe(lineLabelFor('YES'))
+    expect(lineSlotFor('FOLLOW_UP')).toBe('[Something new for them]')
+  })
+  it('takes out any unused spot, and highlights it in previews', () => {
+    expect(withoutLineSlot(`Hi Maria, ${lineSlotFor('FOLLOW_UP')}\nJust checking in.`)).toBe('Hi Maria,\nJust checking in.')
+    expect(splitOnSlot(`a ${lineSlotFor('LAST')} b`, lineSlotFor('LAST')).map((x) => x.slot)).toEqual([false, true, false])
   })
 })

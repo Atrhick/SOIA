@@ -8,7 +8,7 @@ export default function EventsLoading() {
         </div>
         <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="bg-white rounded-lg border p-5 space-y-3">
             <div className="h-5 w-3/4 bg-gray-200 rounded animate-pulse" />

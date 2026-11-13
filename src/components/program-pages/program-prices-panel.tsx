@@ -55,7 +55,7 @@ export function ProgramPricesPanel({ programId, offer }: { programId: string; of
       </div>
 
       <form onSubmit={save} className="mt-4 space-y-4">
-        <div className="grid gap-3 sm:max-w-md sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:max-w-md sm:grid-cols-2">
           <div>
             <label htmlFor="pp-full" className={kit.label}>Full price</label>
             <input id="pp-full" className={kit.input} value={fullPrice} maxLength={40} readOnly={!offer.canEdit} onChange={(e) => setFullPrice(e.target.value)} placeholder="$299" />

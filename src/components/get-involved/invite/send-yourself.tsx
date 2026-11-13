@@ -7,7 +7,7 @@ import { kit } from '@/components/ui/kit/styles'
 import { useToast } from '@/components/ui/kit/toast'
 import { recordShare } from '@/lib/actions/outreach-share'
 import { disclosureLine, shareLinkFor } from '@/lib/get-involved/outreach-templates'
-import { emailFooter, hasBlank, renderScript, visibleScenarios, type Scenario, type ScriptVariant } from '@/lib/get-involved/scripts'
+import { emailFooter, lineLabelFor, lineSlotFor, hasBlank, renderScript, visibleScenarios, withoutLineSlot, type Scenario, type ScriptVariant } from '@/lib/get-involved/scripts'
 import type { InviteProgramOption } from '@/components/get-involved/share-kit/data'
 import { ideasFor } from '@/lib/get-involved/line-ideas'
 import { LineIdeasPicker } from './line-ideas-picker'
@@ -64,7 +64,9 @@ export function SendYourself(props: {
     : null
   const channel = how || isPost ? channelFor(how ?? 'TEXT', scenario ?? '') : 'TEXT'
   const link = shareLinkFor(program.url, channel)
-  const values = { firstName: name.trim() || NAME_PLACEHOLDER, personalLine: personal, myName: props.myFirstName, business: program.business, program: program.program, programLine: program.programLine, link, sponsorship: program.sponsorship, owns: program.owns, mainLink: program.id === null }
+  const slot = lineSlotFor(scenario)
+  // An empty line shows as [its label] in the message, so it's clear the line belongs there and where.
+  const values = { firstName: name.trim() || NAME_PLACEHOLDER, personalLine: personal.trim() || slot, myName: props.myFirstName, business: program.business, program: program.program, programLine: program.programLine, link, sponsorship: program.sponsorship, regularPrice: program.regularPrice, owns: program.owns, mainLink: program.id === null }
   const generated = script
     ? {
         body: renderScript(script.body, values),
@@ -75,9 +77,11 @@ export function SendYourself(props: {
   const subject = custom?.subject ?? generated?.subject ?? ''
   const disclosure = mode === 'yes' ? null : disclosureLine(props.role, program.owns)
   const footer = how === 'EMAIL' && mode === 'first' ? emailFooter(props.mailingAddress) : null
-  const finalText = [body.trim(), disclosure, footer].filter(Boolean).join('\n\n')
-  const target = ready ? openTarget(isPost ? 'POST' : how!, finalText, how === 'EMAIL' ? subject : null) : null
   const needsPersonal = mode === 'first' && !!scenario && NEEDS_PERSONAL.includes(scenario)
+  // An optional line left empty comes out of the message; a required one must be written first.
+  const sendBody = needsPersonal ? body.trim() : withoutLineSlot(body)
+  const finalText = [sendBody, disclosure, footer].filter(Boolean).join('\n\n')
+  const target = ready ? openTarget(isPost ? 'POST' : how!, finalText, how === 'EMAIL' ? subject : null) : null
 
   function fail(field: Field, text: string) {
     setErr({ field, text })
@@ -89,6 +93,7 @@ export function SendYourself(props: {
     if (!isPost && !name.trim()) return fail('name', mode === 'yes' ? 'Add their first name first.' : scenario === 'PARENT' ? "Add the parent's first name first." : 'Add their first name first.')
     if (needsPersonal && !custom && !personal.trim()) return fail('personal', 'Add one line about why you thought of them. It makes people reply.')
     if (!custom && hasBlank(personal)) return fail('personal', 'Change the part in [brackets] to your own words.')
+    if (finalText.includes(slot)) return fail('message', `Your message still says ${slot}. Write that line in the box above, or replace it in the message with your own words.`)
     if (finalText.includes(NAME_PLACEHOLDER)) return fail('message', `Replace ${NAME_PLACEHOLDER} in the message with their name.`)
     if (hasBlank(finalText)) return fail('message', 'Your message still has a part in [brackets]. Change it to your own words.')
     setErr(null)
@@ -129,7 +134,7 @@ export function SendYourself(props: {
               <button type="button" onClick={() => { setScenario(null); setHow(null); setAsk(null) }} className={kit.quiet}>Change</button>
             </div>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {scenarios.map((s) => (
                 <button key={s.key} type="button" onClick={() => setScenario(s.key)} className="flex min-h-[56px] w-full flex-col items-start justify-center rounded-2xl border-2 border-gray-200 bg-white px-4 py-3 text-left hover:border-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2">
                   <span className="text-base font-semibold text-gray-900">{s.label}</span>
@@ -165,11 +170,14 @@ export function SendYourself(props: {
               {err?.field === 'name' && <p id="sy-name-err" className="mt-1 text-sm font-semibold text-red-700">{err.text}</p>}
             </div>
           )}
-          {mode === 'first' && script?.body.includes('{personal line}') && (
+          {script?.body.includes('{personal line}') && (
             <div>
-              <label htmlFor="sy-personal" className={kit.label}>{isPost ? 'Why this matters to you' : 'Why you thought of them'} <span className="font-normal text-gray-600">({needsPersonal ? 'one line' : 'optional'})</span></label>
+              <label htmlFor="sy-personal" className={kit.label}>{lineLabelFor(scenario)} <span className="font-normal text-gray-600">({needsPersonal ? 'one line' : 'optional'})</span></label>
+              <p id="sy-personal-where" className="mb-1.5 text-sm text-gray-700">
+                {custom ? 'You changed the message, so write this line straight into the message below.' : <>It goes into your message below, where it says <strong className="font-semibold text-gray-900">{slot}</strong>.</>}
+              </p>
               <textarea id="sy-personal" ref={personalRef} value={personal} onChange={(e) => { setPersonal(e.target.value); if (err?.field === 'personal') setErr(null) }} rows={2} maxLength={200}
-                placeholder={custom ? `e.g. ${PERSONAL_EXAMPLES[scenario ?? 'KNOW'] ?? PERSONAL_EXAMPLES.KNOW}` : 'Write your own, or tap an idea below'} aria-invalid={err?.field === 'personal'} aria-describedby={err?.field === 'personal' ? 'sy-personal-err' : undefined} className={kit.textarea} />
+                placeholder={custom ? `e.g. ${PERSONAL_EXAMPLES[scenario ?? 'KNOW'] ?? PERSONAL_EXAMPLES.KNOW}` : 'Write your own, or tap an idea below'} aria-invalid={err?.field === 'personal'} aria-describedby={err?.field === 'personal' ? 'sy-personal-where sy-personal-err' : 'sy-personal-where'} className={kit.textarea} />
               {err?.field === 'personal' && <p id="sy-personal-err" className="mt-1 text-sm font-semibold text-red-700">{err.text}</p>}
               {!custom && <LineIdeasPicker id="sy-ideas" ideas={ideasFor(scenario, program.lineIdeas)} target={personalRef} onPick={(l) => { setPersonal(l.slice(0, 200)); if (err?.field === 'personal') setErr(null) }} />}
             </div>

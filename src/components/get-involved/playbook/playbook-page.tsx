@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { appUrl } from '@/lib/get-involved/emails'
 import { ensureInviteSlug, userDisplayName } from '@/lib/get-involved/server'
-import { getOutreachSettings, getSignupOffer } from '@/lib/get-involved/offer'
+import { getOutreachSettings, getRegularPrices, getSignupOffer } from '@/lib/get-involved/offer'
 import { invitePrograms } from '@/lib/get-involved/program-welcome-server'
 import { followUpsDueCount } from '@/lib/get-involved/follow-ups'
 import { getGeneralScripts, loadProgramPitches } from '@/lib/get-involved/scripts-server'
@@ -43,6 +43,7 @@ export async function PlaybookPage({ role, programParam }: { role: 'COACH' | 'AM
 
   const pitch = chosen ? (await loadProgramPitches([chosen.id])).get(chosen.id) ?? null : null
   const offer = chosen ? await getSignupOffer(chosen.id, now) : null
+  const regularPrice = chosen ? (await getRegularPrices([chosen.id])).get(chosen.id) ?? '' : ''
   // invitePrograms() only returns the member's own live programs, so a chosen program is always theirs.
   const owns = !!chosen
 
@@ -85,6 +86,7 @@ export async function PlaybookPage({ role, programParam }: { role: 'COACH' | 'AM
       program: pitch?.program ?? MAIN_LINK_PROGRAM.program,
       programLine: pitch?.programLine ?? MAIN_LINK_PROGRAM.description,
       sponsorship: !!offer && offer.seatsLeft > 0,
+      regularPrice,
     },
     link: appUrl(chosen ? `/join/${slug}/${chosen.slug}` : `/join/${slug}`),
     mailingAddress: settings.mailingAddress || null,

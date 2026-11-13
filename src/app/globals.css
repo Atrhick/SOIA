@@ -350,3 +350,29 @@ select:focus {
   transform: translateY(0);
   transition: opacity 200ms, transform 200ms;
 }
+
+/* ─── Phones (every make, not just iPhone) ────────────────────────────────────
+   1. A tapped text box or dropdown with text under 16px makes iPhones (and some Android browsers)
+      zoom in and stay zoomed, pushing the page off the left edge. On phone widths every field
+      uses 16px text, whatever its Tailwind size class.
+   2. Phones also enlarge text on their own when the page is turned; keep text at the size we set. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select,
+  textarea,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+}
+
+/* Screen-reader-only labels in tables (captions, an "Actions" column heading) are position:absolute. Without a
+   positioned ancestor they escape the table's sideways scroll box and widen the whole page on phones.
+   Making the table their anchor keeps them inside it. */
+table {
+  position: relative;
+}

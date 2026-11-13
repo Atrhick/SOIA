@@ -11,7 +11,7 @@ import { buildInviteText, isValidEmail, parsePastedList, pickInviteScript } from
 import { suggestEmail } from '@/lib/get-involved/email-typo'
 import { disclosureLine } from '@/lib/get-involved/outreach-templates'
 import type { InviteProgramOption } from '@/components/get-involved/share-kit/data'
-import { hasBlank } from '@/lib/get-involved/scripts'
+import { LINE_SLOT, hasBlank, splitOnSlot } from '@/lib/get-involved/scripts'
 import { ideasFor } from '@/lib/get-involved/line-ideas'
 import { LineIdeasPicker } from './line-ideas-picker'
 import { PERSONAL_EXAMPLES } from './shared'
@@ -53,7 +53,7 @@ export function EmailForMe(props: {
     if (!script) return null
     return buildInviteText({
       script,
-      values: { firstName: previewRow.firstName.trim() || '[first name]', personalLine: personal, myName: props.myFirstName, business: program.business, program: program.program, programLine: program.programLine, link: '', sponsorship: program.sponsorship, owns: program.owns, mainLink: program.id === null },
+      values: { firstName: previewRow.firstName.trim() || '[first name]', personalLine: personal.trim() || LINE_SLOT, myName: props.myFirstName, business: program.business, program: program.program, programLine: program.programLine, link: '', sponsorship: program.sponsorship, owns: program.owns, mainLink: program.id === null },
       disclosure: disclosureLine(props.role, program.owns),
       senderFullName: props.myFullName,
     })
@@ -146,7 +146,7 @@ export function EmailForMe(props: {
                   <button type="button" onClick={() => removeRow(r.key)} aria-label={`Remove person ${i + 1}`} className={`inline-flex h-11 w-11 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 ${kit.ring}`}><X className="h-5 w-5" aria-hidden /></button>
                 )}
               </div>
-              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor={`ef-name-${r.key}`} className={kit.label}>{r.parent ? "Parent's first name" : 'First name'}</label>
                   <input id={`ef-name-${r.key}`} value={r.firstName} onChange={(e) => update(r.key, { firstName: e.target.value })} maxLength={60} autoComplete="off" aria-invalid={!!nameErr} aria-describedby={nameErr ? `ef-name-err-${r.key}` : undefined} className={kit.input} />
@@ -185,11 +185,11 @@ export function EmailForMe(props: {
       </fieldset>
 
       <div>
-        <label htmlFor="ef-personal" className={kit.label}>A line of your own <span className="font-normal text-gray-600">(optional)</span></label>
+        <label htmlFor="ef-personal" className={kit.label}>Why you thought of them <span className="font-normal text-gray-600">(optional)</span></label>
         <textarea id="ef-personal" ref={personalRef} value={personal} onChange={(e) => { setPersonal(e.target.value); if (err?.field === 'personal') setErr(null) }} rows={2} maxLength={300} placeholder={rows.length <= 1 ? 'Write your own, or tap an idea below' : `e.g. ${PERSONAL_EXAMPLES[previewRow.parent ? 'PARENT' : 'KNOW']}`}
           aria-invalid={err?.field === 'personal'} aria-describedby={err?.field === 'personal' ? 'ef-personal-err' : undefined} className={kit.textarea} />
         {err?.field === 'personal' && <p id="ef-personal-err" className="mt-1 text-sm font-semibold text-red-700">{err.text}</p>}
-        <p className={kit.hint}>{rows.length > 1 ? 'Goes to everyone on this list, so keep it general.' : 'Why you thought of them. It makes people far more likely to reply.'}</p>
+        <p className={kit.hint}>{rows.length > 1 ? 'Goes to everyone on this list, so keep it general.' : <>It goes near the top of the email, where the preview below shows <strong className="font-semibold text-gray-900">{LINE_SLOT}</strong>. People reply far more when it&apos;s there. Leave it empty and that spot is left out.</>}</p>
         {rows.length <= 1 && <LineIdeasPicker id="ef-ideas" ideas={ideasFor(previewRow.parent ? 'PARENT' : 'KNOW', program.lineIdeas)} target={personalRef} onPick={(l) => { setPersonal(l.slice(0, 300)); if (err?.field === 'personal') setErr(null) }} />}
       </div>
 
@@ -201,7 +201,7 @@ export function EmailForMe(props: {
           <div className="space-y-3 border-t border-gray-200 bg-white p-4 text-base leading-relaxed text-gray-800 rounded-b-2xl">
             <p className="text-sm text-gray-600">From: <strong className="text-gray-900">{preview.from || props.myFirstName}</strong> through NowTransformed</p>
             <p className="text-sm text-gray-600">Subject: <strong className="text-gray-900">{preview.subject}</strong></p>
-            {preview.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+            {preview.paragraphs.map((p, i) => <p key={i}>{splitOnSlot(p, LINE_SLOT).map((x, j) => x.slot ? <mark key={j} className="rounded bg-amber-100 px-1 font-semibold text-amber-900">{x.text}</mark> : x.text)}</p>)}
             <p><span className="inline-block rounded-lg bg-sky-700 px-4 py-2.5 font-semibold text-white">{preview.button}</span></p>
             <p className="text-sm text-gray-600">At the bottom: our mailing address and a link to stop invitations like this.</p>
           </div>

@@ -144,7 +144,7 @@ export function FilesAdminClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Files</h1>
           <p className="text-gray-600">
@@ -227,7 +227,7 @@ export function FilesAdminClient({
               )}
             </div>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
               {filteredDocuments.map((doc) => {
                 const FileIcon = getFileIcon(doc.mimeType)
                 return (

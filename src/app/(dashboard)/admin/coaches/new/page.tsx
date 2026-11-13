@@ -198,7 +198,7 @@ export default function NewCoachPage() {
             {/* Personal Information */}
             <div className="space-y-4 pt-4 border-t">
               <h3 className="font-medium text-gray-900">Personal Information</h3>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Input
                   id="firstName"
                   name="firstName"
@@ -223,7 +223,7 @@ export default function NewCoachPage() {
                 placeholder="+1 (555) 123-4567"
               />
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Input
                   id="city"
                   name="city"

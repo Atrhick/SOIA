@@ -7,7 +7,7 @@ import { invitePrograms } from '@/lib/get-involved/program-welcome-server'
 import { getSignupOffer } from '@/lib/get-involved/offer'
 import { loadFollowUps, type FollowUp } from '@/lib/get-involved/follow-ups'
 import { getGeneralScripts, loadProgramPitches } from '@/lib/get-involved/scripts-server'
-import { renderScript, resolveScript, type ScenarioKey, type ScriptValues } from '@/lib/get-involved/scripts'
+import { lineSlotFor, renderScript, resolveScript, type ScenarioKey, type ScriptValues } from '@/lib/get-involved/scripts'
 import { MAIN_LINK_PROGRAM, isShareChannel, shareLinkFor } from '@/lib/get-involved/outreach-templates'
 import { TaskHeader } from '@/components/ui/kit/task-header'
 import { OneADayNav } from './one-a-day-nav'
@@ -21,10 +21,10 @@ import { FollowUpsClient, type FollowUpCard } from './follow-ups-client'
 
 /** Used only if neither the program nor the general messages have one (content still being written). */
 const FALLBACK: Partial<Record<ScenarioKey, string>> = {
-  FOLLOW_UP: 'Hi {first name}, just checking in on my last message about {program}. No pressure at all. Would a free 30-minute call be helpful?',
+  FOLLOW_UP: 'Hi {first name}, just checking in on my last message about {program}. No pressure at all. Would a free 15-minute call be helpful?',
   LAST: "Hi {first name}, I won't keep messaging about this. If {program} ever sounds helpful, just reply and I'll send you the details. Wishing you all the best!",
-  NO_CALL: "Hi {first name}, thanks for signing up for {program}! Here's your link to pick a time for the free 30-minute call: {link}",
-  YES: "Great! Here's the link to book your free 30-minute call at a time that suits you: {link}",
+  NO_CALL: "Hi {first name}, thanks for signing up for {program}! Here's your link to pick a time for the free 15-minute call: {link}",
+  YES: "Great! Here's the link to book your free 15-minute call at a time that suits you: {link}",
 }
 
 const SUBJECT: Record<'FOLLOW_UP' | 'LAST' | 'NO_CALL' | 'YES', (name: string) => string> = {
@@ -75,7 +75,8 @@ export async function FollowUpsPage({ role }: { role: 'COACH' | 'AMBASSADOR' }) 
   const general = await getGeneralScripts()
   const message = (scenario: 'FOLLOW_UP' | 'LAST' | 'NO_CALL' | 'YES', p: ReturnType<typeof programFor>, firstName: string, link: string) => {
     const text = resolveScript(p.pitch?.rows ?? [], general, scenario, 'SHORT')?.body ?? FALLBACK[scenario] ?? ''
-    const values: ScriptValues = { firstName, personalLine: '', myName: me?.first ?? '', business: p.business, program: p.name, programLine: p.programLine, link, sponsorship: p.sponsorship, owns: p.owns, mainLink: p.mainLink, ownerFirstName: p.ownerFirstName }
+    // The member's own line goes in later (in the browser); until then its spot shows as [label].
+    const values: ScriptValues = { firstName, personalLine: lineSlotFor(scenario), myName: me?.first ?? '', business: p.business, program: p.name, programLine: p.programLine, link, sponsorship: p.sponsorship, owns: p.owns, mainLink: p.mainLink, ownerFirstName: p.ownerFirstName }
     return { subject: SUBJECT[scenario](firstName), body: renderScript(text, values) }
   }
 

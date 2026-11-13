@@ -182,7 +182,7 @@ export function ContactDetailClient({
         />
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           {/* What they told you - the reason the qualification form exists */}
           {contact.lead && (
@@ -222,7 +222,7 @@ export function ContactDetailClient({
               <h2 className="font-semibold text-gray-900 mb-4">History</h2>
 
               <div className="space-y-3 mb-6 pb-6 border-b border-gray-100">
-                <div className="grid gap-3 sm:grid-cols-[150px_1fr]">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[150px_1fr]">
                   <Select value={logType} onValueChange={setLogType} disabled={locked}>
                     <SelectTrigger aria-label="Interaction type">
                       <SelectValue />

@@ -1,6 +1,12 @@
+// One id per build. The page keeps the id it loaded with; /api/version reports the live one, so a
+// home-screen app that was only paused can tell a new version is out (AppUpdateWatcher).
+const APP_VERSION = process.env.APP_VERSION || new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  generateBuildId: async () => APP_VERSION,
+  env: { NEXT_PUBLIC_APP_VERSION: APP_VERSION },
   // Local only: lets several dev servers run side by side (NEXT_DIST_DIR=.next-a). Production uses .next.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   compress: true,
@@ -32,6 +38,8 @@ const nextConfig = {
   },
   async headers() {
     return [
+      // The service worker must never be served from a cache, or phones keep an old one.
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
       {
         source: '/(.*)',
         headers: [

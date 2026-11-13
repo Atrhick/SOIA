@@ -6,7 +6,8 @@
  */
 import type { LineIdea, LineIdeas } from './scripts'
 
-// Written by copywriters and checked by a critic (2026-11-12). Teen-friendly ideas say so in "when".
+// Written by copywriters and checked by a critic (2026-11-12; reply, follow-up, group and post ideas 2026-11-13).
+// Teen-friendly ideas say so in "when". REPLY covers YES and every ASK_* (see POOL below).
 export const GENERAL_LINE_IDEAS: LineIdeas = {
   "KNOW": [
     {
@@ -173,13 +174,226 @@ export const GENERAL_LINE_IDEAS: LineIdeas = {
       "when": "Teen to an aunt or uncle about a cousin",
       "line": "I think [cousin's name] would like the thing I've been doing, so I'm asking you first."
     }
+  ],
+  "ORG": [
+    {
+      "when": "You've seen their work up close",
+      "line": "I've seen how much your group does for families in [town]."
+    },
+    {
+      "when": "Someone in the group suggested you",
+      "line": "[Their name] from your group said you'd be the right person to talk to."
+    },
+    {
+      "when": "You went to one of their events",
+      "line": "I went to your [event name] and kept thinking about it afterward."
+    },
+    {
+      "when": "You serve the same people",
+      "line": "A lot of the people you work with are the same people we work with."
+    },
+    {
+      "when": "They posted about a need",
+      "line": "I saw your post about wanting more for [the people you serve] to do."
+    },
+    {
+      "when": "You're a member yourself",
+      "line": "I've been part of [group name] for a while, so you were the first group I thought of."
+    },
+    {
+      "when": "Teen writing to their school or club",
+      "line": "I'm a student at [school], and our [club or class] was the first place I thought of."
+    },
+    {
+      "when": "Teen writing to their youth group",
+      "line": "Our youth group was the first place I thought of when I started doing this."
+    }
+  ],
+  "POST": [
+    {
+      "when": "A year that taught you something",
+      "line": "This year showed me how much a little support at the right time can change."
+    },
+    {
+      "when": "You wish you'd had it earlier",
+      "line": "I wish something like this had been around when I was younger."
+    },
+    {
+      "when": "You care about your town",
+      "line": "I care a lot about [your town], and this is one way I'm helping."
+    },
+    {
+      "when": "You already help people this way",
+      "line": "I've spent years helping people with [what you do], and this fits right in."
+    },
+    {
+      "when": "You want more people to know",
+      "line": "Most people I talk to have never heard of this, and I think they should."
+    },
+    {
+      "when": "Teen ambassador posting",
+      "line": "I'm doing this as a student ambassador, and it's been one of the best parts of my year."
+    },
+    {
+      "when": "Teen who likes helping out",
+      "line": "I'm in high school, and helping people around here is something I really enjoy."
+    }
+  ],
+  "REPLY": [
+    {
+      "when": "They said yes after a long chat",
+      "line": "Thanks for hearing me out the other day."
+    },
+    {
+      "when": "They asked how much it costs",
+      "line": "I know cost matters, so here it is plainly."
+    },
+    {
+      "when": "They said their week is packed",
+      "line": "You said [busy days] are hard right now, so this is quick."
+    },
+    {
+      "when": "They said a day that works",
+      "line": "You said [day] works best for you."
+    },
+    {
+      "when": "They think their teen won't want to",
+      "line": "You know [teen's name] best, so I'll go with what you think."
+    },
+    {
+      "when": "They asked if it's legit",
+      "line": "Good that you checked. I'd want to know too."
+    },
+    {
+      "when": "They like to read things first",
+      "line": "You said you like to read things before deciding, so here it is."
+    },
+    {
+      "when": "Teen replying to a family friend",
+      "line": "Thanks for asking about it. It means a lot that you're interested."
+    }
+  ],
+  "FOLLOW_UP": [
+    {
+      "when": "You remembered something they mentioned",
+      "line": "I meant to ask how [the thing they mentioned] went."
+    },
+    {
+      "when": "You learned something new since",
+      "line": "Since we talked, I found out [one new detail]."
+    },
+    {
+      "when": "Something made you think of them",
+      "line": "I was at [place] this week and thought of you."
+    },
+    {
+      "when": "Their big week just passed",
+      "line": "Hope [their event, like the move] went well."
+    },
+    {
+      "when": "They had a busy stretch",
+      "line": "I know things have been busy for you, so no rush on this."
+    },
+    {
+      "when": "Teen checking in with a relative",
+      "line": "I told Mom we talked, and she said to say hi."
+    },
+    {
+      "when": "Teen checking in with a neighbor",
+      "line": "I'm still doing this after school and wanted to check in with you."
+    }
+  ],
+  "LAST": [
+    {
+      "when": "They have something coming up",
+      "line": "Good luck with [what they have coming up]."
+    },
+    {
+      "when": "Keeping the friendship first",
+      "line": "Either way, it was really nice catching up."
+    },
+    {
+      "when": "Their season is busy",
+      "line": "I hope things slow down for you soon."
+    },
+    {
+      "when": "You'll see them soon",
+      "line": "See you at [place or event]."
+    },
+    {
+      "when": "They've helped you before",
+      "line": "Thanks again for your help with [what they helped with]."
+    },
+    {
+      "when": "Teen to a family friend",
+      "line": "Thanks for letting me tell you about it. Say hi to [their family member] for me."
+    }
+  ],
+  "NO_CALL": [
+    {
+      "when": "They signed up after a chat",
+      "line": "It was great talking with you about it the other day."
+    },
+    {
+      "when": "Their week got busy",
+      "line": "I know [that week] got busy for you."
+    },
+    {
+      "when": "They had a reason to start soon",
+      "line": "You said you wanted to start before [their date or season]."
+    },
+    {
+      "when": "A gentle nudge",
+      "line": "No rush at all. I just didn't want the link to get lost."
+    },
+    {
+      "when": "You'll see them in person",
+      "line": "If it's easier, I can help you book it when I see you at [place]."
+    },
+    {
+      "when": "Teen to a relative who signed up",
+      "line": "I'm really glad you signed up. It means a lot to me."
+    }
+  ],
+  "THANKS": [
+    {
+      "when": "They joined",
+      "line": "I'm really glad you're doing this."
+    },
+    {
+      "when": "They booked the call",
+      "line": "Thanks for giving it a try."
+    },
+    {
+      "when": "They took time to decide",
+      "line": "I know it took some thought to say yes, so thank you."
+    },
+    {
+      "when": "They were one of the first",
+      "line": "You were one of the first people to say yes, and that meant a lot."
+    },
+    {
+      "when": "They passed it on to someone",
+      "line": "Thank you for passing it on to [who they shared it with]."
+    },
+    {
+      "when": "Teen thanking a relative",
+      "line": "Thank you for believing in me and signing up."
+    }
   ]
 }
 
-/** Ideas for one scenario: the program's own, else the general ones, else the general "someone I know". */
+/** Replies to what someone said share one pool of ideas. */
+const POOL: Record<string, string> = { YES: 'REPLY', ASK_PRICE: 'REPLY', ASK_TIME: 'REPLY', ASK_TEEN: 'REPLY', ASK_LEGIT: 'REPLY', ASK_INFO: 'REPLY' }
+/** Types whose line is about the person, where "someone I know" ideas are a fair fallback. */
+const PERSON_TYPES = ['KNOW', 'INTRO', 'GROUP', 'NEW', 'PARENT']
+
+/** Ideas for one message type: the program's own, else the general ones (none rather than the wrong kind). */
 export function ideasFor(scenario: string | null | undefined, programIdeas?: LineIdeas | null): LineIdea[] {
-  const key = scenario ?? 'KNOW'
-  return programIdeas?.[key]?.length ? programIdeas[key]! : GENERAL_LINE_IDEAS[key]?.length ? GENERAL_LINE_IDEAS[key]! : GENERAL_LINE_IDEAS.KNOW ?? []
+  const key = POOL[scenario ?? 'KNOW'] ?? scenario ?? 'KNOW'
+  if (programIdeas?.[key]?.length) return programIdeas[key]!
+  if (GENERAL_LINE_IDEAS[key]?.length) return GENERAL_LINE_IDEAS[key]!
+  return PERSON_TYPES.includes(key) ? GENERAL_LINE_IDEAS.KNOW ?? [] : []
 }
 
 const BANNED = /\b(journey|unlock|empower\w*|game[- ]changer|transform your life|nonprofit|non-profit|hope this (email )?finds you|reach out|programme)\b/i

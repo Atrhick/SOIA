@@ -9,8 +9,10 @@
  * Voice notes for anyone editing:
  * - Senders range from a 45-year-old coach to a 16-year-old ambassador texting an aunt. Plain, warm,
  *   no slang. Read it out loud as both before you save.
- * - Lead with the person ({personal line} right after the greeting, on its own line so it disappears
- *   cleanly when left empty), then ONE question. Vary the middle: not every message needs {intro}
+ * - Every message has a {personal line}. In KNOW, INTRO, GROUP and PARENT it is required; everywhere else
+ *   it is optional and taken out when left empty, so each message must read well with and without it.
+ *   Put it on its own line (right after the greeting, or after the opening words of a reply) or at the
+ *   end of the greeting line, so it disappears cleanly. Lead with the person, then ONE question. Vary the middle: not every message needs {intro}
  *   ("Have you come across {program}?" works too), and say the call differently each time.
  * - Texts mention the call in a few words and never describe it. An email describes it at most once,
  *   in its own words. "Three weeks" only in ASK_TIME. A parent is on the call for under-18s.
@@ -23,7 +25,7 @@
  *   that helps people grow through small groups and coaching" for the main link. Never write
  *   "I run {business}" here, and nothing after {intro} may assume which of those it was.
  * - {program} is "NowTransformed" on the main link, so only use it where both read naturally.
- * - The free 30-minute call is run by the NowTransformed team, never the sender. Say so plainly.
+ * - The free 15-minute call is run by the NowTransformed team, never the sender. Say so plainly.
  * - Sponsorship goes in [[sponsor: ...]] blocks (gone when there are no seats this month) and must
  *   leave the decision with the team: may, might, could, some, ask.
  * - Texts: no colons, semicolons or em dashes. Put {link} on its own line instead of "here: {link}".
@@ -36,19 +38,19 @@ export const GENERAL_SCRIPTS: GeneralScripts = {
   // ---------- first message ----------
   'KNOW:SHORT': {
     subject: null,
-    body: "Hi {first name},\n{personal line}\nI keep thinking about you and {program}. It's what I've been busy with lately, and there's a free half-hour call if you want to see whether it fits.\nWant to hear more?",
+    body: "Hi {first name},\n{personal line}\nI keep thinking about you and {program}. It's what I've been busy with lately, and there's a free 15-minute call if you want to see whether it fits.\nWant to hear more?",
   },
   'KNOW:EMAIL': {
     subject: "Thought of you, {first name}",
-    body: "Hi {first name},\n\n{personal line}\n\n{intro}. I've been meaning to tell you about it.\n\nIt starts with a free half-hour call with the team, mostly so you can ask your questions and see whether it's for you.\n\nWant me to send you the details?\n\nThanks,\n{my name}",
+    body: "Hi {first name},\n\n{personal line}\n\n{intro}. I've been meaning to tell you about it.\n\nIt starts with a free 15-minute call with the team, mostly so you can ask your questions and see whether it's for you.\n\nWant me to send you the details?\n\nThanks,\n{my name}",
   },
   'INTRO:SHORT': {
     subject: null,
-    body: "Hi {first name}, I'm {my name}.\n{personal line}\n{intro}. There's a free half-hour call with the team to see what would fit you.\nWorth a chat?",
+    body: "Hi {first name}, I'm {my name}.\n{personal line}\n{intro}. There's a free 15-minute call with the team to see what would fit you.\nWorth a chat?",
   },
   'INTRO:EMAIL': {
     subject: "Hello from {my name}",
-    body: "Hi {first name},\n\nI'm {my name}. {personal line}\n\n{intro}.\n\nIf you're curious, there's a free 30-minute call with the team. If it looks like a fit, they'll talk through next steps with you, and it's fine to come with a list of questions.\n\nWould a short call be worth your time?\n\nThanks,\n{my name}",
+    body: "Hi {first name},\n\nI'm {my name}. {personal line}\n\n{intro}.\n\nIf you're curious, there's a free 15-minute call with the team. If it looks like a fit, they'll talk through next steps with you, and it's fine to come with a list of questions.\n\nWould a short call be worth your time?\n\nThanks,\n{my name}",
   },
   'GROUP:SHORT': {
     subject: null,
@@ -56,77 +58,77 @@ export const GENERAL_SCRIPTS: GeneralScripts = {
   },
   'GROUP:EMAIL': {
     subject: "From {my name}, in our group",
-    body: "Hi {first name},\n\nIt's {my name}, from the group. {personal line}\n\n{intro}, and you came to mind.\n\nThe easiest way to find out more is a free half-hour call with the team. It's mostly a chance to say what you're after and see whether this is the right place for it.\n\nCould I send you the details?\n\n{my name}",
+    body: "Hi {first name},\n\nIt's {my name}, from the group. {personal line}\n\n{intro}, and you came to mind.\n\nThe easiest way to find out more is a free 15-minute call with the team. It's mostly a chance to say what you're after and see whether this is the right place for it.\n\nCould I send you the details?\n\n{my name}",
   },
   'NEW:SHORT': {
     subject: null,
-    body: "Hi {first name}, I'm {my name}.\n{personal line}\n{intro}. If any of that is useful to you, there's a free half-hour call with the team.\nCan I tell you a bit more?",
+    body: "Hi {first name}, I'm {my name}.\n{personal line}\n{intro}. If any of that is useful to you, there's a free 15-minute call with the team.\nCan I tell you a bit more?",
   },
   'NEW:EMAIL': {
     subject: "Quick question from {my name}",
-    body: "Hi {first name},\n\nI'm {my name}. {personal line}\n\n{intro}.\n\nI'm only asking whether you'd like to hear more. If you would, there's a free 30-minute call with the team at a time that suits you, to talk about what you're hoping for and whether this is the place for it.\n\nWould it be all right if I sent you a few details?\n\nThanks,\n{my name}",
+    body: "Hi {first name},\n\nI'm {my name}. {personal line}\n\n{intro}.\n\nI'm only asking whether you'd like to hear more. If you would, there's a free 15-minute call with the team at a time that suits you, to talk about what you're hoping for and whether this is the place for it.\n\nWould it be all right if I sent you a few details?\n\nThanks,\n{my name}",
   },
   'PARENT:SHORT': {
     subject: null,
-    body: "Hi {first name},\n{personal line}\n{intro}. It starts with a half-hour call with the team, and for anyone under 18 a parent is on it, so you'd hear everything first.\nCould I tell you about it?",
+    body: "Hi {first name},\n{personal line}\n{intro}. It starts with a 15-minute call with the team, and for anyone under 18 a parent is on it, so you'd hear everything first.\nCould I tell you about it?",
   },
   'PARENT:EMAIL': {
     subject: "A thought for your family",
-    body: "Hi {first name},\n\n{personal line}\n\n{intro}. I wanted to ask you first.\n\nIt starts with a free half-hour call with the team. For anyone under 18 a parent is on it, so you'd hear everything before anything is decided, and you can bring whatever questions you have. [[sponsor: If cost is a worry, you can ask them about a sponsored seat.]]\n\nWant me to send you the details so you can look first?\n\nThanks,\n{my name}",
+    body: "Hi {first name},\n\n{personal line}\n\n{intro}. I wanted to ask you first.\n\nIt starts with a free 15-minute call with the team. For anyone under 18 a parent is on it, so you'd hear everything before anything is decided, and you can bring whatever questions you have. [[sponsor: If cost is a worry, you can ask them about a sponsored seat.]]\n\nWant me to send you the details so you can look first?\n\nThanks,\n{my name}",
   },
   'ORG:SHORT': {
     subject: null,
-    body: "Hi {first name}, I'm {my name}. {intro}.\nI think some of the people you work with could use it. Each person books a free half-hour call with the NowTransformed team, so all you'd do is pass on a name. [[sponsor: They can ask about a sponsored seat on the call.]]\nCould I send you a short overview to share?",
+    body: "Hi {first name}, I'm {my name}. {intro}.\n{personal line}\nI think some people you work with could use it. Each person books a free 15-minute call with the NowTransformed team. You'd just pass on a name. [[sponsor: They can ask about a sponsored seat.]]\nCould I send an overview to share?",
   },
   'ORG:EMAIL': {
     subject: "For the people you work with",
-    body: "Hi {first name},\n\nI'm {my name}. {intro}.\n\nI think some of the people you work with could use it, and a mention from you means more than anything I could post.\n\nIf you pass along a name, that person books a free half-hour call with the NowTransformed team, who get to know them and, if it's a fit, talk through next steps. [[sponsor: Where cost is a barrier, they can ask on the call about a sponsored seat.]]\n\nI can send a short overview you could forward, or come talk with your team for 15 minutes. Would either one help?\n\nThanks,\n{my name}",
+    body: "Hi {first name},\n\nI'm {my name}. {intro}.\n\n{personal line}\n\nI think some of the people you work with could use it, and a mention from you means more than anything I could post.\n\nIf you pass along a name, that person books a free 15-minute call with the NowTransformed team, who get to know them and, if it's a fit, talk through next steps. [[sponsor: Where cost is a barrier, they can ask on the call about a sponsored seat.]]\n\nI can send a short overview you could forward, or come talk with your team for 15 minutes. Would either one help?\n\nThanks,\n{my name}",
   },
   'POST:POST': {
     subject: null,
-    body: "{intro}.\n\nIf you've been wanting something like that for yourself, or you know someone who has, message me. There's a free half-hour call with the team to see whether it fits.\n\nOr book a call here\n{link}",
+    body: "{intro}.\n\n{personal line}\n\nIf you've been wanting something like that for yourself, or you know someone who has, message me. There's a free 15-minute call with the team to see whether it fits.\n\nOr book a call here\n{link}",
   },
   // ---------- when they reply ----------
   'YES:SHORT': {
     subject: null,
-    body: "Great. Here's where you sign up and pick a time\n{link}\nIf you jot down a couple of questions first, the team will go through them with you.",
+    body: "Great. {personal line}\nHere's where you sign up and pick a time\n{link}\nIf you jot down a couple of questions first, the team will go through them with you.",
   },
   'ASK_PRICE:SHORT': {
     subject: null,
-    body: "The call is free. The team goes over cost on the call, so you hear it from them and not my guess. [[sponsor: You can also ask them about a sponsored seat.]]\nWant the link to book it?",
+    body: "{personal line}\nThe call is free. The team goes over cost on the call, so you hear it from them and not my guess. [[sponsor: You can also ask them about a sponsored seat.]]\nWant the link to book it?",
   },
   'ASK_TIME:SHORT': {
     subject: null,
-    body: "It's only half an hour, and you can book it up to three weeks out, so pick whichever week is calmer. Nothing to decide until after.\nWant me to send it so you can look at the times?",
+    body: "{personal line}\nIt's only 15 minutes, and you can book it up to three weeks out, so pick whichever week is calmer. Nothing to decide until after.\nWant me to send it so you can look at the times?",
   },
   'ASK_TEEN:SHORT': {
     subject: null,
-    body: "Pretty normal at that age. They don't have to be sold on it before the call. A parent is always on it for anyone under 18, so you'd be there, and they can ask their own questions.\nWould they try one call with you there?",
+    body: "Pretty normal at that age.\n{personal line}\nThey don't have to be sold on it before the call. A parent is always on it for anyone under 18, so you'd be there, and they can ask their own questions.\nWould they try one call with you there?",
   },
   'ASK_LEGIT:SHORT': {
     subject: null,
-    body: "Good that you checked. NowTransformed is a youth leadership development program, and I'm part of it. The call is with the people who run it. This page shows who invited you and how it works\n{link}\nAsk me anything else.",
+    body: "Good that you checked.\n{personal line}\nNowTransformed is a youth leadership development program, and I'm part of it. The call is with the people who run it. This page shows who invited you and how it works\n{link}\nAsk me anything else.",
   },
   'ASK_INFO:SHORT': {
     subject: null,
-    body: "Sure. Everything's on this page\n{link}\nMind if I check in later this week?",
+    body: "Sure. {personal line}\nEverything's on this page\n{link}\nMind if I check in later this week?",
   },
   // ---------- following up ----------
   'FOLLOW_UP:SHORT': {
     subject: null,
-    body: "Hi {first name}, bumping this in case it got buried. The call's only half an hour, at whatever time suits you.\nStill curious, or not right now?",
+    body: "Hi {first name}, bumping this in case it got buried.\n{personal line}\nThe call's only 15 minutes, at whatever time suits you.\nStill curious, or not right now?",
   },
   'LAST:SHORT': {
     subject: null,
-    body: "Hi {first name}, I'll leave this with you. If you want to talk about {program} later, I'm easy to find.",
+    body: "Hi {first name}, I'll leave this with you.\n{personal line}\nIf you want to talk about {program} later, I'm easy to find.",
   },
   'NO_CALL:SHORT': {
     subject: null,
-    body: "Hi {first name}, thanks for signing up. Your call isn't booked yet, and that email with the booking link is easy to lose. Put your email in here and you'll get a fresh one\n{link}\nIf none of the times work, tell me and I'll ask the team.",
+    body: "Hi {first name}, thanks for signing up.\n{personal line}\nYour call isn't booked yet, and that email with the booking link is easy to lose. Put your email in here and you'll get a fresh one\n{link}\nIf none of the times work, tell me and I'll ask the team.",
   },
   'THANKS:SHORT': {
     subject: null,
-    body: "Hi {first name}, I'm really glad you said yes. Let me know how it goes.",
+    body: "Hi {first name}, I'm really glad you said yes.\n{personal line}\nLet me know how it goes.",
   },
 }
 
@@ -135,7 +137,7 @@ export const GENERAL_TIPS: PlaybookSection[] = [
   {
     title: "If \"selling\" feels weird",
     points: [
-      "You're not selling anything. You're asking one person if they want a 30-minute conversation with the NowTransformed team, and \"no\" is a perfectly good answer.",
+      "You're not selling anything. You're asking one person if they want a 15-minute conversation with the NowTransformed team, and \"no\" is a perfectly good answer.",
       "Think of it like telling someone about a good dentist or a show you liked. You thought of them, so you mentioned it. That's all a first message has to be.",
       "Plenty of people won't reply to the first message, and it's almost never about you. They were busy, the text got buried, or the timing is off.",
       "If you're 17 or under, only message adults you already know, like family, family friends or a teacher you trust. If the person who could use this is under 18, talk to their parent, never to them directly.",
@@ -174,7 +176,7 @@ export const GENERAL_TIPS: PlaybookSection[] = [
     title: "Following up and staying honest",
     points: [
       "Follow up twice at most. Send one check-in after 3 or 4 days with something new, one kind last note around day 10 to 14, and then stop.",
-      "Never send \"Did you see my message?\" because it makes people feel guilty. Give them something new instead, like the fact that the call is only half an hour.",
+      "Never send \"Did you see my message?\" because it makes people feel guilty. Give them something new instead, like the fact that the call is only 15 minutes.",
       "Never say someone will get a sponsored seat. Say they may be able to and can ask on the call, because the team decides.",
       "Don't promise results, health changes or money. Say what happens next (a free call), not what it will do for them.",
       "Never name, tag or post about anyone under 18, and never mention anyone's health, money or foster care situation in public.",

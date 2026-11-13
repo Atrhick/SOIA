@@ -53,7 +53,7 @@ export function WelcomeClient(p: {
           <a href={p.signInPath} className={journeyBtn}>Sign in to my dashboard</a>
         </section>
       ) : (
-      <div className="grid gap-4 md:gap-6 md:grid-cols-2 items-start">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-2 items-start">
         <section aria-labelledby="link-title" className={panel}>
           <h2 id="link-title" className="text-[13px] font-bold uppercase tracking-wide text-primary-800">Your Get Involved link</h2>
           {p.inviteUrl ? (

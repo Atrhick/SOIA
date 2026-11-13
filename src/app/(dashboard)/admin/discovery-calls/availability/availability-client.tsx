@@ -96,7 +96,7 @@ export function AvailabilityClient({ hostUserId, hostName, timezone, windows, sh
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 id="wt-h" className="font-bold text-gray-900">{showZone ? <>{hostName}&apos;s weekly times</> : 'Weekly times'}</h2>
-            <p className="text-sm text-gray-600 mt-0.5">When prospects can book a 30-minute call, in {showZone ? 'this' : `${first}'s`} time zone. Prospects see them in their own zone, 12 hours to 3 weeks ahead.</p>
+            <p className="text-sm text-gray-600 mt-0.5">When prospects can book a 15-minute call, in {showZone ? 'this' : `${first}'s`} time zone. Prospects see them in their own zone, 12 hours to 3 weeks ahead.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {showZone && <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-800"><Globe2 className="h-3.5 w-3.5" aria-hidden />{zoneLabel(timezone)} ({zoneOffset(timezone)})</span>}
@@ -117,7 +117,7 @@ export function AvailabilityClient({ hostUserId, hostName, timezone, windows, sh
         )}
         <p className={`text-sm font-medium flex items-center gap-1.5 ${list.length ? 'text-gray-800' : 'text-amber-800'}`} aria-live="polite">
           {list.length
-            ? <><CheckCircle2 className="h-4 w-4 text-green-700" aria-hidden />{slots} half-hour slot{slots === 1 ? '' : 's'} a week across {new Set(list.map((w) => w.dayOfWeek)).size} day{new Set(list.map((w) => w.dayOfWeek)).size === 1 ? '' : 's'}</>
+            ? <><CheckCircle2 className="h-4 w-4 text-green-700" aria-hidden />{slots} 15-minute slot{slots === 1 ? '' : 's'} a week across {new Set(list.map((w) => w.dayOfWeek)).size} day{new Set(list.map((w) => w.dayOfWeek)).size === 1 ? '' : 's'}</>
             : <><AlertTriangle className="h-4 w-4" aria-hidden />No weekly times: prospects can&apos;t book {first} yet.</>}
         </p>
         {list.length === 0 && (
@@ -138,7 +138,7 @@ export function AvailabilityClient({ hostUserId, hostName, timezone, windows, sh
           const more = nextBlock(list, d)
           return (
             <li key={d} className={`px-5 py-2.5 ${on ? '' : 'bg-gray-50/50'}`}>
-              <div className="grid gap-x-4 gap-y-2 sm:grid-cols-[9.5rem_1fr]">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[9.5rem_1fr]">
                 <div className="flex items-center gap-3 h-10 w-fit">
                   <button type="button" role="switch" aria-checked={on} aria-label={`${DAY_NAMES[d]} available`} onClick={() => toggleDay(d, !on)}
                     className={`relative flex-none h-7 w-12 rounded-full transition-colors ${ring} ${on ? 'bg-primary-700' : 'bg-gray-300'}`}>

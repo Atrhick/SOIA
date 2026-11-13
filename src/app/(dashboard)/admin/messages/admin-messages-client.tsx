@@ -155,7 +155,7 @@ export function AdminMessagesClient({
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
           <Card>
             <CardContent className="py-4">
               <div className="text-center">
@@ -203,7 +203,7 @@ export function AdminMessagesClient({
         )}
 
         {/* Filters */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={filter === 'ALL' ? 'default' : 'outline'}
             size="sm"

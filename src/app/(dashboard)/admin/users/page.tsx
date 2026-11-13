@@ -23,6 +23,7 @@ export default async function AdminUsersPage() {
     <UsersAdminClient
       users={users}
       features={features}
+      currentUserId={session.user.id}
     />
   )
 }

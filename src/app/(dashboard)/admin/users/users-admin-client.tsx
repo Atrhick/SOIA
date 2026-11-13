@@ -45,11 +45,15 @@ import {
   setUserFeaturePermissions,
 } from '@/lib/actions/users'
 import { PasswordInput } from '@/components/ui/password-input'
+import { RolesEditor } from './roles-editor'
+import { ROLE_VIEW_NAMES } from '@/lib/roles'
 
 type User = {
   id: string
   email: string
   role: string
+  /** Other roles this login can switch to. */
+  extraRoles: string[]
   createdAt: string
   firstName: string | null
   lastName: string | null
@@ -97,9 +101,11 @@ const FEATURE_INFO: Record<string, { label: string; description: string }> = {
 export function UsersAdminClient({
   users: initialUsers,
   features,
+  currentUserId,
 }: {
   users: User[]
   features: FeatureConfig[]
+  currentUserId: string
 }) {
   const [users, setUsers] = useState(initialUsers)
   const [searchQuery, setSearchQuery] = useState('')
@@ -129,11 +135,11 @@ export function UsersAdminClient({
   // Reset password state
   const [resetPassword, setResetPassword] = useState('')
 
+  // Every word typed must appear somewhere in the full name or email, so "wendy ndebele" finds Wendy Manasa Ndebele.
+  const searchWords = searchQuery.toLowerCase().split(/\s+/).filter(Boolean)
   const filteredUsers = users.filter(user => {
-    const matchesSearch =
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (user.firstName?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (user.lastName?.toLowerCase().includes(searchQuery.toLowerCase()))
+    const haystack = `${user.firstName ?? ''} ${user.lastName ?? ''} ${user.email}`.toLowerCase()
+    const matchesSearch = searchWords.every((w) => haystack.includes(w))
 
     const matchesRole = roleFilter === 'all' || user.role === roleFilter
 
@@ -329,7 +335,7 @@ export function UsersAdminClient({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600">
@@ -354,7 +360,7 @@ export function UsersAdminClient({
       )}
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -419,18 +425,19 @@ export function UsersAdminClient({
         </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="flex gap-4 mb-4">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by email or name..."
+                placeholder="Search by name or email"
+                aria-label="Search by name or email"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
               <SelectContent>
@@ -494,6 +501,11 @@ export function UsersAdminClient({
                           <SelectItem value="PARENT">Parent</SelectItem>
                         </SelectContent>
                       </Select>
+                      {user.extraRoles.length > 0 && (
+                        <p className="mt-1 text-xs text-gray-600">
+                          Also: {user.extraRoles.map((r) => ROLE_VIEW_NAMES[r as keyof typeof ROLE_VIEW_NAMES] ?? r).join(', ')}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {user.status && (
@@ -553,9 +565,9 @@ export function UsersAdminClient({
 
       {/* User Detail / Permissions Dialog */}
       <Dialog open={isUserDetailDialogOpen} onOpenChange={setIsUserDetailDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>User Permissions</DialogTitle>
+            <DialogTitle>User Settings</DialogTitle>
             <DialogDescription>
               {selectedUser?.email} ({selectedUser?.role})
             </DialogDescription>
@@ -571,6 +583,20 @@ export function UsersAdminClient({
                 <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-2 rounded text-sm">
                   {error}
                 </div>
+              )}
+
+              {selectedUser && (
+                <RolesEditor
+                  key={selectedUser.id}
+                  user={selectedUser}
+                  isSelf={selectedUser.id === currentUserId}
+                  coaches={users.filter((u) => u.coachId).map((u) => ({ id: u.coachId!, name: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email }))}
+                  onSaved={(role, extraRoles) => {
+                    // Profile ids for newly added roles arrive with the next page load.
+                    setUsers((all) => all.map((u) => (u.id === selectedUser.id ? { ...u, role, extraRoles } : u)))
+                    setSelectedUser((cur) => (cur ? { ...cur, role, extraRoles } : cur))
+                  }}
+                />
               )}
 
               <div className="space-y-1">

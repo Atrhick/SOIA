@@ -107,7 +107,7 @@ export function SurveysAdminClient({ surveys, stats }: SurveysAdminClientProps) 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Surveys & Quizzes</h1>
           <p className="text-gray-600">Create and manage quizzes and surveys for coaches and ambassadors</p>
@@ -213,9 +213,9 @@ export function SurveysAdminClient({ surveys, stats }: SurveysAdminClientProps) 
         {filteredSurveys.length > 0 ? (
           filteredSurveys.map((survey) => (
             <div key={survey.id} className="bg-white rounded-lg border p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <h3 className="font-medium">{survey.title}</h3>
                     {getStatusBadge(survey.status)}
                     {survey.isAnonymous && (
@@ -227,7 +227,7 @@ export function SurveysAdminClient({ surveys, stats }: SurveysAdminClientProps) 
                   {survey.description && (
                     <p className="text-sm text-gray-500 mt-1">{survey.description}</p>
                   )}
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-600">
                     <span>{survey.questionCount} questions</span>
                     <span>{survey.submissionCount} submissions</span>
                     <span>
@@ -244,7 +244,7 @@ export function SurveysAdminClient({ surveys, stats }: SurveysAdminClientProps) 
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {survey.status === 'DRAFT' && (
                     <button
                       onClick={() => handleStatusChange(survey.id, 'PUBLISHED')}

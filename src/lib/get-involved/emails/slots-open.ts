@@ -9,7 +9,7 @@ export function timesOpenEmail(p: { firstName: string; bookUrl: string; parent?:
     subject: 'Discovery call times are open',
     html: layout(
       `${p.parent ? `<p style="${P}">Hi ${esc(p.parent.first)}, we're copying you because ${esc(p.firstName)} is 17 or under. A parent or guardian must be on the call.</p>` : ''}
-       <p style="${P}">Hi ${esc(p.firstName)}, good news: new times just opened for your free 30-minute discovery call.</p>
+       <p style="${P}">Hi ${esc(p.firstName)}, good news: new times just opened for your free 15-minute discovery call.</p>
        <p style="${SMALL}">Times go fast, so pick one that works for you soon.</p>`,
       { label: 'Pick a time', url: p.bookUrl },
       '',

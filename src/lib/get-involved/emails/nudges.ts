@@ -70,7 +70,7 @@ export function checkInEmail(p: { firstName: string; bookUrl: string; stopUrl: s
   return {
     subject: `Checking in, ${p.firstName}`,
     html: layout(
-      `<p style="${P}">Hi ${esc(p.firstName)}, last month you asked us to check in. Are you still interested in a free 30-minute call? Pick a time whenever you're ready.</p>
+      `<p style="${P}">Hi ${esc(p.firstName)}, last month you asked us to check in. Are you still interested in a free 15-minute call? Pick a time whenever you're ready.</p>
        ${button({ label: 'Pick a call time', url: p.bookUrl })}
        ${p.stopUrl ? `<p style="${SMALL}">Not for you right now? <a href="${esc(p.stopUrl)}" style="color:#6b7280">Stop emails about this</a>.</p>` : ''}`,
       undefined,

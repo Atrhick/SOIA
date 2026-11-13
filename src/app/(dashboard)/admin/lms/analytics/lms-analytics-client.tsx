@@ -246,7 +246,7 @@ export function LMSAnalyticsClient({
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Activity */}
           <div className="bg-white rounded-lg border">
             <div className="p-4 border-b flex items-center justify-between">

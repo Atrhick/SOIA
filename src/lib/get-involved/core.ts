@@ -18,7 +18,7 @@ export function ageRangeLabel(v: string | null | undefined): string {
   return AGE_RANGES.find((a) => a.value === v)?.label ?? 'Not given'
 }
 
-export const CALL_MINUTES = 30
+export const CALL_MINUTES = 15
 export const BOOKING_WINDOW_DAYS = 21
 export const MIN_NOTICE_HOURS = 12
 /** Prospects can change or cancel up to this long before the call. */
@@ -75,7 +75,7 @@ export interface Slot {
 }
 
 /**
- * All open 30-minute slots across the given hosts. A slot is open for a host
+ * All open CALL_MINUTES-long slots across the given hosts. A slot is open for a host
  * when it falls inside one of their weekly windows (in their own timezone),
  * is at least MIN_NOTICE_HOURS away, within the booking window, not on one of the
  * host's blocked days, and does not overlap a busy block for that host.

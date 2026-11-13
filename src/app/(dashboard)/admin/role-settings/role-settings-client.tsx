@@ -213,7 +213,7 @@ export function RoleSettingsClient({ configs, liveTerms, history, inProgress, in
               </div>
               <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${form.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>{form.active ? 'Offered on calls' : 'Not offered'}</span>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label htmlFor={fid('label')} className={lbl}>Role name</label>
                 <input id={fid('label')} value={form.label} maxLength={80} onChange={(e) => { set('label', e.target.value); clearError('label') }} aria-invalid={!!err('label')} aria-describedby={described('label')} className={`${inp} ${border('label')}`} />
@@ -305,7 +305,7 @@ export function RoleSettingsClient({ configs, liveTerms, history, inProgress, in
               {/* ---- Orientation ---- */}
               <section className={card} aria-labelledby="rs-orient-h">
                 <h2 id="rs-orient-h" className="text-lg font-bold text-gray-900">Orientation</h2>
-                <div className="grid gap-4 md:grid-cols-[1fr_10rem]">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_10rem]">
                   <div>
                     <label htmlFor={fid('orientationUrl')} className={lbl}>Recording link</label>
                     <input id={fid('orientationUrl')} type="url" inputMode="url" value={form.orientationUrl} maxLength={500} onChange={(e) => { set('orientationUrl', e.target.value); clearError('orientationUrl') }} aria-invalid={!!err('orientationUrl')} aria-describedby={described('orientationUrl', true)} className={`${inp} ${border('orientationUrl')}`} placeholder="https://…" />

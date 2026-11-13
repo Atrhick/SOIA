@@ -88,13 +88,13 @@ export function ConsentClient(props: {
         </div>
       )}
       <ul className="list-disc pl-5 text-sm leading-7 text-gray-700">
-        <li>First step: a free 30-minute video call. You join it with {childFirst}.</li>
+        <li>First step: a free 15-minute video call. You join it with {childFirst}.</li>
         {offer && <li>Families who are a good fit may qualify for a NowTransformed sponsored seat. The team will talk about it on the free call.</li>}
         <li>We use {childFirst}&apos;s details only for this. You can ask us to delete them any time.</li>
       </ul>
 
       <form onSubmit={onSubmit} className="space-y-4 border-t border-gray-100 pt-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="rel" className="block text-sm font-semibold text-gray-900 mb-1.5">Your relationship to {childFirst}</label>
             <select id="rel" name="relationship" className={input} defaultValue={props.relationship}><option>Parent</option><option>Legal guardian</option></select>

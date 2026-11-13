@@ -620,7 +620,7 @@ export function CollaborationClient({
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Channels */}
         <Card>
           <CardHeader>
@@ -765,7 +765,7 @@ export function CollaborationClient({
                 <p className="text-gray-500 text-sm">No documents shared</p>
               </div>
             ) : (
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {documents.map((doc) => (
                   <a
                     key={doc.id}

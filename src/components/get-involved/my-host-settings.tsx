@@ -33,7 +33,7 @@ export function MyHostSettings({ timezone, meetingUrl, ageLabels, active }: { ti
           {active ? 'You are taking new calls' : 'You are not taking new calls right now'} for: {ageLabels.join(', ') || 'no age ranges yet'}. An admin sets these.
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label htmlFor="my-tz" className="block text-sm font-semibold text-gray-700 mb-1">Your time zone</label>
           <TimeZoneSelect id="my-tz" value={tz} onChange={setTz} className={input} />

@@ -222,7 +222,7 @@ function HostForm({ person, isNew, onDone }: { person: Person; isNew?: boolean; 
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); save() }} className="space-y-5" noValidate>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1" htmlFor={`dn-${id}`}>Name prospects see</label>
           <input id={`dn-${id}`} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className={input} placeholder="e.g. Lina Lopez" aria-invalid={nameMissing || undefined} />

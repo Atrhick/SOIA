@@ -44,7 +44,7 @@ export function programWelcomeParts(p: { firstName: string; inviterName: string 
         { text: 'NowTransformed', bold: true },
         { text: `, a grant-funded youth empowerment program built on four pillars: ${NT_PILLARS}. Because of that funding, you may qualify for a sponsored place at a discount.` },
       ],
-      [{ text: 'Book a free 30-minute discovery call to find out whether you qualify, or to learn more about the youth program.' }],
+      [{ text: 'Book a free 15-minute discovery call to find out whether you qualify, or to learn more about the youth program.' }],
     ],
     cta: 'Book my discovery call',
   }
@@ -102,7 +102,7 @@ export function welcomeCallParts(p: { firstName: string; inviterName: string | n
       [{ text: `Hi ${p.firstName},` }],
       [{ text: 'Thanks for your interest in ' }, ...named, { text: `.${inviterFirst ? ` ${inviterFirst} shared it with you because they thought it could help.` : ''}` }],
       [{ text: p.note.trim() }],
-      [{ text: 'The next step is a free 30-minute call. Times start as soon as tomorrow.' }],
+      [{ text: 'The next step is a free 15-minute call. Times start as soon as tomorrow.' }],
     ],
     cta: 'Pick a call time',
   }

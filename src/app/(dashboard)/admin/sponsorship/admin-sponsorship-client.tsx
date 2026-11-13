@@ -137,7 +137,7 @@ export function AdminSponsorshipClient({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4 lg:grid-cols-7">
         <Card>
           <CardContent className="py-4">
             <div className="text-center">
@@ -305,7 +305,7 @@ export function AdminSponsorshipClient({
                     {/* Expanded Content */}
                     {isExpanded && (
                       <>
-                        <div className="grid gap-4 md:grid-cols-3 text-sm border-t pt-3">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 text-sm border-t pt-3">
                           <div>
                             <span className="text-gray-500">Requested:</span>{' '}
                             <span className="font-medium text-green-600">

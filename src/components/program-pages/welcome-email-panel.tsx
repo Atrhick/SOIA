@@ -95,7 +95,7 @@ export function WelcomeEmailPanel({ data }: { data: WelcomePanelData }) {
         <p className="basis-full text-sm text-gray-600">The email uses both names. Change them at the top of this page; new emails use them as soon as you save.</p>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2 items-start">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 items-start">
         <div className="space-y-3 min-w-0">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <label htmlFor={`wn-${data.programId}`} className="block text-base font-semibold text-gray-900">Your paragraph about {data.programName}</label>

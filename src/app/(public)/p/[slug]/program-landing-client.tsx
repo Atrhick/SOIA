@@ -250,7 +250,7 @@ export function ProgramLandingClient({
               <legend className="text-sm font-medium text-gray-900 mb-2">
                 Who are you exploring this program for?
               </legend>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {PROGRAM_AUDIENCES.map((a) => (
                   <label
                     key={a}

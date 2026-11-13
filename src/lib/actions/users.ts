@@ -7,6 +7,7 @@ import { sendWelcomeInvite } from '@/lib/welcome-invite'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { upcomingHostCallsError, upcomingHostedCallsWhere } from '@/lib/prospect-pipeline'
+import { ROLE_VIEW_NAMES, SWITCHABLE_ROLES, rolesOf, splitRoles } from '@/lib/roles'
 
 const createUserSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -41,6 +42,7 @@ export async function getAllUsers() {
             status: true,
           }
         },
+        associateProfile: { select: { firstName: true, lastName: true } },
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -50,9 +52,10 @@ export async function getAllUsers() {
         id: u.id,
         email: u.email,
         role: u.role,
+        extraRoles: u.extraRoles as string[],
         createdAt: u.createdAt.toISOString(),
-        firstName: u.coachProfile?.firstName || u.ambassadorProfile?.firstName || null,
-        lastName: u.coachProfile?.lastName || u.ambassadorProfile?.lastName || null,
+        firstName: u.coachProfile?.firstName || u.ambassadorProfile?.firstName || u.associateProfile?.firstName || null,
+        lastName: u.coachProfile?.lastName || u.ambassadorProfile?.lastName || u.associateProfile?.lastName || null,
         status: u.coachProfile?.coachStatus || u.ambassadorProfile?.status || null,
         coachId: u.coachProfile?.id || null,
         ambassadorId: u.ambassadorProfile?.id || null,
@@ -179,9 +182,11 @@ export async function updateUserRole(userId: string, newRole: string) {
       if (blocked) return { error: blocked }
     }
 
+    // A main role can't also be an extra one.
+    const current = await prisma.user.findUnique({ where: { id: userId }, select: { extraRoles: true } })
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { role: newRole as typeof validRoles[number] },
+      data: { role: newRole as typeof validRoles[number], extraRoles: (current?.extraRoles ?? []).filter((r) => r !== newRole) },
     })
 
     await prisma.auditLog.create({
@@ -425,4 +430,107 @@ export async function setUserFeaturePermissions(
     console.error('Error setting user permissions:', error)
     return { error: 'Failed to set permissions' }
   }
+}
+
+const setRolesSchema = z.object({
+  userId: z.string().min(1),
+  roles: z.array(z.enum(SWITCHABLE_ROLES)).min(1, 'Pick at least one role'),
+  firstName: z.string().trim().max(100).optional(),
+  lastName: z.string().trim().max(100).optional(),
+  /** The coach who leads them, needed the first time someone is made an ambassador. */
+  ambassadorCoachId: z.string().optional(),
+})
+
+/**
+ * Gives one login any mix of the admin, coach and ambassador roles, so the person can switch views
+ * instead of keeping a separate login per role. Adding coach or ambassador creates that profile the
+ * first time; taking a role away keeps the profile and its history (adding it back reuses it).
+ */
+export async function setUserRoles(input: z.infer<typeof setRolesSchema>) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN' || session.user.isImpersonating) {
+    return { error: 'Unauthorized' }
+  }
+  const parsed = setRolesSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || 'Invalid data' }
+  const { userId, roles, ambassadorCoachId } = parsed.data
+  const split = splitRoles(roles)
+  if (!split) return { error: 'Pick at least one role' }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true, email: true, role: true, extraRoles: true,
+      coachProfile: { select: { id: true, firstName: true, lastName: true } },
+      ambassadorProfile: { select: { id: true, firstName: true, lastName: true } },
+      associateProfile: { select: { id: true } },
+    },
+  })
+  if (!user) return { error: 'User not found' }
+  if (user.associateProfile) return { error: 'Change this person’s association from the Associates page instead' }
+  if (rolesOf(user).some((r) => !(SWITCHABLE_ROLES as readonly string[]).includes(r))) {
+    return { error: `Only ${SWITCHABLE_ROLES.map((r) => ROLE_VIEW_NAMES[r]).join(', ')} can be combined. Change this person’s main role first.` }
+  }
+  if (userId === session.user.id && !roles.includes('ADMIN')) return { error: 'You can’t take away your own admin role' }
+
+  const had = rolesOf(user)
+  // Only admins host discovery calls (same rule as changing the main role).
+  if (had.includes('ADMIN') && !roles.includes('ADMIN')) {
+    const upcoming = await prisma.discoveryCall.count({ where: upcomingHostedCallsWhere(userId, new Date()) })
+    const blocked = upcomingHostCallsError(upcoming)
+    if (blocked) return { error: blocked }
+  }
+
+  const known = user.coachProfile ?? user.ambassadorProfile
+  const firstName = parsed.data.firstName || known?.firstName || ''
+  const lastName = parsed.data.lastName || known?.lastName || ''
+  const needsCoach = roles.includes('COACH') && !user.coachProfile
+  const needsAmbassador = roles.includes('AMBASSADOR') && !user.ambassadorProfile
+  if ((needsCoach || needsAmbassador) && !firstName) return { error: 'Add their first and last name first' }
+  if (needsAmbassador) {
+    if (!ambassadorCoachId) return { error: 'Choose the coach who leads them as an ambassador' }
+    const coach = await prisma.coachProfile.findUnique({ where: { id: ambassadorCoachId }, select: { id: true } })
+    if (!coach && ambassadorCoachId !== 'SELF') return { error: 'That coach was not found' }
+    if (ambassadorCoachId === 'SELF' && !roles.includes('COACH')) return { error: 'Choose the coach who leads them as an ambassador' }
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      let coachId = user.coachProfile?.id
+      if (needsCoach) {
+        const coach = await tx.coachProfile.create({ data: { userId, firstName, lastName, coachStatus: 'ONBOARDING_INCOMPLETE' } })
+        await tx.businessExcellenceCRM.create({ data: { coachId: coach.id } })
+        await tx.websiteContentStatus.create({ data: { coachId: coach.id } })
+        coachId = coach.id
+      }
+      if (needsAmbassador) {
+        await tx.ambassador.create({
+          data: {
+            userId,
+            coachId: ambassadorCoachId === 'SELF' ? coachId! : ambassadorCoachId!,
+            firstName,
+            lastName,
+            email: user.email,
+            status: 'APPROVED',
+          },
+        })
+      }
+      await tx.user.update({ where: { id: userId }, data: { role: split.role, extraRoles: split.extraRoles } })
+      await tx.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: 'UPDATE_USER_ROLES',
+          entityType: 'User',
+          entityId: userId,
+          details: JSON.stringify({ from: had, to: roles }),
+        },
+      })
+    })
+  } catch (error) {
+    console.error('Error setting user roles:', error)
+    return { error: 'Failed to save roles' }
+  }
+
+  revalidatePath('/admin/users')
+  return { success: true, role: split.role, extraRoles: split.extraRoles as string[] }
 }

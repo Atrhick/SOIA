@@ -315,7 +315,7 @@ export default async function CoachDashboard({ searchParams }: PageProps) {
       )}
 
       {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Only while onboarding is unfinished - it should not hold prime
             position for a coach who completed it months ago. */}
         {coachData.coachStatus === 'ONBOARDING_INCOMPLETE' && (
@@ -379,7 +379,7 @@ export default async function CoachDashboard({ searchParams }: PageProps) {
       </div>
 
       {/* Business Excellence & Events */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Business Excellence Summary */}
         <Card variant="default">
           <CardHeader>
@@ -483,7 +483,7 @@ export default async function CoachDashboard({ searchParams }: PageProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Link href="/coach/income-goals" className="quick-action group">
               <Target className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
               <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">

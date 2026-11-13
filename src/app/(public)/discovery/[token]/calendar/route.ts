@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     endsAt: call.endsAt,
     title: `NowTransformed discovery call with ${host}`,
     description: [
-      `Your free 30-minute discovery call with ${host}.`,
+      `Your free ${Math.round((call.endsAt.getTime() - call.startsAt.getTime()) / 60_000)}-minute discovery call with ${host}.`,
       meetingUrl ? `Join: ${meetingUrl}` : null,
       p.ageRange === 'UNDER_18' ? 'A parent or guardian must be on this call.' : null,
       `Change or cancel (up to 2 hours before): ${journeyUrl(p.journeyToken)}`,

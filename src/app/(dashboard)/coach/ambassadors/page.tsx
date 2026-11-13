@@ -70,7 +70,7 @@ export default async function AmbassadorsPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ambassadors</h1>
           <p className="text-gray-600">Manage your assigned ambassadors</p>
@@ -84,7 +84,7 @@ export default async function AmbassadorsPage({
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="py-4">
             <div className="flex items-center gap-4">

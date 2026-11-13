@@ -23,7 +23,7 @@ export function CallOriginCards({ o }: { o: CallOrigin }) {
   const inviterFirst = o.inviter?.first
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <section aria-labelledby="origin-h" className={card}>
         <h2 id="origin-h" className="font-bold text-gray-900 mb-3">Where {first} came from</h2>
         <dl className="grid grid-cols-1 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">

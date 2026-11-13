@@ -602,14 +602,14 @@ export function SurveyEditorClient({ survey }: SurveyEditorClientProps) {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Link href="/admin/surveys">
           <button className="p-2 hover:bg-gray-100 rounded-lg">
             <ArrowLeft className="h-5 w-5" />
           </button>
         </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900">{settingsForm.title}</h1>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${
               survey.type === 'QUIZ' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
@@ -949,9 +949,9 @@ export function SurveyEditorClient({ survey }: SurveyEditorClientProps) {
       </div>
 
       {/* Questions Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Questions ({questions.length})</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => {
               setPageForm({ title: '', description: '' })

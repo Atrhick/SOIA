@@ -201,7 +201,7 @@ function RecordForm({ data, started, onDone }: { data: CallRecordData; started: 
           </div>
           <FieldError id="e-parent" msg={fe.parentAttended} />
           {parent !== 'no' && (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="parentName" className={lbl}>Name of the adult on the call</label>
                 <input id="parentName" value={parentName} onChange={(e) => { clear('parentName'); setParentName(e.target.value) }} maxLength={120} autoComplete="off" aria-invalid={!!fe.parentName} aria-describedby={fe.parentName ? 'e-pn' : undefined} className={`${field} h-11`} />
@@ -222,7 +222,7 @@ function RecordForm({ data, started, onDone }: { data: CallRecordData; started: 
         </fieldset>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start">
         <div className="space-y-5 min-w-0">
           <fieldset className={`${card} min-w-0`} aria-describedby={fe.outcome ? 'e-outcome' : undefined}>
             <legend className="sr-only">How did the call go?</legend>
@@ -314,10 +314,10 @@ function Recorded({ data, onDone }: { data: CallRecordData; onDone: (m: string) 
   const when = (iso: string) => whenIn(iso, data.tz)
   const { call, prospect: p } = data
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start">
       <section className={`${card} space-y-3 min-w-0`}>
         <h2 className={h2}>Call record</h2>
-        <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[160px_minmax(0,1fr)] text-sm">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[160px_minmax(0,1fr)] text-sm">
           <dt className="font-semibold text-gray-700">Result</dt><dd className="text-gray-900">{RESULT[call.status]?.label ?? call.status}{call.outcomeAt ? ` · recorded ${when(call.outcomeAt)}` : ''}</dd>
           {call.cancelReason && <><dt className="font-semibold text-gray-700">Reason</dt><dd className="text-gray-900">{call.cancelReason}</dd></>}
           {p.minor && call.status === 'KEPT' && <><dt className="font-semibold text-gray-700">Adult on the call</dt><dd className="text-gray-900">{call.parentAttendeeName ? `${call.parentAttendeeName}${call.parentAttendeeRelationship ? ` (${call.parentAttendeeRelationship})` : ''}` : call.parentAttended ? 'Yes' : 'Not recorded'}</dd></>}

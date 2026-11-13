@@ -92,7 +92,7 @@ export function AdminEventsClient({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Events</h1>
           <p className="text-gray-600">Create and manage events</p>
@@ -104,7 +104,7 @@ export function AdminEventsClient({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="py-4">
             <div className="flex items-center gap-4">
@@ -201,7 +201,7 @@ export function AdminEventsClient({
                 defaultValue={editingEvent?.location || ''}
               />
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Input
                   name="startDate"
                   label="Start Date"

@@ -6,7 +6,7 @@ import { ChevronDown, Copy, Pencil } from 'lucide-react'
 import { kit } from '@/components/ui/kit/styles'
 import { useToast } from '@/components/ui/kit/toast'
 import {
-  GROUP_LABELS, VARIANT_LABELS, emailFooter, hasBlank, renderScript,
+  GROUP_LABELS, VARIANT_LABELS, lineLabelFor, lineSlotFor, splitOnSlot, emailFooter, fillPrice, hasBlank, renderScript, withoutLineSlot,
   type LineIdeas, type PlaybookGuide, type PlaybookSection, type ScenarioKey, type ScriptGroup, type ScriptText, type ScriptVariant,
 } from '@/lib/get-involved/scripts'
 import { resetProgramGuide, resetProgramScript, saveProgramGuide, saveProgramScript } from '@/lib/actions/program-scripts'
@@ -32,7 +32,7 @@ export interface PlaybookData {
   owns: boolean
   program: { id: string; name: string; guide: PlaybookGuide | null; guideSource: 'OWNER' | 'PROGRAM' | null; hasDefaultGuide: boolean; lineIdeas: LineIdeas | null } | null
   tips: PlaybookSection[]
-  values: { myName: string; business: string; program: string; programLine: string; sponsorship: boolean }
+  values: { myName: string; business: string; program: string; programLine: string; sponsorship: boolean; regularPrice: string }
   link: string
   mailingAddress: string | null
   messages: PlaybookMessage[]
@@ -114,11 +114,11 @@ export function PlaybookClient({ data }: { data: PlaybookData }) {
 
 // ---------- "How to pitch" ----------
 
-function GuideView({ guide }: { guide: PlaybookGuide }) {
+function GuideView({ guide, price }: { guide: PlaybookGuide; price: string }) {
   return (
     <div className="max-w-prose space-y-5">
-      {guide.summary && <p className="text-lg leading-relaxed text-gray-900">{guide.summary}</p>}
-      {guide.sections.map((s, i) => <TipsBlock key={i} section={s} />)}
+      {guide.summary && <p className="text-lg leading-relaxed text-gray-900">{fillPrice(guide.summary, price)}</p>}
+      {guide.sections.map((s, i) => <TipsBlock key={i} section={{ ...s, points: s.points.map((pt) => fillPrice(pt, price)) }} />)}
     </div>
   )
 }
@@ -182,7 +182,7 @@ function PitchSection({ data }: { data: PlaybookData }) {
       ) : p?.guide ? (
         <>
           <p className="text-sm text-gray-600">{p.guideSource === 'OWNER' ? 'Written by you' : `Written for ${p.name}`}</p>
-          <GuideView guide={p.guide} />
+          <GuideView guide={p.guide} price={data.values.regularPrice} />
         </>
       ) : p ? (
         <p className="max-w-prose text-base text-gray-800">
@@ -231,14 +231,17 @@ function MessageRow({ m, data, programName, isOpen, onToggle, firstName, setFirs
   const id = `pb-${m.key}`
   const lineRef = useRef<HTMLTextAreaElement>(null)
   const program = data.program
-  const values = { ...data.values, firstName, personalLine, link: linkFor(data.link, v.variant) }
+  // An empty line shows as [its label], so it's clear where it goes; it's left out when copied.
+  const slot = lineSlotFor(m.key)
+  const values = { ...data.values, firstName, personalLine: personalLine.trim() || slot, link: linkFor(data.link, v.variant) }
   const text = `${v.subject ?? ''}\n${v.body}`
   const subject = v.subject ? renderScript(v.subject, values) : null
   const body = renderScript(v.body, values)
   const footer = v.variant === 'EMAIL' ? emailFooter(data.mailingAddress) : null
 
   async function copy(what: 'body' | 'subject') {
-    const out = what === 'subject' ? subject ?? '' : footer ? `${body}\n\n${footer}` : body
+    const sendBody = withoutLineSlot(body)
+    const out = what === 'subject' ? subject ?? '' : footer ? `${sendBody}\n\n${footer}` : sendBody
     if (what === 'body' && hasBlank(personalLine)) { toast.error('Change the part in [brackets] in your line to your own words first.'); lineRef.current?.focus(); return }
     if (await copyText(out)) toast.success(what === 'subject' ? 'Subject copied.' : COPIED[v.variant])
     else toast.error("Couldn't copy. Press and hold the message to select it, then copy.")
@@ -299,7 +302,7 @@ function MessageRow({ m, data, programName, isOpen, onToggle, firstName, setFirs
           ) : (
             <>
               {(text.includes('{first name}') || text.includes('{personal line}')) && (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {text.includes('{first name}') && (
                     <div>
                       <label htmlFor={`${id}-name`} className={kit.label}>Their first name</label>
@@ -308,10 +311,10 @@ function MessageRow({ m, data, programName, isOpen, onToggle, firstName, setFirs
                   )}
                   {text.includes('{personal line}') && (
                     <div className="sm:col-span-2">
-                      <label htmlFor={`${id}-line`} className={kit.label}>One line about them</label>
+                      <label htmlFor={`${id}-line`} className={kit.label}>{lineLabelFor(m.key)} <span className="font-normal text-gray-600">(optional)</span></label>
                       <textarea id={`${id}-line`} ref={lineRef} value={personalLine} onChange={(e) => setPersonalLine(e.target.value)} rows={2} maxLength={300}
                         className={kit.textarea} placeholder="Write your own, or tap an idea below" />
-                      <p className={kit.hint}>Say why you thought of them. It makes people far more likely to reply.</p>
+                      <p className={kit.hint}>It goes into the message below, where it says <strong className="font-semibold text-gray-900">{slot}</strong>. People reply far more when it&apos;s there. Leave it empty and that spot is left out when you copy.</p>
                       <LineIdeasPicker id={`${id}-ideas`} ideas={ideasFor(m.key, program?.lineIdeas)} target={lineRef} onPick={(l) => setPersonalLine(l.slice(0, 300))} />
                     </div>
                   )}
@@ -320,7 +323,7 @@ function MessageRow({ m, data, programName, isOpen, onToggle, firstName, setFirs
 
               <div className="max-w-prose rounded-xl border border-gray-200 bg-white p-4">
                 {subject && <p className="mb-2 text-base"><span className="text-gray-600">Subject: </span><strong className="text-gray-900">{subject}</strong></p>}
-                <p className="whitespace-pre-line text-base leading-relaxed text-gray-900">{body}</p>
+                <p className="whitespace-pre-line text-base leading-relaxed text-gray-900">{splitOnSlot(body, slot).map((x, j) => x.slot ? <mark key={j} className="rounded bg-amber-100 px-1 font-semibold text-amber-900">{x.text}</mark> : x.text)}</p>
                 {footer && <p className="mt-3 whitespace-pre-line border-t border-gray-100 pt-3 text-sm text-gray-600">{footer}</p>}
               </div>
 

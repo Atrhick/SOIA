@@ -65,7 +65,7 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, TemplateText> = {
   },
   EMAIL: {
     subject: '{first name}, thought of you',
-    body: "Hi {first name},\n\n{personal line}\n\nI'm involved with {program}, {one-line description}. {seat line} The first step is a free 30-minute call.\n\nIf you're curious, just reply and I'll send the details. Would you be open to hearing about it?",
+    body: "Hi {first name},\n\n{personal line}\n\nI'm involved with {program}, {one-line description}. {seat line} The first step is a free 15-minute call.\n\nIf you're curious, just reply and I'll send the details. Would you be open to hearing about it?",
   },
   DM: {
     subject: null,
@@ -81,7 +81,7 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, TemplateText> = {
   },
   AFTER_YES: {
     subject: null,
-    body: 'Great! Here is the 1-minute form. It books a free 30-minute call at a time that suits you: {link}',
+    body: 'Great! Here is the 1-minute form. It books a free 15-minute call at a time that suits you: {link}',
   },
   NUDGE: {
     subject: null,

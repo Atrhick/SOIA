@@ -170,7 +170,7 @@ export default async function AdminDashboard() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Total Coaches"
           value={stats.totalCoaches}
@@ -221,7 +221,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Events & Recent Activity */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Upcoming Events */}
         <Card variant="default">
           <CardHeader>
@@ -243,18 +243,18 @@ export default async function AdminDashboard() {
                   <Link
                     key={event.id}
                     href={`/admin/events/${event.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-150"
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-150"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-primary-50 flex items-center justify-center">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-primary-50 flex items-center justify-center">
                         <Calendar className="h-5 w-5 text-primary-600" />
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{event.name}</p>
-                        <p className="text-sm text-gray-500">{event.location}</p>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-gray-900">{event.name}</p>
+                        <p className="truncate text-sm text-gray-500">{event.location}</p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 text-right">
                       <p className="text-sm font-semibold text-primary-600">
                         {new Date(event.startDate).toLocaleDateString('en-US', {
                           month: 'short',
@@ -298,19 +298,19 @@ export default async function AdminDashboard() {
                   <Link
                     key={coach.id}
                     href={`/admin/coaches/${coach.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-150"
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-150"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-sm">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-sm">
                         <span className="text-sm font-semibold text-white">
                           {(coach.firstName?.[0] || '?').toUpperCase()}{(coach.lastName?.[0] || '?').toUpperCase()}
                         </span>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-gray-900">
                           {coach.firstName} {coach.lastName}
                         </p>
-                        <p className="text-sm text-gray-500">{coach.user.email}</p>
+                        <p className="truncate text-sm text-gray-500">{coach.user.email}</p>
                       </div>
                     </div>
                     <Badge
@@ -342,7 +342,7 @@ export default async function AdminDashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Link href="/admin/coaches/new" className="quick-action group">
               <Users className="h-6 w-6 text-gray-400 quick-action-icon mb-2" />
               <span className="text-sm font-medium text-gray-700 group-hover:text-primary-700">
