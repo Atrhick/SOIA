@@ -3,19 +3,21 @@ import { redirect } from 'next/navigation'
 import { inviterBySlug } from '@/lib/get-involved/server'
 import { inviterProgramBySlug } from '@/lib/get-involved/program-welcome-server'
 import { SignupPage } from '@/components/get-involved/signup/signup-page'
-import { loadSignupPage, viaParam } from '../load'
+import { invParam, loadSignupPage, viaParam } from '../load'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Get Involved | NowTransformed', robots: { index: false } }
 
 /** A program page's share link: the inviter's sign-up page about that program. */
-export default async function JoinProgramPage({ params, searchParams }: { params: { slug: string; program: string }; searchParams: { via?: string | string[] } }) {
+export default async function JoinProgramPage({ params, searchParams }: { params: { slug: string; program: string }; searchParams: { via?: string | string[]; inv?: string | string[] } }) {
   const via = viaParam(searchParams?.via)
-  const main = `/join/${encodeURIComponent(params.slug)}${via ? `?via=${via}` : ''}`
+  const inv = invParam(searchParams?.inv)
+  const qs = new URLSearchParams({ ...(via ? { via } : {}), ...(inv ? { inv } : {}) }).toString()
+  const main = `/join/${encodeURIComponent(params.slug)}${qs ? `?${qs}` : ''}`
   const inviter = await inviterBySlug(params.slug)
   if (!inviter) redirect(main)
   const program = await inviterProgramBySlug(inviter.id, params.program)
   // A program that was unpublished or reassigned falls back to the inviter's main link.
   if (!program) redirect(main)
-  return <SignupPage {...await loadSignupPage(inviter, params.slug, program.slug, via)} />
+  return <SignupPage {...await loadSignupPage(inviter, params.slug, program.slug, via, inv)} />
 }

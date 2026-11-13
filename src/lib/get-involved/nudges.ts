@@ -133,7 +133,8 @@ async function programFor(programId: string | null) {
 
 async function offerFor(programId: string | null) {
   const o = await getSignupOffer(programId).catch(() => null)
-  return o ? { sponsoredPrice: o.sponsoredPrice, fullPrice: o.fullPrice, seatsLeft: o.seatsLeft } : null
+  // Only whether seats are left: prospect emails never carry prices (the team offers the seat on the call).
+  return o ? { seatsLeft: o.seatsLeft } : null
 }
 
 async function sendWelcomes(now: Date): Promise<number> {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
-import { LogOut, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu, Smartphone, Bell, BellOff } from 'lucide-react'
+import { LogOut, Search, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu, Smartphone, Bell, BellOff } from 'lucide-react'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,10 +12,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getUsersForImpersonation, getImpersonationData } from '@/lib/actions/impersonation'
 import { useRouter } from 'next/navigation'
 import { NotificationBell } from '@/components/notifications/notification-bell'
@@ -47,6 +45,8 @@ export function Header({ user }: HeaderProps) {
   const mobileNav = useMobileNav()
   const [users, setUsers] = useState<ImpersonationUser[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [query, setQuery] = useState('')
   // Hidden once the app runs from the home screen.
   const [canInstall, setCanInstall] = useState(false)
   useEffect(() => { setCanInstall(!isInstalled()) }, [])
@@ -94,12 +94,14 @@ export function Header({ user }: HeaderProps) {
     await update({
       stopImpersonating: true
     })
-    router.push('/admin')
-    router.refresh()
+    // A full load: router.push + refresh raced and left the address on the coach/ambassador page.
+    window.location.assign('/admin')
   }
 
-  const coaches = users.filter(u => u.role === 'COACH')
-  const ambassadors = users.filter(u => u.role === 'AMBASSADOR')
+  const q = query.trim().toLowerCase()
+  const matches = (u: ImpersonationUser) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+  const coaches = users.filter(u => u.role === 'COACH' && matches(u))
+  const ambassadors = users.filter(u => u.role === 'AMBASSADOR' && matches(u))
 
   return (
     <>
@@ -109,8 +111,9 @@ export function Header({ user }: HeaderProps) {
           <div className="bg-amber-500 text-white px-4 py-1.5">
             <div className="flex items-center justify-center gap-3">
               <Shield className="w-4 h-4 shrink-0" />
-              <span className="min-w-0 truncate text-sm font-medium">
-                Viewing as: <strong>{user.email}</strong> ({user.role})
+              <span className="min-w-0 truncate text-sm font-medium" title={user.email}>
+                Viewing as: <strong>{user.name || user.email}</strong>
+                <span className="hidden sm:inline"> ({user.email}, {user.role.toLowerCase()})</span>
               </span>
               <Button
                 size="sm"
@@ -147,7 +150,7 @@ export function Header({ user }: HeaderProps) {
             {user.role === 'ADMIN' && <NotificationBell />}
 
             {/* User Menu */}
-            <DropdownMenu onOpenChange={(open) => { if (open) loadUsers() }}>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 border-l pl-4">
                   <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
@@ -169,7 +172,7 @@ export function Header({ user }: HeaderProps) {
                   <>
                     <div className="px-2 py-1.5 mb-1 bg-amber-50 rounded-sm">
                       <p className="text-xs text-amber-700">
-                        Viewing as: <span className="font-medium">{user.email}</span>
+                        Viewing as: <span className="font-medium">{user.name ? `${user.name} (${user.email})` : user.email}</span>
                       </p>
                     </div>
                     <DropdownMenuItem
@@ -186,58 +189,13 @@ export function Header({ user }: HeaderProps) {
                 {/* Admin-only: Impersonation */}
                 {user.role === 'ADMIN' && !user.isImpersonating && (
                   <>
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>
-                        <Users className="mr-2 h-4 w-4" />
-                        <span>Login as User</span>
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="w-64 max-h-80 overflow-y-auto">
-                        {isLoadingUsers ? (
-                          <DropdownMenuItem disabled>Loading users...</DropdownMenuItem>
-                        ) : (
-                          <>
-                            {coaches.length > 0 && (
-                              <>
-                                <DropdownMenuLabel className="text-xs text-gray-500">Coaches</DropdownMenuLabel>
-                                {coaches.map((u) => (
-                                  <DropdownMenuItem
-                                    key={u.id}
-                                    onClick={() => handleImpersonate(u)}
-                                    className="cursor-pointer"
-                                  >
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{u.name}</span>
-                                      <span className="text-xs text-gray-500">{u.email}</span>
-                                    </div>
-                                  </DropdownMenuItem>
-                                ))}
-                              </>
-                            )}
-                            {ambassadors.length > 0 && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuLabel className="text-xs text-gray-500">Ambassadors</DropdownMenuLabel>
-                                {ambassadors.map((u) => (
-                                  <DropdownMenuItem
-                                    key={u.id}
-                                    onClick={() => handleImpersonate(u)}
-                                    className="cursor-pointer"
-                                  >
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{u.name}</span>
-                                      <span className="text-xs text-gray-500">{u.email}</span>
-                                    </div>
-                                  </DropdownMenuItem>
-                                ))}
-                              </>
-                            )}
-                            {coaches.length === 0 && ambassadors.length === 0 && (
-                              <DropdownMenuItem disabled>No users available</DropdownMenuItem>
-                            )}
-                          </>
-                        )}
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
+                    <DropdownMenuItem
+                      onSelect={() => { setPickerOpen(true); setQuery(''); void loadUsers() }}
+                      className="cursor-pointer"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Login as User</span>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
                 )}
@@ -277,6 +235,56 @@ export function Header({ user }: HeaderProps) {
           </div>
         </div>
       </header>
+
+      {/* Admin: pick someone to view the app as. A dialog, not a side submenu, so it fits on phones. */}
+      {user.role === 'ADMIN' && !user.isImpersonating && (
+        <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+          <DialogContent className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-md flex-col gap-3 p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle>Login as User</DialogTitle>
+              <DialogDescription>See the app as this coach or ambassador. It switches back after 30 minutes.</DialogDescription>
+            </DialogHeader>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name or email"
+                aria-label="Search name or email"
+                className="h-11 w-full rounded-lg border border-gray-300 pl-9 pr-3 text-base focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+              />
+            </div>
+            <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+              {isLoadingUsers ? (
+                <p className="py-6 text-center text-sm text-gray-500">Loading people…</p>
+              ) : coaches.length === 0 && ambassadors.length === 0 ? (
+                <p className="py-6 text-center text-sm text-gray-500">{q ? 'No one matches that search.' : 'No users available.'}</p>
+              ) : (
+                [{ label: 'Coaches', list: coaches }, { label: 'Ambassadors', list: ambassadors }].filter((g) => g.list.length).map((g) => (
+                  <section key={g.label} className="mb-3">
+                    <h3 className="sticky top-0 bg-white py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{g.label} ({g.list.length})</h3>
+                    <ul className="space-y-1">
+                      {g.list.map((u) => (
+                        <li key={u.id}>
+                          <button
+                            type="button"
+                            onClick={() => { setPickerOpen(false); void handleImpersonate(u) }}
+                            className="flex min-h-[48px] w-full flex-col items-start justify-center rounded-lg px-3 py-2 text-left hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
+                          >
+                            <span className="w-full truncate font-medium text-gray-900">{u.name}</span>
+                            <span className="w-full truncate text-sm text-gray-500">{u.email}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   )
 }

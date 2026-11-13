@@ -46,7 +46,7 @@ export default async function ConsentPage({ params }: { params: { token: string 
         line: program && owns ? `the NowTransformed ${role} who runs this program` : `a NowTransformed ${role}`,
       } : null}
       programName={program?.label ?? null}
-      offer={offer && offer.sponsoredPrice ? { sponsoredPrice: offer.sponsoredPrice, fullPrice: offer.fullPrice } : null}
+      offer={!!offer}
       alreadyGiven={!!p.parentConsentAt}
       bookPath={p.journeyToken ? `/discovery/${p.journeyToken}` : null}
     />

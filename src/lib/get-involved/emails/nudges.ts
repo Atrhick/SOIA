@@ -4,6 +4,7 @@
  */
 import { Mail, P, SMALL, button, esc, layout } from '../emails'
 import type { SeatOffer } from './welcome'
+import { SPONSOR_LINE } from '../scripts'
 
 const stack = (html: string) => `<div style="margin:0 0 6px">${html}</div>`
 
@@ -35,7 +36,7 @@ export function nudge1Email(p: {
   }
 }
 
-/** Nudge 2, day 7: the last automatic email. The seat line and subject only when seats are left. */
+/** Nudge 2, day 7: the last automatic email. The "may qualify" line only while the program has seats this month. */
 export function nudge2Email(p: {
   firstName: string
   offer: SeatOffer | null
@@ -44,12 +45,13 @@ export function nudge2Email(p: {
   stopUrl: string | null
   prospectId?: string | null
 }): Mail {
-  const seats = p.offer && p.offer.seatsLeft > 0 ? p.offer.seatsLeft : 0
+  // No seat counts or prices before the call (no promises, no fake scarcity): only "may qualify".
+  const seats = !!p.offer && p.offer.seatsLeft > 0
   const lead = seats
-    ? `There ${seats === 1 ? 'is' : 'are'} ${seats} sponsored seat${seats === 1 ? '' : 's'} left this month. If now isn't the right time, that's fine. Just tell us:`
+    ? `We'd still love to talk with you. ${esc(SPONSOR_LINE)} We'll talk about it on the free call. If now isn't the right time, that's fine. Just tell us:`
     : "We'd still love to talk with you. If now isn't the right time, that's fine. Just tell us:"
   return {
-    subject: seats ? 'Should I keep your sponsored seat?' : `${p.firstName}, should we keep a call time for you?`,
+    subject: `${p.firstName}, should we keep a call time for you?`,
     html: layout(
       `<p style="${P}">Hi ${esc(p.firstName)},</p>
        <p style="${P}">${lead}</p>

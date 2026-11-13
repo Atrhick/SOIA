@@ -1,8 +1,10 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import Link from 'next/link'
 import { Loader2, Trash2, Upload } from 'lucide-react'
+import { useToast } from '@/components/ui/kit/toast'
+import { TaskHeader } from '@/components/ui/kit/task-header'
+import { kit } from '@/components/ui/kit/styles'
 import { removeInvitePhoto, saveInvitePhoto, saveInviteProfile } from '@/lib/actions/invite-profile'
 import {
   ACCEPTED_PHOTO_TYPES, MAX_PHOTO_BYTES, PHOTO_QUALITY, PHOTO_SIZE, WHY_MAX, centerCropSquare, initialsOf, isValidJpegDataUrl,
@@ -11,7 +13,7 @@ import {
 export interface InviteProfileProgram {
   id: string
   name: string
-  /** e.g. "sponsored seats: 3 of 5 left", or null when the program has no offer. */
+  /** e.g. "3 of 5 sponsored seats left this month", or null when the program has no offer. */
   seatsLabel: string | null
 }
 
@@ -26,12 +28,7 @@ interface Props {
   programs: InviteProfileProgram[]
 }
 
-const inp = 'w-full h-11 rounded-lg border border-gray-400 px-3 text-[15px] text-gray-900 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600 disabled:bg-gray-100 disabled:text-gray-500'
-const lbl = 'block text-sm font-semibold text-gray-800'
-const hint = 'text-[13px] text-gray-600'
-const card = 'bg-white border border-gray-200 rounded-xl p-4 sm:p-5'
-const btnPrimary = 'h-12 px-4 rounded-lg bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
-const btnSecondary = 'h-11 px-4 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-sm font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
+const card = kit.card
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024
 
@@ -79,177 +76,211 @@ function Avatar({ src, name, size }: { src: string | null; name: string; size: '
   )
 }
 
+/** Example "why" lines: adults talk about their work; ambassadors (many are teens) about what they care about. */
+const EXAMPLE_WHY = {
+  COACH: 'I burned out at 30. Now I help busy parents build small habits that keep stress in check.',
+  AMBASSADOR: 'A mentor helped me figure out what I wanted to do. I want other teens to have that too.',
+}
+
+/** The current photo as a data URL, so "Remove photo" can be undone. Null if it can't be read. */
+async function photoAsDataUrl(src: string): Promise<string | null> {
+  if (src.startsWith('data:')) return src
+  try {
+    const blob = await (await fetch(src, { cache: 'no-store' })).blob()
+    return await new Promise<string | null>((resolve) => {
+      const r = new FileReader()
+      r.onload = () => resolve(typeof r.result === 'string' && isValidJpegDataUrl(r.result) ? r.result : null)
+      r.onerror = () => resolve(null)
+      r.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
 export function InviteProfileClient({ role, name, slug, photoUrl, why: initialWhy, programId: initialProgramId, programs }: Props) {
-  const base = role === 'COACH' ? '/coach' : '/ambassador'
   const roleWord = role === 'COACH' ? 'coach' : 'ambassador'
+  const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
+  const whyRef = useRef<HTMLTextAreaElement>(null)
 
   const [photo, setPhoto] = useState<string | null>(photoUrl)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [why, setWhy] = useState(initialWhy)
   const [programId, setProgramId] = useState(initialProgramId && programs.some((p) => p.id === initialProgramId) ? initialProgramId : '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [saving, setSaving] = useState<'save' | 'preview' | null>(null)
+  const [whyError, setWhyError] = useState<string | null>(null)
 
   const left = WHY_MAX - why.length
   const shownWhy = why.replace(/\s+/g, ' ').trim()
+  const chosen = programs.find((p) => p.id === programId)
+  const previewUrl = slug ? `/join/${encodeURIComponent(slug)}` : null
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    setError(null); setNotice(null)
-    if (!(ACCEPTED_PHOTO_TYPES as readonly string[]).includes(file.type)) { setError('Choose a JPG, PNG or WebP photo.'); return }
-    if (file.size > MAX_FILE_BYTES) { setError('That file is too large. Choose a photo under 20 MB.'); return }
+    if (!(ACCEPTED_PHOTO_TYPES as readonly string[]).includes(file.type)) { toast.error('Choose a JPG, PNG or WebP photo.'); return }
+    if (file.size > MAX_FILE_BYTES) { toast.error('That file is too large. Choose a photo under 20 MB.'); return }
     setPhotoBusy(true)
     try {
       const data = await fileToJpegDataUrl(file).catch(() => null)
-      if (!data) { setError(`That photo could not be made small enough (under ${Math.round(MAX_PHOTO_BYTES / 1024)} KB). Try a simpler photo.`); return }
+      if (!data) { toast.error(`That photo could not be made small enough (under ${Math.round(MAX_PHOTO_BYTES / 1024)} KB). Try a simpler photo.`); return }
       const r = await saveInvitePhoto(data)
-      if (!r.ok) { setError(r.error); return }
+      if (!r.ok) { toast.error(r.error); return }
       setPhoto(data)
-      setNotice('Photo saved.')
+      toast.success('Photo saved.')
     } finally {
       setPhotoBusy(false)
     }
   }
 
   async function onRemovePhoto() {
-    setError(null); setNotice(null)
+    if (!photo) return
     setPhotoBusy(true)
     try {
+      const before = await photoAsDataUrl(photo)
       const r = await removeInvitePhoto()
-      if (!r.ok) { setError(r.error); return }
+      if (!r.ok) { toast.error(r.error); return }
       setPhoto(null)
-      setNotice('Photo removed.')
+      toast.success('Photo removed.', before ? {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            const u = await saveInvitePhoto(before)
+            if (u.ok) { setPhoto(before); toast.success('Photo put back.') } else toast.error(u.error)
+          },
+        },
+      } : undefined)
     } finally {
       setPhotoBusy(false)
     }
   }
 
-  async function onSave(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null); setNotice(null)
-    if (left < 0) { setError(`Keep "why I do this" to ${WHY_MAX} characters.`); return }
-    setSaving(true)
+  /** Saves; with `preview`, then opens the sign-up page in a new tab so it shows what was just saved. */
+  async function save(preview: boolean) {
+    setWhyError(null)
+    if (left < 0) {
+      setWhyError(`Make it ${-left} characters shorter (${WHY_MAX} at most).`)
+      whyRef.current?.focus()
+      return
+    }
+    // Open the tab inside the tap (phones block pop-ups opened later), then point it at the page once saved.
+    const tab = preview && previewUrl ? window.open('about:blank', '_blank') : null
+    setSaving(preview ? 'preview' : 'save')
     try {
       const r = await saveInviteProfile({ why, programId })
-      if (!r.ok) setError(r.error)
-      else setNotice('Profile saved.')
+      if (!r.ok) { tab?.close(); toast.error(r.error); return }
+      if (preview && previewUrl) {
+        if (tab) tab.location.href = previewUrl
+        else window.location.href = previewUrl
+        toast.success('Saved. Your page opened in a new tab.')
+      } else {
+        toast.success('Saved. People see this on your sign-up page.')
+      }
+    } catch {
+      tab?.close()
+      toast.error("That didn't save. Check your connection and try again.")
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
   }
 
   return (
     <div className="space-y-5">
-      <div>
-        <p className="text-[13px] text-gray-600">
-          <Link href={`${base}/one-a-day`} className="text-sky-800 hover:text-sky-900 underline-offset-2 hover:underline">One-A-Day</Link> / My invite profile
-        </p>
-        <h1 className="text-2xl font-bold text-gray-900 mt-1">My invite profile</h1>
-        <p className="text-gray-600 mt-1">What people see at the top of your sign-up page and in your messages. Set it once.</p>
-      </div>
+      <TaskHeader title="Your invite profile" doThis="Add a photo and one line on why you do this. People see it when you invite them." />
 
-      {error && (
-        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
-      )}
-      {notice && !error && (
-        <div role="status" className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{notice}</div>
-      )}
-
-      <div className="flex flex-wrap gap-5 items-start">
-        <form onSubmit={onSave} className={`${card} flex-[3_1_520px] min-w-0 space-y-5`}>
+      <div className="flex flex-wrap items-start gap-5">
+        <form onSubmit={(e) => { e.preventDefault(); save(false) }} noValidate className={`${card} min-w-0 flex-[3_1_480px] space-y-6`}>
           <div className="flex flex-wrap items-center gap-4">
             <Avatar src={photo} name={name} size="lg" />
-            <div className="space-y-1.5 min-w-0 flex-1">
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="text-base font-semibold text-gray-900">Your photo</p>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className={btnSecondary} onClick={() => fileRef.current?.click()} disabled={photoBusy}>
-                  {photoBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Upload className="w-4 h-4" aria-hidden />}
-                  {photo ? 'Change photo' : 'Upload a photo'}
+                <button type="button" className={kit.secondary} onClick={() => fileRef.current?.click()} disabled={photoBusy}>
+                  {photoBusy ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <Upload className="h-5 w-5" aria-hidden />}
+                  {photo ? 'Change photo' : 'Add a photo'}
                 </button>
                 {photo && (
-                  <button type="button" className={btnSecondary} onClick={onRemovePhoto} disabled={photoBusy}>
-                    <Trash2 className="w-4 h-4" aria-hidden /> Remove photo
+                  <button type="button" className={kit.secondary} onClick={onRemovePhoto} disabled={photoBusy}>
+                    <Trash2 className="h-5 w-5" aria-hidden /> Remove
                   </button>
                 )}
               </div>
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} aria-hidden onChange={onPickFile} />
-              <p className={hint}>A clear, smiling photo of your face. A real photo gets more sign-ups than a logo. JPG, PNG or WebP; we crop it to a square.</p>
             </div>
+            <p className={`${kit.hint} basis-full`}>A clear, smiling photo of your face gets more sign-ups than a logo. It saves as soon as you pick it.</p>
           </div>
 
-          <div className="space-y-1.5">
-            <label className={lbl} htmlFor="invite-why">Why I do this (one line)</label>
+          <div>
+            <label className={kit.label} htmlFor="invite-why">Why I do this</label>
             <textarea
+              ref={whyRef}
               id="invite-why"
               rows={3}
               maxLength={WHY_MAX + 40}
               value={why}
-              onChange={(e) => setWhy(e.target.value.replace(/[\r\n]+/g, ' '))}
-              placeholder="I started this program because I burned out at 30. Now I help busy parents build habits that keep stress in check."
-              className={`${inp} h-auto py-2.5 leading-normal`}
+              onChange={(e) => { setWhy(e.target.value.replace(/[\r\n]+/g, ' ')); setWhyError(null) }}
+              placeholder={EXAMPLE_WHY[role]}
+              className={kit.textarea}
               aria-describedby="invite-why-hint"
-              aria-invalid={left < 0}
+              aria-invalid={left < 0 || !!whyError}
             />
-            <p id="invite-why-hint" className={hint}>
-              Your own words. Describe what you do, not promised results.{' '}
-              <span className={left < 0 ? 'text-red-700 font-semibold' : ''} aria-live="polite">
-                {left >= 0 ? `${left} characters left.` : `${-left} characters over.`}
+            <p id="invite-why-hint" className={kit.hint}>
+              One line in your own words, for example: &ldquo;{EXAMPLE_WHY[role]}&rdquo; Say what you do; never promise results.{' '}
+              <span className={left < 0 ? 'font-semibold text-red-700' : ''} aria-live="polite">
+                {left >= 0 ? `${left} characters left.` : `${-left} characters too long.`}
               </span>
             </p>
+            {whyError && <p role="alert" className="mt-1 text-sm font-semibold text-red-700">{whyError}</p>}
           </div>
 
-          <div className="space-y-1.5">
-            <label className={lbl} htmlFor="invite-program">Program my main link shares</label>
-            <select id="invite-program" className={inp} value={programId} onChange={(e) => setProgramId(e.target.value)} disabled={programs.length === 0} aria-describedby="invite-program-hint">
-              <option value="">Automatic: my most recent live program</option>
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}{p.seatsLabel ? ` (${p.seatsLabel})` : ''}</option>
-              ))}
+          <div>
+            <label className={kit.label} htmlFor="invite-program">Program your main link shares</label>
+            <select id="invite-program" className={`${kit.input} truncate pr-8`} value={programId} onChange={(e) => setProgramId(e.target.value)} disabled={programs.length === 0} aria-describedby="invite-program-hint">
+              <option value="">Automatic</option>
+              {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <p id="invite-program-hint" className={hint}>
+            <p id="invite-program-hint" className={kit.hint}>
               {programs.length === 0
-                ? 'You have no live program page yet, so your main link uses the standard sign-up.'
-                : "Prices and seat numbers come from the program's offer settings, set by an admin."}
+                ? "You don't have a live program page yet, so your main link uses the standard sign-up."
+                : <>
+                    {chosen ? (chosen.seatsLabel ? `${chosen.name}: ${chosen.seatsLabel}. ` : '') : 'Automatic shares your newest live program. '}
+                    You set your program&apos;s prices on its program page. The NowTransformed team sets how many sponsored seats each program has.
+                  </>}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <button type="submit" className={btnPrimary} disabled={saving}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-              Save profile
-            </button>
-            {slug ? (
-              <a href={`/join/${encodeURIComponent(slug)}`} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} h-12`}>
-                Preview my page
-              </a>
-            ) : (
-              <span className={`${btnSecondary} h-12 opacity-60 cursor-not-allowed`} aria-disabled="true">Preview my page</span>
+          <div className="flex flex-wrap gap-2.5">
+            {previewUrl && (
+              <button type="button" className={`${kit.primary} flex-1 whitespace-nowrap`} onClick={() => save(true)} disabled={!!saving}>
+                {saving === 'preview' && <Loader2 className="h-5 w-5 animate-spin" aria-hidden />}Save and preview
+              </button>
             )}
+            <button type="submit" className={`${previewUrl ? kit.secondary : kit.primary} flex-1`} disabled={!!saving}>
+              {saving === 'save' && <Loader2 className="h-5 w-5 animate-spin" aria-hidden />}Save
+            </button>
           </div>
-          <p className={hint}>The preview opens in a new tab and shows what is saved.</p>
         </form>
 
-        <aside className={`${card} flex-[2_1_320px] min-w-0 space-y-3`} aria-label="Preview of the top of your sign-up page">
-          <p className="font-bold text-gray-900">Preview: top of your page</p>
-          <div className="rounded-xl border border-gray-200 bg-slate-50 p-4 space-y-3">
+        <aside className={`${card} min-w-0 flex-[2_1_300px] space-y-3`} aria-label="Preview of the top of your sign-up page">
+          <p className="text-base font-bold text-gray-900">How it looks to people you invite</p>
+          <div className="space-y-3 rounded-xl border border-gray-200 bg-slate-50 p-4">
             <div className="flex items-center gap-3">
               <Avatar src={photo} name={name} size="md" />
               <div className="min-w-0">
-                <p className="text-xs text-gray-600">Invited by</p>
-                <p className="font-bold text-gray-900 truncate">{name}</p>
-                <p className="text-xs text-gray-600">NowTransformed {roleWord}</p>
+                <p className="text-sm text-gray-600">Invited by</p>
+                <p className="truncate text-base font-bold text-gray-900">{name}</p>
+                <p className="text-sm text-gray-600">NowTransformed {roleWord}</p>
               </div>
             </div>
             {shownWhy ? (
-              <p className="text-sm leading-relaxed text-gray-700 break-words">&ldquo;{shownWhy}&rdquo;</p>
+              <p className="break-words text-base leading-relaxed text-gray-800">&ldquo;{shownWhy}&rdquo;</p>
             ) : (
-              <p className="text-sm text-gray-500 italic">Your &ldquo;why I do this&rdquo; line shows here.</p>
+              <p className="text-base italic text-gray-600">Your &ldquo;why I do this&rdquo; line shows here.</p>
             )}
           </div>
-          <p className={hint}>Under-18 prospects and their parents see the same card.</p>
+          <p className={kit.hint}>Parents of teens see the same card.</p>
         </aside>
       </div>
     </div>

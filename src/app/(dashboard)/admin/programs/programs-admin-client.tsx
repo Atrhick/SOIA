@@ -267,9 +267,9 @@ export function ProgramsAdminClient({
           <CardTitle className="text-base">All programs ({programs.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <div className="md:overflow-x-auto">
+            <table className="block w-full text-sm md:table">
+              <thead className="hidden bg-gray-50 text-left md:table-header-group text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-4 py-3">Program</th>
                   <th className="px-4 py-3">Owner</th>
@@ -279,16 +279,17 @@ export function ProgramsAdminClient({
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="block divide-y divide-gray-100 md:table-row-group">
                 {programs.map((p) => {
                   const meta = STATUS_META[p.status] ?? { label: p.status, variant: 'outline' as const }
                   return (
-                    <tr key={p.id} className="align-middle">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{p.name}</p>
+                    <tr key={p.id} className="block space-y-3 p-4 align-middle md:table-row md:space-y-0 md:p-0">
+                      <td className="block md:table-cell md:px-4 md:py-3">
+                        <p className="text-base font-semibold text-gray-900 md:text-sm md:font-medium">{p.name}</p>
                         <p className="text-gray-500">{p.organization}</p>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="block md:table-cell md:px-4 md:py-3">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 md:hidden">Owner</span>
                         <Select
                           value={encodeOwnerChoice(p)}
                           onValueChange={(value) =>
@@ -303,7 +304,7 @@ export function ProgramsAdminClient({
                           }
                           disabled={isPending}
                         >
-                          <SelectTrigger className="w-[220px]" aria-label={`Owner of ${p.name}`}>
+                          <SelectTrigger className="w-full md:w-[220px]" aria-label={`Owner of ${p.name}`}>
                             <SelectValue placeholder="Assign an owner" />
                           </SelectTrigger>
                           <SelectContent>
@@ -336,18 +337,20 @@ export function ProgramsAdminClient({
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="inline-block md:table-cell md:px-4 md:py-3">
                         <Badge variant={meta.variant}>{meta.label}</Badge>
                       </td>
-                      <td className="px-4 py-3 tabular-nums">{p.leadCount}</td>
-                      <td className="px-4 py-3">
+                      <td className="ml-3 inline-block tabular-nums text-gray-700 md:ml-0 md:table-cell md:px-4 md:py-3 md:text-gray-900">{p.leadCount}<span className="md:hidden"> {p.leadCount === 1 ? 'lead' : 'leads'}</span></td>
+                      <td className="block min-w-0 md:table-cell md:px-4 md:py-3">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 md:hidden">Public link</span>
                         {p.isLive ? (
                           <div className="flex items-center gap-1">
                             <a
                               href={`/p/${p.slug}`}
+                              title={`/p/${p.slug}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-primary-600 hover:underline inline-flex items-center gap-1"
+                              className="text-primary-600 hover:underline inline-flex min-w-0 items-center gap-1 break-all"
                             >
                               /p/{p.slug}
                               <ExternalLink className="h-3 w-3" />
@@ -369,7 +372,7 @@ export function ProgramsAdminClient({
                           <span className="text-gray-400">Not live</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <td className="-mx-2 flex flex-wrap items-center gap-1 md:mx-0 md:table-cell md:whitespace-nowrap md:px-4 md:py-3 md:text-right">
                         {p.status === 'PENDING_REVIEW' && (
                           <Button size="sm" variant="outline" onClick={() => setReviewTarget(p)}>
                             Review

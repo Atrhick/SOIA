@@ -137,21 +137,29 @@ describe('signed email links', () => {
 })
 
 describe('outreach templates', () => {
-  it('welcome: seat line only with seats left; note escaped', () => {
+  it('welcome: "may qualify" line only with seats left, never prices; note escaped', () => {
     const base = { firstName: 'Sarah', bookUrl: 'https://x.test/discovery/t', inviter: { name: 'Maya Johnson', roleLabel: 'NowTransformed coach', photoUrl: null }, program: { name: 'Health & Stress', note: 'You <b>grow</b>.' } }
     const m = welcomeCallEmail({ ...base, offer: { sponsoredPrice: '$49', fullPrice: '$199', seatsLeft: 3 } })
     expect(m.subject).toBe('Sarah, pick a time for your free call with NowTransformed')
     expect(m.html).toContain('Pick a call time')
-    expect(m.html).toContain('3 seats left this month')
+    expect(m.html).toContain('may qualify for a NowTransformed sponsored seat')
+    expect(m.html).not.toContain('$49')
+    expect(m.html).not.toContain('$199')
+    expect(m.html).not.toContain('seats left')
+    expect(m.html.toLowerCase()).not.toContain('grant')
     expect(m.html).toContain('&lt;b&gt;grow&lt;/b&gt;')
     expect(m.html).toContain('Maya shared it with you')
     expect(m.html).toContain('>MJ<')
-    expect(welcomeCallEmail({ ...base, offer: { sponsoredPrice: '$49', fullPrice: '$199', seatsLeft: 0 } }).html).not.toContain('seats left')
+    expect(welcomeCallEmail({ ...base, offer: { sponsoredPrice: '$49', fullPrice: '$199', seatsLeft: 0 } }).html).not.toContain('sponsored seat')
     expect(welcomeCallEmail({ ...base, offer: null }).html).not.toContain('sponsored')
   })
-  it('nudge 2 subject and seats depend on the offer', () => {
+  it('nudge 2: "may qualify" line only with seats left; no counts, no seat promise in the subject', () => {
     const b = { firstName: 'Sarah', bookUrl: 'https://x.test/b', laterUrl: 'https://x.test/l', stopUrl: 'https://x.test/s' }
-    expect(nudge2Email({ ...b, offer: { sponsoredPrice: null, fullPrice: null, seatsLeft: 2 } }).subject).toBe('Should I keep your sponsored seat?')
+    const withSeats = nudge2Email({ ...b, offer: { sponsoredPrice: '$49', fullPrice: null, seatsLeft: 2 } })
+    expect(withSeats.subject).toBe('Sarah, should we keep a call time for you?')
+    expect(withSeats.html).toContain('may qualify for a NowTransformed sponsored seat')
+    expect(withSeats.html).not.toContain('$49')
+    expect(withSeats.html).not.toMatch(/\d+ sponsored seats? left/)
     const none = nudge2Email({ ...b, offer: null })
     expect(none.subject).not.toContain('sponsored')
     expect(none.html).toContain('Maybe later: check in next month')

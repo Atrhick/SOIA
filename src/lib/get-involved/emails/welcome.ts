@@ -5,6 +5,7 @@
  * `note` only while it is approved.
  */
 import { companyFor } from '../program-welcome'
+import { SPONSOR_LINE } from '../scripts'
 import { Mail, P, SMALL, button, esc, layout } from '../emails'
 
 export interface WelcomeInviter {
@@ -15,9 +16,10 @@ export interface WelcomeInviter {
   photoUrl: string | null
 }
 
+/** Only `seatsLeft` decides whether the sponsorship line shows; prices are never put in prospect emails. */
 export interface SeatOffer {
-  sponsoredPrice: string | null
-  fullPrice: string | null
+  sponsoredPrice?: string | null
+  fullPrice?: string | null
   seatsLeft: number
 }
 
@@ -35,14 +37,14 @@ export function inviterHeader(i: WelcomeInviter): string {
   </tr></table>`
 }
 
-/** "Your sponsored seat: $X instead of $Y. 3 seats left this month." Empty unless seats are left. */
+/**
+ * "Families who are a good fit may qualify for a NowTransformed sponsored seat. We'll talk about it on
+ * your free call." Only while the program has seats this month. Never prices or seat counts before the
+ * call: the team qualifies on the call and offers the seat there.
+ */
 export function seatLine(offer: SeatOffer | null | undefined): string {
   if (!offer || offer.seatsLeft <= 0) return ''
-  const seats = `${offer.seatsLeft} seat${offer.seatsLeft === 1 ? '' : 's'} left this month.`
-  const price = offer.sponsoredPrice
-    ? `Your sponsored seat: <strong>${esc(offer.sponsoredPrice)}</strong>${offer.fullPrice ? ` instead of ${esc(offer.fullPrice)}` : ''}. `
-    : 'Sponsored seats are available. '
-  return `<p style="${SMALL};font-size:14px;color:#4b5563">${price}${seats}</p>`
+  return `<p style="${SMALL};font-size:14px;color:#4b5563">${esc(SPONSOR_LINE)} We'll talk about it on your free call.</p>`
 }
 
 export function welcomeCallEmail(p: {

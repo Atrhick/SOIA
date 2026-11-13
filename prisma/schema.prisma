@@ -31,38 +31,39 @@ enum UserStatus {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
-  password      String
-  role          UserRole   @default(COACH)
-  status        UserStatus @default(ACTIVE)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  role      UserRole   @default(COACH)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   // Relations
-  coachProfile       CoachProfile?
-  ambassadorProfile  Ambassador?   @relation("AmbassadorUser")
-  parentOfAmbassador Ambassador?   @relation("ParentUser")
-  sentMessages       Message[]     @relation("SentMessages")
-  messageThreads     MessageThread[] @relation("ThreadParticipants")
+  coachProfile        CoachProfile?
+  ambassadorProfile   Ambassador?          @relation("AmbassadorUser")
+  parentOfAmbassador  Ambassador?          @relation("ParentUser")
+  sentMessages        Message[]            @relation("SentMessages")
+  messageThreads      MessageThread[]      @relation("ThreadParticipants")
   passwordResetTokens PasswordResetToken[]
-  associateProfile   AssociateProfile?
-  timeEntries        TimeEntry[]
-  timeEntryEdits     TimeEntryChange[] @relation("TimeEntryEditor")
+  associateProfile    AssociateProfile?
+  timeEntries         TimeEntry[]
+  timeEntryEdits      TimeEntryChange[]    @relation("TimeEntryEditor")
 
   // Get Involved / One-A-Day
-  inviteSlug          String?         @unique
-  invitePhoto         String?         @db.Text // small JPEG data URL from the invite profile
-  inviteWhy           String?         // one line, "why I do this"
-  inviteProgramId     String?         // program their main link shares (null = latest approved)
-  outreachShares      OutreachShare[]
-  outreachGroups      OutreachGroupMember[]
-  pushSubscriptions PushSubscription[]
-  invitedProspects    Prospect[]      @relation("ProspectInviter")
-  discoveryHost       DiscoveryHost?
-  hostedDiscoveryCalls DiscoveryCall[] @relation("DiscoveryCallHost")
+  inviteSlug           String?               @unique
+  invitePhoto          String?               @db.Text // small JPEG data URL from the invite profile
+  inviteWhy            String? // one line, "why I do this"
+  inviteProgramId      String? // program their main link shares (null = latest approved)
+  outreachShares       OutreachShare[]
+  outreachInvites      OutreachInvite[]
+  outreachGroups       OutreachGroupMember[]
+  pushSubscriptions    PushSubscription[]
+  invitedProspects     Prospect[]            @relation("ProspectInviter")
+  discoveryHost        DiscoveryHost?
+  hostedDiscoveryCalls DiscoveryCall[]       @relation("DiscoveryCallHost")
   // Get Involved phase 2/3: the prospect record this login was created from.
-  journeyProspect     Prospect?       @relation("ProspectUser")
+  journeyProspect      Prospect?             @relation("ProspectUser")
 
   @@index([role, status])
   @@map("users")
@@ -78,33 +79,33 @@ enum CoachStatus {
 }
 
 model CoachProfile {
-  id                    String      @id @default(cuid())
-  userId                String      @unique
-  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Profile Info
-  firstName             String
-  lastName              String
-  bio                   String?     @db.Text
-  photoUrl              String?
-  phone                 String?
-  city                  String?
-  region                String?
-  country               String?
+  firstName String
+  lastName  String
+  bio       String? @db.Text
+  photoUrl  String?
+  phone     String?
+  city      String?
+  region    String?
+  country   String?
 
   // Coach Status
-  coachStatus           CoachStatus @default(ONBOARDING_INCOMPLETE)
+  coachStatus CoachStatus @default(ONBOARDING_INCOMPLETE)
 
   // Recruiter relationship
-  recruiterId           String?
-  recruiter             CoachProfile? @relation("RecruitedCoaches", fields: [recruiterId], references: [id])
-  recruitedCoaches      CoachProfile[] @relation("RecruitedCoaches")
+  recruiterId      String?
+  recruiter        CoachProfile?  @relation("RecruitedCoaches", fields: [recruiterId], references: [id])
+  recruitedCoaches CoachProfile[] @relation("RecruitedCoaches")
 
   // Resource Center Owner status
-  isResourceCenterOwner Boolean     @default(false)
+  isResourceCenterOwner Boolean @default(false)
 
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   ambassadors           Ambassador[]
@@ -124,16 +125,16 @@ model CoachProfile {
   classes               CoachClass[]
 
   // CRM Relations
-  crmContacts           CRMContact[]
-  crmDeals              CRMDeal[]
+  crmContacts CRMContact[]
+  crmDeals    CRMDeal[]
 
   // Prospect & Ambassador Intro Relations
-  prospect              Prospect?
-  ambassadorIntros      AmbassadorIntroduction[]
+  prospect         Prospect?
+  ambassadorIntros AmbassadorIntroduction[]
 
   // Program pages & associates
-  programs              CoachProgram[]
-  associates            AssociateProfile[]
+  programs   CoachProgram[]
+  associates AssociateProfile[]
 
   @@map("coach_profiles")
 }
@@ -157,81 +158,81 @@ enum AssessmentStatus {
 }
 
 model Ambassador {
-  id               String           @id @default(cuid())
+  id String @id @default(cuid())
 
   // Authentication link
-  userId           String?          @unique
-  user             User?            @relation("AmbassadorUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId String? @unique
+  user   User?   @relation("AmbassadorUser", fields: [userId], references: [id], onDelete: Cascade)
 
-  coachId          String
-  coach            CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  coachId  String
+  coach    CoachProfile   @relation(fields: [coachId], references: [id], onDelete: Cascade)
   // Program pages this ambassador owns (CoachProgram.ambassadorId).
-  programs         CoachProgram[]
+  programs CoachProgram[]
 
   // Basic Info
   firstName        String
   lastName         String
   email            String?
   phone            String?
-  phoneCountryCode String?          @default("US")
-  dateOfBirth      DateTime?        // For age validation (10-24)
+  phoneCountryCode String?   @default("US")
+  dateOfBirth      DateTime? // For age validation (10-24)
   region           String?
 
   // Address
-  address1         String?
-  address2         String?
-  city             String?
-  state            String?
-  postalCode       String?
-  country          String?          @default("US")
+  address1   String?
+  address2   String?
+  city       String?
+  state      String?
+  postalCode String?
+  country    String? @default("US")
 
   // Profile
-  photoUrl         String?
-  bio              String?          @db.Text
+  photoUrl String?
+  bio      String? @db.Text
 
   // Social Media Links
-  instagramUrl     String?
-  facebookUrl      String?
-  twitterUrl       String?
-  tiktokUrl        String?
-  linkedinUrl      String?
-  youtubeUrl       String?
-  websiteUrl       String?
+  instagramUrl String?
+  facebookUrl  String?
+  twitterUrl   String?
+  tiktokUrl    String?
+  linkedinUrl  String?
+  youtubeUrl   String?
+  websiteUrl   String?
 
   // Status
   status           AmbassadorStatus @default(PENDING)
   assessmentStatus AssessmentStatus @default(NOT_SUBMITTED)
 
   // WhatsApp Support Team
-  whatsappGroupCreated Boolean      @default(false)
+  whatsappGroupCreated Boolean @default(false)
   whatsappGroupLink    String?
 
   // Power Team
-  powerTeamInvited Boolean          @default(false)
+  powerTeamInvited  Boolean   @default(false)
   powerTeamJoinedAt DateTime?
 
   // Parent/Guardian (for ambassadors under 18)
-  parentFirstName      String?
-  parentLastName       String?
-  parentEmail          String?
-  parentPhone          String?
+  parentFirstName        String?
+  parentLastName         String?
+  parentEmail            String?
+  parentPhone            String?
   parentPhoneCountryCode String?
-  parentRelationship   String?      // e.g., "Mother", "Father", "Guardian"
-  parentalConsentGiven Boolean      @default(false)
-  parentalConsentDate  DateTime?
-  parentUserId         String?      @unique
-  parentUser           User?        @relation("ParentUser", fields: [parentUserId], references: [id], onDelete: SetNull)
+  parentRelationship     String? // e.g., "Mother", "Father", "Guardian"
+  parentalConsentGiven   Boolean   @default(false)
+  parentalConsentDate    DateTime?
+  parentUserId           String?   @unique
+  parentUser             User?     @relation("ParentUser", fields: [parentUserId], references: [id], onDelete: SetNull)
 
-  notes            String?          @db.Text
+  notes String? @db.Text
 
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  sponsorshipRequests    SponsorshipRequest[]
-  onboardingProgress     AmbassadorOnboardingProgress[]
-  businessIdea           BusinessIdea?
-  classEnrollments       ClassEnrollment[]
+  sponsorshipRequests SponsorshipRequest[]
+  onboardingProgress  AmbassadorOnboardingProgress[]
+  businessIdea        BusinessIdea?
+  classEnrollments    ClassEnrollment[]
 
   @@index([coachId])
   @@index([status])
@@ -268,28 +269,28 @@ model OnboardingTask {
   sortOrder   Int                @default(0)
   isActive    Boolean            @default(true)
 
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  progress    CoachOnboardingProgress[]
+  progress CoachOnboardingProgress[]
 
   @@map("onboarding_tasks")
 }
 
 model CoachOnboardingProgress {
-  id          String              @id @default(cuid())
-  coachId     String
-  coach       CoachProfile        @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  taskId      String
-  task        OnboardingTask      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id      String         @id @default(cuid())
+  coachId String
+  coach   CoachProfile   @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  taskId  String
+  task    OnboardingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   status      OnboardingItemStatus @default(NOT_STARTED)
   completedAt DateTime?
-  notes       String?             @db.Text
+  notes       String?              @db.Text
 
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([coachId, taskId])
   @@map("coach_onboarding_progress")
@@ -300,70 +301,70 @@ model CoachOnboardingProgress {
 // ============================================
 
 model Course {
-  id          String    @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
-  description String?   @db.Text
+  description String? @db.Text
   videoUrl    String?
-  embedCode   String?   @db.Text
-  isRequired  Boolean   @default(false)
-  sortOrder   Int       @default(0)
-  isActive    Boolean   @default(true)
+  embedCode   String? @db.Text
+  isRequired  Boolean @default(false)
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  questions   QuizQuestion[]
-  results     QuizResult[]
+  questions QuizQuestion[]
+  results   QuizResult[]
 
   @@map("courses")
 }
 
 model QuizQuestion {
-  id            String       @id @default(cuid())
-  courseId      String
-  course        Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  questionText  String       @db.Text
-  sortOrder     Int          @default(0)
+  questionText String @db.Text
+  sortOrder    Int    @default(0)
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  options       QuizOption[]
+  options QuizOption[]
 
   @@map("quiz_questions")
 }
 
 model QuizOption {
-  id          String       @id @default(cuid())
-  questionId  String
-  question    QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  id         String       @id @default(cuid())
+  questionId String
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
-  optionText  String
-  isCorrect   Boolean      @default(false)
-  sortOrder   Int          @default(0)
+  optionText String
+  isCorrect  Boolean @default(false)
+  sortOrder  Int     @default(0)
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("quiz_options")
 }
 
 model QuizResult {
-  id          String       @id @default(cuid())
-  coachId     String
-  coach       CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  courseId    String
-  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id       String       @id @default(cuid())
+  coachId  String
+  coach    CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  courseId String
+  course   Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   score       Float
   passed      Boolean
-  completedAt DateTime     @default(now())
+  completedAt DateTime @default(now())
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("quiz_results")
 }
@@ -392,16 +393,16 @@ enum LMSProgressStatus {
 }
 
 model LMSCourse {
-  id              String          @id @default(cuid())
+  id String @id @default(cuid())
 
-  title           String
-  description     String?         @db.Text
-  thumbnail       String?         // URL to course thumbnail image
+  title       String
+  description String? @db.Text
+  thumbnail   String? // URL to course thumbnail image
 
-  status          LMSCourseStatus @default(DRAFT)
+  status LMSCourseStatus @default(DRAFT)
 
   // Access control
-  allowedRoles    String[]        // ["COACH", "AMBASSADOR"]
+  allowedRoles String[] // ["COACH", "AMBASSADOR"]
 
   // Prerequisites (IDs of courses that must be completed first)
   prerequisiteIds String[]
@@ -410,80 +411,80 @@ model LMSCourse {
   estimatedDuration Int?
 
   // Sorting
-  sortOrder       Int             @default(0)
+  sortOrder Int @default(0)
 
-  createdBy       String          // Admin user ID
-  publishedAt     DateTime?
+  createdBy   String // Admin user ID
+  publishedAt DateTime?
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  modules         LMSModule[]
-  enrollments     LMSEnrollment[]
+  modules     LMSModule[]
+  enrollments LMSEnrollment[]
 
   @@map("lms_courses")
 }
 
 model LMSModule {
-  id              String      @id @default(cuid())
-  courseId        String
-  course          LMSCourse   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id       String    @id @default(cuid())
+  courseId String
+  course   LMSCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  title           String
-  description     String?     @db.Text
+  title       String
+  description String? @db.Text
 
   // Optional unlock requirement (e.g., previous module must be completed)
   unlockAfterModuleId String?
 
-  sortOrder       Int         @default(0)
+  sortOrder Int @default(0)
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  lessons         LMSLesson[]
+  lessons LMSLesson[]
 
   @@map("lms_modules")
 }
 
 model LMSLesson {
-  id              String      @id @default(cuid())
-  moduleId        String
-  module          LMSModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  id       String    @id @default(cuid())
+  moduleId String
+  module   LMSModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
-  title           String
-  description     String?     @db.Text
+  title       String
+  description String? @db.Text
 
   // Estimated duration in minutes
   estimatedDuration Int?
 
-  sortOrder       Int         @default(0)
+  sortOrder Int @default(0)
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  contentBlocks   LMSContentBlock[]
-  progress        LMSLessonProgress[]
+  contentBlocks LMSContentBlock[]
+  progress      LMSLessonProgress[]
 
   @@map("lms_lessons")
 }
 
 model LMSContentBlock {
-  id              String          @id @default(cuid())
-  lessonId        String
-  lesson          LMSLesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id       String    @id @default(cuid())
+  lessonId String
+  lesson   LMSLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  title           String?         // Optional title for the block
-  type            LMSContentType
+  title String? // Optional title for the block
+  type  LMSContentType
 
   // Content stored as JSON based on type:
   // VIDEO: { url: string, provider: "youtube" | "vimeo" | "custom", duration: number }
   // TEXT: { content: string, format: "markdown" | "html" }
   // QUIZ: { surveyId: string } - Links to existing Survey system
   // DOCUMENT: { url: string, fileName: string, fileSize: number, mimeType: string }
-  content         Json
+  content Json
 
   // Completion requirements
   // VIDEO: percentage watched (e.g., 80)
@@ -492,43 +493,43 @@ model LMSContentBlock {
   // DOCUMENT: null (download/view = complete)
   completionThreshold Int?
 
-  sortOrder       Int             @default(0)
+  sortOrder Int @default(0)
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  progress        LMSContentProgress[]
+  progress LMSContentProgress[]
 
   @@map("lms_content_blocks")
 }
 
 model LMSEnrollment {
-  id              String          @id @default(cuid())
-  courseId        String
-  course          LMSCourse       @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  userId          String
+  id       String    @id @default(cuid())
+  courseId String
+  course   LMSCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId   String
 
   // Progress tracking
-  status          LMSProgressStatus @default(NOT_STARTED)
-  progressPercentage Int           @default(0)
+  status             LMSProgressStatus @default(NOT_STARTED)
+  progressPercentage Int               @default(0)
 
   // Completion
-  completedAt     DateTime?
+  completedAt DateTime?
 
   // Certificate (if applicable)
   certificateIssuedAt DateTime?
-  certificateUrl  String?
+  certificateUrl      String?
 
   // Time tracking
-  totalTimeSpent  Int             @default(0) // Total minutes spent
-  lastAccessedAt  DateTime?
+  totalTimeSpent Int       @default(0) // Total minutes spent
+  lastAccessedAt DateTime?
 
-  enrolledAt      DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  enrolledAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Relations
-  lessonProgress  LMSLessonProgress[]
+  lessonProgress LMSLessonProgress[]
 
   @@unique([courseId, userId])
   @@index([userId])
@@ -539,22 +540,22 @@ model LMSEnrollment {
 }
 
 model LMSLessonProgress {
-  id              String          @id @default(cuid())
-  enrollmentId    String
-  enrollment      LMSEnrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  lessonId        String
-  lesson          LMSLesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id           String        @id @default(cuid())
+  enrollmentId String
+  enrollment   LMSEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lessonId     String
+  lesson       LMSLesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  status          LMSProgressStatus @default(NOT_STARTED)
+  status LMSProgressStatus @default(NOT_STARTED)
 
   // Time tracking
-  timeSpent       Int             @default(0) // Minutes spent on this lesson
+  timeSpent Int @default(0) // Minutes spent on this lesson
 
-  startedAt       DateTime?
-  completedAt     DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   contentProgress LMSContentProgress[]
@@ -564,23 +565,23 @@ model LMSLessonProgress {
 }
 
 model LMSContentProgress {
-  id              String          @id @default(cuid())
+  id               String            @id @default(cuid())
   lessonProgressId String
-  lessonProgress  LMSLessonProgress @relation(fields: [lessonProgressId], references: [id], onDelete: Cascade)
-  contentBlockId  String
-  contentBlock    LMSContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+  lessonProgress   LMSLessonProgress @relation(fields: [lessonProgressId], references: [id], onDelete: Cascade)
+  contentBlockId   String
+  contentBlock     LMSContentBlock   @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
 
-  status          LMSProgressStatus @default(NOT_STARTED)
+  status LMSProgressStatus @default(NOT_STARTED)
 
   // For VIDEO: percentage watched (0-100)
   // For QUIZ: score achieved
-  progressValue   Int?
+  progressValue Int?
 
-  startedAt       DateTime?
-  completedAt     DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([lessonProgressId, contentBlockId])
   @@map("lms_content_progress")
@@ -598,20 +599,20 @@ enum GoalStatus {
 }
 
 model WeeklyGoal {
-  id          String       @id @default(cuid())
-  coachId     String
-  coach       CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
   weekStart   DateTime
   weekEnd     DateTime
   title       String
   targetValue Int
   actualValue Int?
-  status      GoalStatus   @default(PENDING)
-  notes       String?      @db.Text
+  status      GoalStatus @default(PENDING)
+  notes       String?    @db.Text
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("weekly_goals")
 }
@@ -628,17 +629,17 @@ enum IncomeActivityType {
 }
 
 model IncomeEntry {
-  id           String             @id @default(cuid())
-  coachId      String
-  coach        CoachProfile       @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
   date         DateTime
   activityType IncomeActivityType
   description  String?            @db.Text
   amount       Decimal            @db.Decimal(10, 2)
 
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("income_entries")
 }
@@ -648,71 +649,71 @@ model IncomeEntry {
 // ============================================
 
 model BusinessExcellenceCRM {
-  id                    String       @id @default(cuid())
-  coachId               String       @unique
-  coach                 CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String       @unique
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
-  crmActivated          Boolean      @default(false)
-  crmSubscriptionActive Boolean      @default(false)
+  crmActivated          Boolean   @default(false)
+  crmSubscriptionActive Boolean   @default(false)
   crmProvider           String?
   activationDate        DateTime?
   lastLoginDate         DateTime?
 
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("business_excellence_crm")
 }
 
 model WebsiteContentStatus {
-  id                      String       @id @default(cuid())
-  coachId                 String       @unique
-  coach                   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String       @unique
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
   // Logo
-  logoSubmitted           Boolean      @default(false)
-  logoUrl                 String?
+  logoSubmitted Boolean @default(false)
+  logoUrl       String?
 
   // Services
-  servicesSubmitted       Boolean      @default(false)
-  servicesDescription     String?      @db.Text
+  servicesSubmitted   Boolean @default(false)
+  servicesDescription String? @db.Text
 
   // Products
-  productsSubmitted       Boolean      @default(false)
-  productsDescription     String?      @db.Text
+  productsSubmitted   Boolean @default(false)
+  productsDescription String? @db.Text
 
   // Pricing
-  pricingSubmitted        Boolean      @default(false)
-  pricingDescription      String?      @db.Text
+  pricingSubmitted   Boolean @default(false)
+  pricingDescription String? @db.Text
 
   // Target Audience
-  targetAudienceSubmitted Boolean      @default(false)
-  targetAudienceDescription String?    @db.Text
+  targetAudienceSubmitted   Boolean @default(false)
+  targetAudienceDescription String? @db.Text
 
   // Business Contact
-  contactSubmitted        Boolean      @default(false)
-  contactEmail            String?
-  contactPhone            String?
-  contactCity             String?
-  contactCountry          String?
-  contactSocialMedia      String?
-  contactWebsite          String?
+  contactSubmitted   Boolean @default(false)
+  contactEmail       String?
+  contactPhone       String?
+  contactCity        String?
+  contactCountry     String?
+  contactSocialMedia String?
+  contactWebsite     String?
 
   // About
-  aboutSubmitted          Boolean      @default(false)
-  aboutDescription        String?      @db.Text
+  aboutSubmitted   Boolean @default(false)
+  aboutDescription String? @db.Text
 
   // Vision & Mission
-  visionMissionSubmitted  Boolean      @default(false)
-  visionStatement         String?      @db.Text
-  missionStatement        String?      @db.Text
+  visionMissionSubmitted Boolean @default(false)
+  visionStatement        String? @db.Text
+  missionStatement       String? @db.Text
 
   // Bio
-  bioSubmitted            Boolean      @default(false)
-  bioContent              String?      @db.Text
+  bioSubmitted Boolean @default(false)
+  bioContent   String? @db.Text
 
-  createdAt               DateTime     @default(now())
-  updatedAt               DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("website_content_status")
 }
@@ -733,33 +734,33 @@ enum TargetPeriod {
 }
 
 model OutreachActivityTarget {
-  id        String           @id @default(cuid())
-  coachId   String
-  coach     CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
-  category  OutreachCategory
-  period    TargetPeriod
-  target    Int
+  category OutreachCategory
+  period   TargetPeriod
+  target   Int
 
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([coachId, category, period])
   @@map("outreach_activity_targets")
 }
 
 model OutreachActivityLog {
-  id        String           @id @default(cuid())
-  coachId   String
-  coach     CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
-  date      DateTime
-  category  OutreachCategory
-  quantity  Int
-  notes     String?          @db.Text
+  date     DateTime
+  category OutreachCategory
+  quantity Int
+  notes    String?          @db.Text
 
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("outreach_activity_logs")
 }
@@ -776,39 +777,39 @@ enum ResourceCenterAppStatus {
 }
 
 model ResourceCenterApplication {
-  id                  String                   @id @default(cuid())
-  coachId             String                   @unique
-  coach               CoachProfile             @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String       @unique
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
-  proposedLocation    String
-  communityDescription String?                 @db.Text
-  visionAndGoals      String?                  @db.Text
-  capacityInfo        String?                  @db.Text
+  proposedLocation     String
+  communityDescription String? @db.Text
+  visionAndGoals       String? @db.Text
+  capacityInfo         String? @db.Text
 
-  status              ResourceCenterAppStatus  @default(NOT_SUBMITTED)
-  declineReason       String?                  @db.Text
-  reviewedAt          DateTime?
+  status        ResourceCenterAppStatus @default(NOT_SUBMITTED)
+  declineReason String?                 @db.Text
+  reviewedAt    DateTime?
 
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("resource_center_applications")
 }
 
 model ResourceCenter {
-  id          String       @id @default(cuid())
-  ownerId     String       @unique
-  owner       CoachProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  ownerId String       @unique
+  owner   CoachProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   name        String
   location    String
-  description String?      @db.Text
+  description String? @db.Text
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  classes     ResourceCenterClass[]
+  classes ResourceCenterClass[]
 
   @@map("resource_centers")
 }
@@ -824,14 +825,14 @@ model ResourceCenterClass {
   resourceCenterId String
   resourceCenter   ResourceCenter @relation(fields: [resourceCenterId], references: [id], onDelete: Cascade)
 
-  title            String
-  date             DateTime
-  audienceType     AudienceType
-  attendanceCount  Int            @default(0)
-  notes            String?        @db.Text
+  title           String
+  date            DateTime
+  audienceType    AudienceType
+  attendanceCount Int          @default(0)
+  notes           String?      @db.Text
 
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("resource_center_classes")
 }
@@ -852,10 +853,10 @@ model Event {
   requireOnboardingComplete   Boolean @default(false)
   requiredApprovedAmbassadors Int     @default(0)
 
-  isActive    Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   qualifications EventQualificationStatus[]
@@ -871,16 +872,16 @@ enum QualificationStatus {
 }
 
 model EventQualificationStatus {
-  id        String              @id @default(cuid())
-  eventId   String
-  event     Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  coachId   String
-  coach     CoachProfile        @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  eventId String
+  event   Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
-  status    QualificationStatus @default(NOT_QUALIFIED)
+  status QualificationStatus @default(NOT_QUALIFIED)
 
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([eventId, coachId])
   @@map("event_qualification_status")
@@ -893,17 +894,17 @@ enum RSVPStatus {
 }
 
 model EventRSVP {
-  id        String       @id @default(cuid())
-  eventId   String
-  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  coachId   String
-  coach     CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  eventId String
+  event   Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
-  status    RSVPStatus
-  notes     String?      @db.Text
+  status RSVPStatus
+  notes  String?    @db.Text
 
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([eventId, coachId])
   @@map("event_rsvps")
@@ -935,29 +936,29 @@ enum SponsorshipStatus {
 }
 
 model SponsorshipRequest {
-  id              String                 @id @default(cuid())
-  coachId         String
-  coach           CoachProfile           @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
-  requestType     SponsorshipRequestType
+  requestType SponsorshipRequestType
 
   // Beneficiary - either coach themselves or an ambassador
-  beneficiaryType String                 // "SELF" or "AMBASSADOR" or "PROJECT"
+  beneficiaryType String // "SELF" or "AMBASSADOR" or "PROJECT"
   ambassadorId    String?
-  ambassador      Ambassador?            @relation(fields: [ambassadorId], references: [id], onDelete: SetNull)
+  ambassador      Ambassador? @relation(fields: [ambassadorId], references: [id], onDelete: SetNull)
   projectName     String?
 
-  amountRequested Decimal                @db.Decimal(10, 2)
-  amountContributing Decimal?            @db.Decimal(10, 2)
-  reason          String                 @db.Text
-  urgency         SponsorshipUrgency     @default(NORMAL)
+  amountRequested    Decimal            @db.Decimal(10, 2)
+  amountContributing Decimal?           @db.Decimal(10, 2)
+  reason             String             @db.Text
+  urgency            SponsorshipUrgency @default(NORMAL)
 
-  status          SponsorshipStatus      @default(SUBMITTED)
-  adminNotes      String?                @db.Text
-  decidedAt       DateTime?
+  status     SponsorshipStatus @default(SUBMITTED)
+  adminNotes String?           @db.Text
+  decidedAt  DateTime?
 
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("sponsorship_requests")
 }
@@ -982,34 +983,34 @@ enum ThreadStatus {
 }
 
 model MessageThread {
-  id          String          @id @default(cuid())
-  subject     String
-  category    MessageCategory
-  status      ThreadStatus    @default(OPEN)
+  id       String          @id @default(cuid())
+  subject  String
+  category MessageCategory
+  status   ThreadStatus    @default(OPEN)
 
-  participants User[]         @relation("ThreadParticipants")
+  participants User[] @relation("ThreadParticipants")
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  messages    Message[]
+  messages Message[]
 
   @@map("message_threads")
 }
 
 model Message {
-  id        String        @id @default(cuid())
-  threadId  String
-  thread    MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  senderId  String
-  sender    User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  id       String        @id @default(cuid())
+  threadId String
+  thread   MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId String
+  sender   User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
-  content   String        @db.Text
-  isRead    Boolean       @default(false)
+  content String  @db.Text
+  isRead  Boolean @default(false)
 
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([threadId])
   @@index([senderId])
@@ -1021,15 +1022,15 @@ model Message {
 // ============================================
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  userId      String?
-  action      String
-  entityType  String
-  entityId    String?
-  details     String?  @db.Text
-  ipAddress   String?
+  id         String  @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  details    String? @db.Text
+  ipAddress  String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@map("audit_logs")
 }
@@ -1064,29 +1065,29 @@ model AmbassadorOnboardingTask {
   sortOrder   Int                          @default(0)
   isActive    Boolean                      @default(true)
 
-  createdAt   DateTime                     @default(now())
-  updatedAt   DateTime                     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  progress    AmbassadorOnboardingProgress[]
+  progress AmbassadorOnboardingProgress[]
 
   @@map("ambassador_onboarding_tasks")
 }
 
 model AmbassadorOnboardingProgress {
-  id           String                      @id @default(cuid())
+  id           String                   @id @default(cuid())
   ambassadorId String
-  ambassador   Ambassador                  @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
+  ambassador   Ambassador               @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
   taskId       String
-  task         AmbassadorOnboardingTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task         AmbassadorOnboardingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  status       AmbassadorOnboardingStatus  @default(NOT_STARTED)
-  completedAt  DateTime?
-  reviewedBy   String?                     // Admin/Director userId who reviewed
-  notes        String?                     @db.Text
+  status      AmbassadorOnboardingStatus @default(NOT_STARTED)
+  completedAt DateTime?
+  reviewedBy  String? // Admin/Director userId who reviewed
+  notes       String?                    @db.Text
 
-  createdAt    DateTime                    @default(now())
-  updatedAt    DateTime                    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([ambassadorId, taskId])
   @@map("ambassador_onboarding_progress")
@@ -1106,23 +1107,23 @@ enum BusinessIdeaStatus {
 }
 
 model BusinessIdea {
-  id           String             @id @default(cuid())
-  ambassadorId String             @unique
-  ambassador   Ambassador         @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  ambassadorId String     @unique
+  ambassador   Ambassador @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
 
   title        String
-  description  String             @db.Text
-  targetMarket String?            @db.Text
-  resources    String?            @db.Text  // What resources they need
+  description  String  @db.Text
+  targetMarket String? @db.Text
+  resources    String? @db.Text // What resources they need
 
-  status       BusinessIdeaStatus @default(DRAFT)
-  reviewedBy   String?            // Admin userId who reviewed
-  feedback     String?            @db.Text
+  status     BusinessIdeaStatus @default(DRAFT)
+  reviewedBy String? // Admin userId who reviewed
+  feedback   String?            @db.Text
 
-  submittedAt  DateTime?
-  reviewedAt   DateTime?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@map("business_ideas")
 }
@@ -1132,26 +1133,26 @@ model BusinessIdea {
 // ============================================
 
 model CoachClass {
-  id          String       @id @default(cuid())
-  coachId     String
-  coach       CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
   title       String
-  description String?      @db.Text
+  description String?   @db.Text
   date        DateTime?
-  duration    Int?         // Minutes
+  duration    Int? // Minutes
   location    String?
-  isOnline    Boolean      @default(false)
+  isOnline    Boolean   @default(false)
   meetingLink String?
 
-  isFree      Boolean      @default(true)
-  price       Decimal?     @db.Decimal(10, 2)
+  isFree      Boolean  @default(true)
+  price       Decimal? @db.Decimal(10, 2)
   maxCapacity Int?
 
-  isActive    Boolean      @default(true)
+  isActive Boolean @default(true)
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   enrollments ClassEnrollment[]
@@ -1174,17 +1175,17 @@ enum PaymentStatus {
 }
 
 model ClassEnrollment {
-  id           String           @id @default(cuid())
+  id           String     @id @default(cuid())
   ambassadorId String
-  ambassador   Ambassador       @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
+  ambassador   Ambassador @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
   classId      String
-  class        CoachClass       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class        CoachClass @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   status        EnrollmentStatus @default(ENROLLED)
   paymentStatus PaymentStatus    @default(NOT_REQUIRED)
 
-  enrolledAt   DateTime         @default(now())
-  attendedAt   DateTime?
+  enrolledAt DateTime  @default(now())
+  attendedAt DateTime?
 
   @@unique([ambassadorId, classId])
   @@map("class_enrollments")
@@ -1195,25 +1196,25 @@ model ClassEnrollment {
 // ============================================
 
 model FeatureConfig {
-  id                    String   @id @default(cuid())
-  feature               String   @unique // "CRM", "PROJECT_MANAGEMENT", "COLLABORATION", "TIME_CLOCK", "SCHEDULING", "KNOWLEDGE_BASE"
-  isEnabled             Boolean  @default(true)
+  id                    String  @id @default(cuid())
+  feature               String  @unique // "CRM", "PROJECT_MANAGEMENT", "COLLABORATION", "TIME_CLOCK", "SCHEDULING", "KNOWLEDGE_BASE"
+  isEnabled             Boolean @default(true)
   settings              Json?
-  enabledForCoaches     Boolean  @default(true)
-  enabledForAmbassadors Boolean  @default(false)
+  enabledForCoaches     Boolean @default(true)
+  enabledForAmbassadors Boolean @default(false)
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("feature_configs")
 }
 
 // Per-user feature permission overrides
 model UserFeaturePermission {
-  id        String   @id @default(cuid())
-  userId    String
-  feature   String   // "CRM", "PROJECT_MANAGEMENT", etc.
-  granted   Boolean  @default(true) // true = granted, false = denied
+  id      String  @id @default(cuid())
+  userId  String
+  feature String // "CRM", "PROJECT_MANAGEMENT", etc.
+  granted Boolean @default(true) // true = granted, false = denied
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1227,16 +1228,16 @@ model UserFeaturePermission {
 // ============================================
 
 model CRMPipelineStage {
-  id        String    @id @default(cuid())
+  id        String  @id @default(cuid())
   name      String
-  color     String    @default("#3B82F6")
-  sortOrder Int       @default(0)
-  isActive  Boolean   @default(true)
+  color     String  @default("#3B82F6")
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
 
-  deals     CRMDeal[]
+  deals CRMDeal[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("crm_pipeline_stages")
 }
@@ -1258,18 +1259,18 @@ enum ContactStatus {
 }
 
 model CRMContact {
-  id         String        @id @default(cuid())
-  ownerId    String        // CoachProfile ID
-  owner      CoachProfile  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  ownerId String // CoachProfile ID
+  owner   CoachProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  firstName  String
-  lastName   String
-  email      String?
-  phone      String?
-  company    String?
-  jobTitle   String?
-  notes      String?       @db.Text
-  tags       String[]
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  company   String?
+  jobTitle  String?
+  notes     String?  @db.Text
+  tags      String[]
 
   // Where this person came from, and where the coach has got to with them.
   source          ContactSource @default(MANUAL)
@@ -1287,8 +1288,8 @@ model CRMContact {
   deals      CRMDeal[]
   activities CRMActivity[]
 
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([ownerId, status])
   @@index([ownerId, nextFollowUpAt])
@@ -1296,24 +1297,24 @@ model CRMContact {
 }
 
 model CRMDeal {
-  id                String            @id @default(cuid())
-  ownerId           String            // CoachProfile ID
-  owner             CoachProfile      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  contactId         String?
-  contact           CRMContact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  stageId           String
-  stage             CRMPipelineStage  @relation(fields: [stageId], references: [id])
+  id        String           @id @default(cuid())
+  ownerId   String // CoachProfile ID
+  owner     CoachProfile     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  contactId String?
+  contact   CRMContact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  stageId   String
+  stage     CRMPipelineStage @relation(fields: [stageId], references: [id])
 
   title             String
-  value             Decimal?          @db.Decimal(10, 2)
-  probability       Int               @default(50) // 0-100
+  value             Decimal?  @db.Decimal(10, 2)
+  probability       Int       @default(50) // 0-100
   expectedCloseDate DateTime?
-  notes             String?           @db.Text
+  notes             String?   @db.Text
 
-  activities        CRMActivity[]
+  activities CRMActivity[]
 
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("crm_deals")
 }
@@ -1327,12 +1328,12 @@ enum CRMActivityType {
 }
 
 model CRMActivity {
-  id          String          @id @default(cuid())
-  userId      String          // Who created the activity
-  contactId   String?
-  contact     CRMContact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  dealId      String?
-  deal        CRMDeal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  id        String      @id @default(cuid())
+  userId    String // Who created the activity
+  contactId String?
+  contact   CRMContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId    String?
+  deal      CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   type        CRMActivityType
   title       String
@@ -1340,8 +1341,8 @@ model CRMActivity {
   dueDate     DateTime?
   completedAt DateTime?
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("crm_activities")
 }
@@ -1373,55 +1374,55 @@ enum TaskPriority {
 }
 
 model Project {
-  id          String             @id @default(cuid())
-  ownerId     String             // User ID (creator; an admin for shared projects)
-  ownerType   String             // "COACH", "AMBASSADOR" or "ADMIN"
+  id        String @id @default(cuid())
+  ownerId   String // User ID (creator; an admin for shared projects)
+  ownerType String // "COACH", "AMBASSADOR" or "ADMIN"
 
   name        String
-  description String?            @db.Text
-  status      ProjectStatus      @default(PLANNING)
+  description String?       @db.Text
+  status      ProjectStatus @default(PLANNING)
   startDate   DateTime?
   endDate     DateTime?
 
   // Shared projects are created by admins and offered to everyone; the rest
   // are personal and offered only to their owner.
-  isShared    Boolean            @default(false)
+  isShared   Boolean   @default(false)
   // Archived projects drop out of pickers but keep their hours in reports.
-  archivedAt  DateTime?
+  archivedAt DateTime?
 
   tasks       Task[]
   milestones  ProjectMilestone[]
   timeEntries TimeEntry[]
 
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([ownerId])
   @@map("projects")
 }
 
 model ProjectMilestone {
-  id          String    @id @default(cuid())
-  projectId   String
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   name        String
   description String?
   dueDate     DateTime?
   completedAt DateTime?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("project_milestones")
 }
 
 model Task {
-  id          String       @id @default(cuid())
+  id          String   @id @default(cuid())
   projectId   String?
-  project     Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assigneeId  String?      // User ID
-  createdById String       // User ID
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assigneeId  String? // User ID
+  createdById String // User ID
 
   title       String
   description String?      @db.Text
@@ -1430,8 +1431,8 @@ model Task {
   dueDate     DateTime?
   completedAt DateTime?
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("tasks")
 }
@@ -1441,21 +1442,21 @@ model Task {
 // ============================================
 
 enum ChannelType {
-  CHANNEL         // Group discussion channel
-  DIRECT_MESSAGE  // Private conversation between users
+  CHANNEL // Group discussion channel
+  DIRECT_MESSAGE // Private conversation between users
 }
 
 model CollaborationChannel {
-  id           String          @id @default(cuid())
-  type         ChannelType     @default(CHANNEL)
-  name         String?         // Optional for DMs (auto-generated from participants)
-  description  String?
-  icon         String?         // Emoji icon for channel (e.g., "rocket", "team")
-  isPrivate    Boolean         @default(false)
-  createdById  String          // User ID
+  id          String      @id @default(cuid())
+  type        ChannelType @default(CHANNEL)
+  name        String? // Optional for DMs (auto-generated from participants)
+  description String?
+  icon        String? // Emoji icon for channel (e.g., "rocket", "team")
+  isPrivate   Boolean     @default(false)
+  createdById String // User ID
 
   // Access control - which roles can access (for channels only)
-  allowedRoles String[]        // ["ADMIN", "COACH", "AMBASSADOR"]
+  allowedRoles String[] // ["ADMIN", "COACH", "AMBASSADOR"]
 
   // Default meeting link for channel huddles
   defaultMeetingLink String?
@@ -1464,21 +1465,21 @@ model CollaborationChannel {
   members      ChannelMember[]
   meetingLinks MeetingLink[]
 
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("collaboration_channels")
 }
 
 model ChannelMember {
-  id         String               @id @default(cuid())
-  channelId  String
-  channel    CollaborationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  userId     String
+  id        String               @id @default(cuid())
+  channelId String
+  channel   CollaborationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String
 
-  joinedAt   DateTime             @default(now())
-  mutedUntil DateTime?            // Mute notifications until this time
-  lastReadAt DateTime             @default(now()) // For unread tracking
+  joinedAt   DateTime  @default(now())
+  mutedUntil DateTime? // Mute notifications until this time
+  lastReadAt DateTime  @default(now()) // For unread tracking
 
   @@unique([channelId, userId])
   @@index([channelId])
@@ -1490,12 +1491,12 @@ model ChannelPost {
   id        String               @id @default(cuid())
   channelId String
   channel   CollaborationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  authorId  String               // User ID
+  authorId  String // User ID
 
-  content   String               @db.Text
-  isPinned  Boolean              @default(false)
-  isEdited  Boolean              @default(false)
-  editedAt  DateTime?
+  content  String    @db.Text
+  isPinned Boolean   @default(false)
+  isEdited Boolean   @default(false)
+  editedAt DateTime?
 
   replies      ChannelPostReply[]
   reactions    PostReaction[]
@@ -1503,8 +1504,8 @@ model ChannelPost {
   attachments  PostAttachment[]
   meetingLinks MeetingLink[]
 
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([channelId])
   @@index([channelId, createdAt])
@@ -1513,61 +1514,61 @@ model ChannelPost {
 }
 
 model ChannelPostReply {
-  id        String      @id @default(cuid())
-  postId    String
-  post      ChannelPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  authorId  String      // User ID
+  id       String      @id @default(cuid())
+  postId   String
+  post     ChannelPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId String // User ID
 
-  content   String      @db.Text
-  isEdited  Boolean     @default(false)
-  editedAt  DateTime?
+  content  String    @db.Text
+  isEdited Boolean   @default(false)
+  editedAt DateTime?
 
   reactions   PostReaction[]
   mentions    PostMention[]
   attachments PostAttachment[]
 
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("channel_post_replies")
 }
 
 model SharedDocument {
-  id           String   @id @default(cuid())
-  uploaderId   String   // User ID
+  id         String @id @default(cuid())
+  uploaderId String // User ID
 
-  title        String
-  description  String?
-  fileName     String
-  fileUrl      String
-  fileSize     Int?
-  mimeType     String?
+  title       String
+  description String?
+  fileName    String
+  fileUrl     String
+  fileSize    Int?
+  mimeType    String?
 
   // Access control
   isPublic     Boolean  @default(false)
   allowedRoles String[] // ["ADMIN", "COACH", "AMBASSADOR"]
 
-  category     String?  // Optional category/folder
+  category String? // Optional category/folder
 
-  attachments  PostAttachment[]
+  attachments PostAttachment[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("shared_documents")
 }
 
 // Emoji Reactions for posts and replies
 model PostReaction {
-  id        String            @id @default(cuid())
-  postId    String?
-  post      ChannelPost?      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  replyId   String?
-  reply     ChannelPostReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
-  userId    String
-  emoji     String            // "+1", "heart", "smile", etc.
+  id      String            @id @default(cuid())
+  postId  String?
+  post    ChannelPost?      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  replyId String?
+  reply   ChannelPostReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  userId  String
+  emoji   String // "+1", "heart", "smile", etc.
 
-  createdAt DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([postId, userId, emoji])
   @@unique([replyId, userId, emoji])
@@ -1584,7 +1585,7 @@ model PostMention {
   mentionedUserId String
   isRead          Boolean           @default(false)
 
-  createdAt       DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([postId, mentionedUserId])
   @@unique([replyId, mentionedUserId])
@@ -1601,7 +1602,7 @@ model PostAttachment {
   documentId String
   document   SharedDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  createdAt  DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@map("post_attachments")
 }
@@ -1625,10 +1626,10 @@ model MeetingLink {
   url         String
   title       String?
   scheduledAt DateTime?
-  duration    Int?                  // Duration in minutes
+  duration    Int? // Duration in minutes
   createdById String
 
-  createdAt   DateTime              @default(now())
+  createdAt DateTime @default(now())
 
   @@map("meeting_links")
 }
@@ -1640,11 +1641,11 @@ model MeetingLink {
 // One row per stretch of work. A running timer is a row with no endTime; hours
 // are always endTime - startTime, so nothing is stored that could drift.
 model TimeEntry {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId   String?
-  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   description String?
   startTime   DateTime
@@ -1652,10 +1653,10 @@ model TimeEntry {
   // Typed in after the fact rather than timed.
   isManual    Boolean   @default(false)
 
-  changes     TimeEntryChange[]
+  changes TimeEntryChange[]
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, startTime])
   @@index([startTime])
@@ -1667,17 +1668,17 @@ model TimeEntry {
 
 // History of edits to an entry. Admins must give a reason; owners may not.
 model TimeEntryChange {
-  id        String    @id @default(cuid())
-  entryId   String
-  entry     TimeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
-  editorId  String?
-  editor    User?     @relation("TimeEntryEditor", fields: [editorId], references: [id], onDelete: SetNull)
+  id       String    @id @default(cuid())
+  entryId  String
+  entry    TimeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  editorId String?
+  editor   User?     @relation("TimeEntryEditor", fields: [editorId], references: [id], onDelete: SetNull)
 
-  reason    String?
+  reason String?
   // { field: [before, after] } for each field that changed.
-  diff      Json
+  diff   Json
 
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([entryId])
   @@map("time_entry_changes")
@@ -1703,47 +1704,47 @@ enum AttendeeStatus {
 }
 
 model CalendarEvent {
-  id             String            @id @default(cuid())
-  creatorId      String            // User ID
+  id        String @id @default(cuid())
+  creatorId String // User ID
 
-  title          String
-  description    String?           @db.Text
-  type           CalendarEventType @default(MEETING)
+  title       String
+  description String?           @db.Text
+  type        CalendarEventType @default(MEETING)
 
-  startTime      DateTime
-  endTime        DateTime
-  isAllDay       Boolean           @default(false)
-  timezone       String            @default("America/Los_Angeles")
+  startTime DateTime
+  endTime   DateTime
+  isAllDay  Boolean  @default(false)
+  timezone  String   @default("America/Los_Angeles")
 
-  location       String?
-  isOnline       Boolean           @default(false)
-  meetingLink    String?
+  location    String?
+  isOnline    Boolean @default(false)
+  meetingLink String?
 
   // Recurrence
-  isRecurring    Boolean           @default(false)
-  recurrenceRule String?           // iCal RRULE format
-  seriesId       String?           // Groups events in the same recurring series
+  isRecurring    Boolean @default(false)
+  recurrenceRule String? // iCal RRULE format
+  seriesId       String? // Groups events in the same recurring series
 
   // Link to Admin Calendar (optional)
   adminCalendarId String?
-  adminCalendar   AdminCalendar?   @relation("AdminCalendarEvents", fields: [adminCalendarId], references: [id], onDelete: SetNull)
+  adminCalendar   AdminCalendar? @relation("AdminCalendarEvents", fields: [adminCalendarId], references: [id], onDelete: SetNull)
 
-  attendees      EventAttendee[]
-  bookings       CalendarBooking[]
+  attendees EventAttendee[]
+  bookings  CalendarBooking[]
 
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("calendar_events")
 }
 
 model EventAttendee {
-  id       String         @id @default(cuid())
-  eventId  String
-  event    CalendarEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId   String
+  id      String        @id @default(cuid())
+  eventId String
+  event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId  String
 
-  status   AttendeeStatus @default(PENDING)
+  status AttendeeStatus @default(PENDING)
 
   @@unique([eventId, userId])
   @@map("event_attendees")
@@ -1760,50 +1761,50 @@ enum ArticleStatus {
 }
 
 model KBCategory {
-  id           String       @id @default(cuid())
-  name         String
-  slug         String       @unique
-  description  String?
-  sortOrder    Int          @default(0)
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  sortOrder   Int     @default(0)
 
   // Hierarchical categories
-  parentId     String?
-  parent       KBCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children     KBCategory[] @relation("CategoryHierarchy")
+  parentId String?
+  parent   KBCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children KBCategory[] @relation("CategoryHierarchy")
 
-  articles     KBArticle[]
+  articles KBArticle[]
 
   // Access control
-  allowedRoles String[]     // ["ADMIN", "COACH", "AMBASSADOR"]
+  allowedRoles String[] // ["ADMIN", "COACH", "AMBASSADOR"]
 
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("kb_categories")
 }
 
 model KBArticle {
-  id           String        @id @default(cuid())
-  categoryId   String?
-  category     KBCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  authorId     String        // User ID
+  id         String      @id @default(cuid())
+  categoryId String?
+  category   KBCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  authorId   String // User ID
 
-  title        String
-  slug         String        @unique
-  content      String        @db.Text // Markdown content
-  excerpt      String?
+  title   String
+  slug    String  @unique
+  content String  @db.Text // Markdown content
+  excerpt String?
 
-  status       ArticleStatus @default(DRAFT)
-  publishedAt  DateTime?
+  status      ArticleStatus @default(DRAFT)
+  publishedAt DateTime?
 
-  tags         String[]
-  viewCount    Int           @default(0)
+  tags      String[]
+  viewCount Int      @default(0)
 
   // Access control
-  allowedRoles String[]      // ["ADMIN", "COACH", "AMBASSADOR"]
+  allowedRoles String[] // ["ADMIN", "COACH", "AMBASSADOR"]
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("kb_articles")
 }
@@ -1818,11 +1819,11 @@ enum SurveyType {
 }
 
 enum SurveyQuestionType {
-  MULTIPLE_CHOICE      // Single answer - radio buttons
-  MULTIPLE_SELECT      // Multiple answers - checkboxes
-  LIKERT_SCALE         // 1-5 scale with labels
-  TEXT_SHORT           // Short text response
-  TEXT_LONG            // Long text response (textarea)
+  MULTIPLE_CHOICE // Single answer - radio buttons
+  MULTIPLE_SELECT // Multiple answers - checkboxes
+  LIKERT_SCALE // 1-5 scale with labels
+  TEXT_SHORT // Short text response
+  TEXT_LONG // Long text response (textarea)
 }
 
 enum SurveyPublishStatus {
@@ -1833,173 +1834,173 @@ enum SurveyPublishStatus {
 }
 
 enum QuizScoreMode {
-  NO_SCORING    // Practice mode - no scores calculated or shown
-  SCORE_ONLY    // Show score but no pass/fail judgment
-  PASS_FAIL     // Score with passing threshold required
+  NO_SCORING // Practice mode - no scores calculated or shown
+  SCORE_ONLY // Show score but no pass/fail judgment
+  PASS_FAIL // Score with passing threshold required
 }
 
 model Survey {
-  id              String              @id @default(cuid())
+  id String @id @default(cuid())
 
-  title           String
-  description     String?             @db.Text
-  type            SurveyType          // QUIZ or SURVEY
-  status          SurveyPublishStatus @default(DRAFT)
+  title       String
+  description String?             @db.Text
+  type        SurveyType // QUIZ or SURVEY
+  status      SurveyPublishStatus @default(DRAFT)
 
   // Audience Configuration
-  allowedRoles    String[]            // ["COACH", "AMBASSADOR"]
+  allowedRoles String[] // ["COACH", "AMBASSADOR"]
 
   // Survey-specific options
-  isAnonymous     Boolean             @default(false)
+  isAnonymous Boolean @default(false)
 
   // Public Assessment Settings (for prospect assessments)
-  isPublic            Boolean         @default(false)
-  requiresProspectInfo Boolean        @default(false)  // Captures name, email, phone, referrer
-  showProgressBar     Boolean         @default(true)
+  isPublic             Boolean @default(false)
+  requiresProspectInfo Boolean @default(false) // Captures name, email, phone, referrer
+  showProgressBar      Boolean @default(true)
 
   // Contact Info Field Configuration (JSON)
   // Structure: { fields: [{ name: string, label: string, type: string, required: boolean, enabled: boolean }] }
-  contactInfoConfig   Json?
+  contactInfoConfig Json?
 
   // Quiz-specific options
-  scoreMode       QuizScoreMode       @default(SCORE_ONLY)  // How to handle quiz scoring
-  passingScore    Int?                // Percentage required to pass (only for PASS_FAIL mode)
-  showResults     Boolean             @default(true)
-  allowRetake     Boolean             @default(true)
+  scoreMode    QuizScoreMode @default(SCORE_ONLY) // How to handle quiz scoring
+  passingScore Int? // Percentage required to pass (only for PASS_FAIL mode)
+  showResults  Boolean       @default(true)
+  allowRetake  Boolean       @default(true)
 
   // Scheduling
-  publishedAt     DateTime?
-  closesAt        DateTime?
+  publishedAt DateTime?
+  closesAt    DateTime?
 
-  createdBy       String              // Admin user ID
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdBy String // Admin user ID
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  pages           SurveyPage[]
-  questions       SurveyQuestion[]
-  submissions     SurveySubmission[]
+  pages       SurveyPage[]
+  questions   SurveyQuestion[]
+  submissions SurveySubmission[]
 
   @@map("surveys")
 }
 
 model SurveyPage {
-  id              String              @id @default(cuid())
-  surveyId        String
-  survey          Survey              @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  surveyId String
+  survey   Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
-  title           String?             // Optional section title (e.g., "Personal Information")
-  description     String?             @db.Text // Optional section description
-  sortOrder       Int                 @default(0)
+  title       String? // Optional section title (e.g., "Personal Information")
+  description String? @db.Text // Optional section description
+  sortOrder   Int     @default(0)
 
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  questions       SurveyQuestion[]
+  questions SurveyQuestion[]
 
   @@map("survey_pages")
 }
 
 model SurveyQuestion {
-  id              String              @id @default(cuid())
-  surveyId        String
-  survey          Survey              @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  surveyId String
+  survey   Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
   // Page grouping (optional - null means standalone/legacy question)
-  pageId          String?
-  page            SurveyPage?         @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  pageId String?
+  page   SurveyPage? @relation(fields: [pageId], references: [id], onDelete: SetNull)
 
-  questionText    String              @db.Text
-  questionType    SurveyQuestionType
-  isRequired      Boolean             @default(true)
-  sortOrder       Int                 @default(0)
+  questionText String             @db.Text
+  questionType SurveyQuestionType
+  isRequired   Boolean            @default(true)
+  sortOrder    Int                @default(0)
 
   // Likert scale configuration (JSON)
   // e.g., { "minLabel": "Strongly Disagree", "maxLabel": "Strongly Agree", "minValue": 1, "maxValue": 5 }
-  likertConfig    Json?
+  likertConfig Json?
 
   // For text questions - character limits
-  minLength       Int?
-  maxLength       Int?
+  minLength Int?
+  maxLength Int?
 
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  options         SurveyOption[]
-  answers         SurveyAnswer[]
+  options SurveyOption[]
+  answers SurveyAnswer[]
 
   @@map("survey_questions")
 }
 
 model SurveyOption {
-  id              String            @id @default(cuid())
-  questionId      String
-  question        SurveyQuestion    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  id         String         @id @default(cuid())
+  questionId String
+  question   SurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
-  optionText      String
-  isCorrect       Boolean           @default(false)  // Only relevant for quizzes
-  sortOrder       Int               @default(0)
+  optionText String
+  isCorrect  Boolean @default(false) // Only relevant for quizzes
+  sortOrder  Int     @default(0)
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  selectedBy      SurveyAnswer[]    @relation("SelectedSurveyOptions")
+  selectedBy SurveyAnswer[] @relation("SelectedSurveyOptions")
 
   @@map("survey_options")
 }
 
 model SurveySubmission {
-  id              String            @id @default(cuid())
-  surveyId        String
-  survey          Survey            @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  surveyId String
+  survey   Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
   // Responder info (null for anonymous surveys)
-  userId          String?
-  userRole        String?           // Role at time of submission
-  contactEmail    String?           // Email for public surveys (e.g., coach assessment)
+  userId       String?
+  userRole     String? // Role at time of submission
+  contactEmail String? // Email for public surveys (e.g., coach assessment)
 
   // Quiz scoring (null for surveys)
-  score           Float?
-  passed          Boolean?
+  score  Float?
+  passed Boolean?
 
-  submittedAt     DateTime          @default(now())
+  submittedAt DateTime @default(now())
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  answers         SurveyAnswer[]
+  answers SurveyAnswer[]
 
+  @@unique([surveyId, contactEmail])
   @@index([contactEmail])
   @@index([surveyId])
-  @@unique([surveyId, contactEmail])
   @@map("survey_submissions")
 }
 
 model SurveyAnswer {
-  id              String              @id @default(cuid())
-  submissionId    String
-  submission      SurveySubmission    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  questionId      String
-  question        SurveyQuestion      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  id           String           @id @default(cuid())
+  submissionId String
+  submission   SurveySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     SurveyQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   // For MULTIPLE_CHOICE / MULTIPLE_SELECT - selected option IDs
-  selectedOptions SurveyOption[]      @relation("SelectedSurveyOptions")
+  selectedOptions SurveyOption[] @relation("SelectedSurveyOptions")
 
   // For LIKERT_SCALE - numeric value
-  likertValue     Int?
+  likertValue Int?
 
   // For TEXT_SHORT / TEXT_LONG - text response
-  textResponse    String?             @db.Text
+  textResponse String? @db.Text
 
   // Was this answer correct? (for quiz scoring)
-  isCorrect       Boolean?
+  isCorrect Boolean?
 
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([submissionId, questionId])
   @@map("survey_answers")
@@ -2077,164 +2078,171 @@ enum NotificationType {
 }
 
 model Prospect {
-  id                    String              @id @default(cuid())
+  id String @id @default(cuid())
 
   // Contact Information (from assessment)
-  firstName             String
-  lastName              String
-  email                 String              @unique
-  phone                 String?
-  phoneCountryCode      String?             @default("US")
-  referrerName          String?
+  firstName        String
+  lastName         String
+  email            String  @unique
+  phone            String?
+  phoneCountryCode String? @default("US")
+  referrerName     String?
 
   // Unique Access Tokens
-  assessmentToken       String              @unique @default(cuid())
-  orientationToken      String?             @unique
-  businessFormToken     String?             @unique
-  bizDevInterviewToken  String?             @unique
-  acceptanceToken       String?             @unique
+  assessmentToken      String  @unique @default(cuid())
+  orientationToken     String? @unique
+  businessFormToken    String? @unique
+  bizDevInterviewToken String? @unique
+  acceptanceToken      String? @unique
 
   // Pipeline Status
-  status                ProspectStatus      @default(ASSESSMENT_PENDING)
+  status ProspectStatus @default(ASSESSMENT_PENDING)
 
   // Assessment
-  assessmentSurveyId    String?
+  assessmentSurveyId     String?
   assessmentSubmissionId String?
-  assessmentCompletedAt DateTime?
+  assessmentCompletedAt  DateTime?
 
   // Orientation
   orientationScheduledAt DateTime?
   orientationCompletedAt DateTime?
-  orientationNotes      String?             @db.Text
+  orientationNotes       String?   @db.Text
 
   // Business Development Form - Step 1: Business Identity
-  companyName           String?
-  tagline               String?
-  bio                   String?             @db.Text
-  businessType          String?             // "Coaching", "Consulting", "Training", etc.
-  businessTypeOther     String?             // Custom value when businessType is "Other"
+  companyName       String?
+  tagline           String?
+  bio               String? @db.Text
+  businessType      String? // "Coaching", "Consulting", "Training", etc.
+  businessTypeOther String? // Custom value when businessType is "Other"
 
   // Business Development Form - Step 2: Online Presence
-  websiteUrl            String?
-  needsWebsiteHelp      Boolean?
-  instagramHandle       String?
-  facebookHandle        String?
-  linkedinHandle        String?
-  tiktokHandle          String?
+  websiteUrl       String?
+  needsWebsiteHelp Boolean?
+  instagramHandle  String?
+  facebookHandle   String?
+  linkedinHandle   String?
+  tiktokHandle     String?
 
   // Business Development Form - Step 3: Services & Packages
-  servicePackages       Json?               // [{id, name, description, price, duration}]
-  servicesInterested    String[]            // Legacy field for backward compatibility
-  proposedCostOfServices String?            @db.Text  // Legacy field
+  servicePackages        Json? // [{id, name, description, price, duration}]
+  servicesInterested     String[] // Legacy field for backward compatibility
+  proposedCostOfServices String?  @db.Text // Legacy field
 
   // Business Development Form - Step 4: Target Audience & Differentiators
-  idealClient           String?             @db.Text
-  uniqueValue           String?             @db.Text  // What makes you unique
-  certifications        String?             @db.Text
+  idealClient    String? @db.Text
+  uniqueValue    String? @db.Text // What makes you unique
+  certifications String? @db.Text
 
   // Business Development Form - Step 5: Goals
-  threeYearRevenueGoal  String?
-  threeYearClientGoal   String?
-  visionStatement       String?             @db.Text
-  missionStatement      String?             @db.Text
+  threeYearRevenueGoal String?
+  threeYearClientGoal  String?
+  visionStatement      String? @db.Text
+  missionStatement     String? @db.Text
 
   // Business Development Form - Draft & Resume Support
-  businessFormDraft     Json?               // {currentStep, formData}
+  businessFormDraft       Json? // {currentStep, formData}
   businessFormLastSavedAt DateTime?
   businessFormSubmittedAt DateTime?
 
   // Interview
-  interviewScheduledAt  DateTime?
-  interviewCompletedAt  DateTime?
-  interviewNotes        String?             @db.Text
-  interviewResult       String?
+  interviewScheduledAt DateTime?
+  interviewCompletedAt DateTime?
+  interviewNotes       String?   @db.Text
+  interviewResult      String?
 
   // Acceptance & Terms
-  termsAcceptedAt       DateTime?
-  privacyAcceptedAt     DateTime?
+  termsAcceptedAt         DateTime?
+  privacyAcceptedAt       DateTime?
   nonRefundAcknowledgedAt DateTime?
 
   // Payment & Account
-  payment               ProspectPayment?
-  coachProfileId        String?             @unique
-  coachProfile          CoachProfile?       @relation(fields: [coachProfileId], references: [id])
+  payment        ProspectPayment?
+  coachProfileId String?          @unique
+  coachProfile   CoachProfile?    @relation(fields: [coachProfileId], references: [id])
 
   // Admin tracking
-  assignedAdminId       String?
+  assignedAdminId String?
 
   // Get Involved intake (One-A-Day). All optional so older prospects are untouched.
-  ageRange              AgeRange?
-  city                  String?
-  contactConsentAt      DateTime?
-  invitedById           String?
-  invitedBy             User?               @relation("ProspectInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  ageRange                 AgeRange?
+  city                     String?
+  contactConsentAt         DateTime?
+  invitedById              String?
+  invitedBy                User?                  @relation("ProspectInviter", fields: [invitedById], references: [id], onDelete: SetNull)
   // The inviter's program page whose share link they used (picks the welcome email). Optional.
-  programId             String?
-  program               CoachProgram?       @relation(fields: [programId], references: [id], onDelete: SetNull)
-  inviteSource          ProspectSource?
-  inviterNote           String?             @db.Text
-  journeyToken          String?             @unique
-  journeyTokenIssuedAt  DateTime?
-  parentName            String?
-  parentEmail           String?
-  parentPhone           String?
-  parentConsentToken    String?             @unique
+  programId                String?
+  program                  CoachProgram?          @relation(fields: [programId], references: [id], onDelete: SetNull)
+  inviteSource             ProspectSource?
+  inviterNote              String?                @db.Text
+  journeyToken             String?                @unique
+  journeyTokenIssuedAt     DateTime?
+  parentName               String?
+  parentEmail              String?
+  parentPhone              String?
+  parentConsentToken       String?                @unique
   parentConsentRequestedAt DateTime?
-  parentConsentAt       DateTime?
-  parentConsentSignature String?
-  parentRelationship    String?
-  parentConsentDeclinedAt DateTime?
+  parentConsentAt          DateTime?
+  parentConsentSignature   String?
+  parentRelationship       String?
+  parentConsentDeclinedAt  DateTime?
   // Outreach round 1 (2026-11-12)
-  smsConsentAt          DateTime?           // ticked "text me reminders" (sending needs SMS_ENABLED + a provider)
-  welcomeEmailSentAt    DateTime?           // welcome goes out only if they leave the sign-up page without booking
-  nudge1SentAt          DateTime?           // day 2, no call booked
-  nudge2SentAt          DateTime?           // day 7, last automatic nudge
-  checkInAt             DateTime?           // "Maybe later": one check-in email on this date
-  checkInSentAt         DateTime?
-  emailOptOutAt         DateTime?           // "Stop emails about this"
-  helpWith              String?             @db.Text // "what would you most like help with?" (booked screen)
-  inviteChannel         String?             // ?via= on the share link: TEXT | WHATSAPP | EMAIL | DM | POST | PARENT
-  noShowCount           Int                 @default(0)
-  discoveryCalls        DiscoveryCall[]
-  discoverySlotRequests DiscoverySlotRequest[]
+  smsConsentAt             DateTime? // ticked "text me reminders" (sending needs SMS_ENABLED + a provider)
+  welcomeEmailSentAt       DateTime? // welcome goes out only if they leave the sign-up page without booking
+  nudge1SentAt             DateTime? // day 2, no call booked
+  nudge2SentAt             DateTime? // day 7, last automatic nudge
+  checkInAt                DateTime? // "Maybe later": one check-in email on this date
+  checkInSentAt            DateTime?
+  emailOptOutAt            DateTime? // "Stop emails about this"
+  sponsoredSeatOfferedAt   DateTime? // One-A-Day v2: admin offered a sponsored seat on the call (uses one of the program's monthly seats)
+  sponsoredSeatOfferedById String?
+  sponsoredSeatFullPrice   String? // prices as offered (snapshot)
+  sponsoredSeatPrice       String?
+  outreachInviteId         String? // the "Email them for me" invite that brought them in
+  helpWith                 String?                @db.Text // "what would you most like help with?" (booked screen)
+  inviteChannel            String? // ?via= on the share link: TEXT | WHATSAPP | EMAIL | DM | POST | PARENT
+  noShowCount              Int                    @default(0)
+  discoveryCalls           DiscoveryCall[]
+  discoverySlotRequests    DiscoverySlotRequest[]
 
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  statusHistory         ProspectStatusHistory[]
-  calendarBookings      CalendarBooking[]
+  statusHistory    ProspectStatusHistory[]
+  calendarBookings CalendarBooking[]
 
   // Get Involved phase 2/3 (role journey). All optional. A Get Involved prospect is one with a journeyToken.
-  journeyRole              GetInvolvedRole?
-  journeyRoleChosenAt      DateTime?
-  journeyRoleChosenById    String?
+  journeyRole               GetInvolvedRole?
+  journeyRoleChosenAt       DateTime?
+  journeyRoleChosenById     String?
   // Copy of the role's settings (price, billing, questions, orientation) taken when the role was chosen,
   // so later edits in Role Settings only affect new prospects. Read it with prospectRoleConfig().
-  roleConfigSnapshot       Json?
-  assessmentAnswers        Json?               // [{ question, type, answer }] in question order
-  assessmentSentAt         DateTime?
-  assessmentSubmittedAt    DateTime?
-  assessmentReminderSentAt DateTime?
-  orientationWatchedAt     DateTime?
-  orientationRemindAt      DateTime?           // "remind me later" date they picked
+  roleConfigSnapshot        Json?
+  assessmentAnswers         Json? // [{ question, type, answer }] in question order
+  assessmentSentAt          DateTime?
+  assessmentSubmittedAt     DateTime?
+  assessmentReminderSentAt  DateTime?
+  orientationWatchedAt      DateTime?
+  orientationRemindAt       DateTime? // "remind me later" date they picked
   orientationReminderSentAt DateTime?
-  orientationCheckAnswer   String?             @db.Text
-  roleTermsAcceptedAt      DateTime?
-  acceptedTermsId          String?
-  acceptedTerms            GetInvolvedRoleTerms? @relation(fields: [acceptedTermsId], references: [id], onDelete: Restrict)
+  orientationCheckAnswer    String?               @db.Text
+  roleTermsAcceptedAt       DateTime?
+  acceptedTermsId           String?
+  acceptedTerms             GetInvolvedRoleTerms? @relation(fields: [acceptedTermsId], references: [id], onDelete: Restrict)
   // bcrypt hash of the password chosen on the Join page, kept only until the login is created (paid roles).
-  pendingPasswordHash      String?
-  userId                   String?             @unique
-  user                     User?               @relation("ProspectUser", fields: [userId], references: [id], onDelete: SetNull)
-  joinedAt                 DateTime?
-  notAFitAt                DateTime?
-  notes                    ProspectNote[]
+  pendingPasswordHash       String?
+  userId                    String?               @unique
+  user                      User?                 @relation("ProspectUser", fields: [userId], references: [id], onDelete: SetNull)
+  joinedAt                  DateTime?
+  notAFitAt                 DateTime?
+  notes                     ProspectNote[]
 
   @@index([email])
   @@index([status])
   @@index([assessmentSurveyId])
   @@index([invitedById, createdAt])
   @@index([programId])
+  @@index([outreachInviteId])
+  @@index([programId, sponsoredSeatOfferedAt])
   @@map("prospects")
 }
 
@@ -2265,7 +2273,7 @@ model DiscoveryAvailability {
   id          String        @id @default(cuid())
   hostId      String
   host        DiscoveryHost @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  dayOfWeek   Int           // 0 = Sunday
+  dayOfWeek   Int // 0 = Sunday
   startMinute Int
   endMinute   Int
 
@@ -2294,7 +2302,7 @@ model DiscoverySlotRequest {
   id         String    @id @default(cuid())
   prospectId String
   prospect   Prospect  @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-  kind       String    // NOTIFY | REACH_OUT
+  kind       String // NOTIFY | REACH_OUT
   createdAt  DateTime  @default(now())
   handledAt  DateTime?
 
@@ -2304,34 +2312,34 @@ model DiscoverySlotRequest {
 }
 
 model DiscoveryCall {
-  id                String              @id @default(cuid())
-  prospectId        String
-  prospect          Prospect            @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-  hostId            String?
-  host              User?               @relation("DiscoveryCallHost", fields: [hostId], references: [id], onDelete: SetNull)
-  startsAt          DateTime
-  endsAt            DateTime
-  timezone          String              // the booker's timezone, for emails
-  status            DiscoveryCallStatus @default(BOOKED)
-  meetingUrl        String?
-  parentWillAttend  Boolean             @default(false)
-  parentAttended    Boolean?
-  rescheduleCount   Int                 @default(0)
-  cancelledAt       DateTime?
-  cancelledBy       String?             // PROSPECT | HOST | ADMIN
-  cancelReason      String?
-  reminder24hSentAt DateTime?
-  reminder1hSentAt  DateTime?
-  reminder3dSentAt  DateTime?
-  attendanceConfirmedAt DateTime?         // "Yes, I'll be there" from the 3-day reminder
-  outcomeAt         DateTime?
-  outcomeById       String?
-  notes             String?             @db.Text
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                         String              @id @default(cuid())
+  prospectId                 String
+  prospect                   Prospect            @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  hostId                     String?
+  host                       User?               @relation("DiscoveryCallHost", fields: [hostId], references: [id], onDelete: SetNull)
+  startsAt                   DateTime
+  endsAt                     DateTime
+  timezone                   String // the booker's timezone, for emails
+  status                     DiscoveryCallStatus @default(BOOKED)
+  meetingUrl                 String?
+  parentWillAttend           Boolean             @default(false)
+  parentAttended             Boolean?
+  rescheduleCount            Int                 @default(0)
+  cancelledAt                DateTime?
+  cancelledBy                String? // PROSPECT | HOST | ADMIN
+  cancelReason               String?
+  reminder24hSentAt          DateTime?
+  reminder1hSentAt           DateTime?
+  reminder3dSentAt           DateTime?
+  attendanceConfirmedAt      DateTime? // "Yes, I'll be there" from the 3-day reminder
+  outcomeAt                  DateTime?
+  outcomeById                String?
+  notes                      String?             @db.Text
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
   // Get Involved phase 2: what the call covered, and the adult who attended a minor's call.
-  topicsCovered     String[]            @default([])
-  parentAttendeeName String?
+  topicsCovered              String[]            @default([])
+  parentAttendeeName         String?
   parentAttendeeRelationship String?
 
   @@index([hostId, startsAt])
@@ -2341,52 +2349,52 @@ model DiscoveryCall {
 }
 
 model ProspectStatusHistory {
-  id          String         @id @default(cuid())
-  prospectId  String
-  prospect    Prospect       @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-  fromStatus  ProspectStatus?
-  toStatus    ProspectStatus
-  changedBy   String?
-  notes       String?        @db.Text
-  createdAt   DateTime       @default(now())
+  id         String          @id @default(cuid())
+  prospectId String
+  prospect   Prospect        @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  fromStatus ProspectStatus?
+  toStatus   ProspectStatus
+  changedBy  String?
+  notes      String?         @db.Text
+  createdAt  DateTime        @default(now())
 
   @@map("prospect_status_history")
 }
 
 model ProspectPayment {
-  id              String                @id @default(cuid())
-  prospectId      String                @unique
-  prospect        Prospect              @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  prospectId String   @unique
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
 
-  method          PaymentMethod
-  status          ProspectPaymentStatus @default(PENDING)
-  amount          Decimal               @db.Decimal(10, 2)
-  currency        String                @default("USD")
+  method   PaymentMethod
+  status   ProspectPaymentStatus @default(PENDING)
+  amount   Decimal               @db.Decimal(10, 2)
+  currency String                @default("USD")
 
   // Stripe
   stripePaymentIntentId String?
   stripeSessionId       String?
 
   // PayPal
-  paypalOrderId         String?
-  paypalTransactionId   String?
+  paypalOrderId       String?
+  paypalTransactionId String?
 
   // Manual
-  manualReference       String?
-  manualApprovedBy      String?
-  manualApprovedAt      DateTime?
+  manualReference  String?
+  manualApprovedBy String?
+  manualApprovedAt DateTime?
 
-  paidAt          DateTime?
-  failedAt        DateTime?
-  failureReason   String?
+  paidAt        DateTime?
+  failedAt      DateTime?
+  failureReason String?
 
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Get Involved phase 3: what this payment is for (null for the old coach pipeline).
-  journeyRole     GetInvolvedRole?
-  billing         RoleBilling?
-  checkoutUrl     String?
+  journeyRole          GetInvolvedRole?
+  billing              RoleBilling?
+  checkoutUrl          String?
   stripeSubscriptionId String?
 
   // Invo (card, one-time roles only). A new checkout session per Pay click; the webhook stores the order.
@@ -2398,64 +2406,64 @@ model ProspectPayment {
 }
 
 model AdminNotification {
-  id          String           @id @default(cuid())
-  userId      String
-  type        NotificationType
-  title       String
-  message     String           @db.Text
-  entityType  String?
-  entityId    String?
-  isRead      Boolean          @default(false)
-  readAt      DateTime?
-  actionUrl   String?
-  createdAt   DateTime         @default(now())
+  id         String           @id @default(cuid())
+  userId     String
+  type       NotificationType
+  title      String
+  message    String           @db.Text
+  entityType String?
+  entityId   String?
+  isRead     Boolean          @default(false)
+  readAt     DateTime?
+  actionUrl  String?
+  createdAt  DateTime         @default(now())
 
   @@index([userId, isRead])
   @@map("admin_notifications")
 }
 
 model PDFReadingProgress {
-  id              String        @id @default(cuid())
-  userId          String
-  documentId      String
-  totalPages      Int
-  currentPage     Int           @default(1)
-  pagesRead       Int[]
-  lastReadAt      DateTime      @default(now())
-  completedAt     DateTime?
-  totalTimeSpent  Int           @default(0)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  documentId     String
+  totalPages     Int
+  currentPage    Int       @default(1)
+  pagesRead      Int[]
+  lastReadAt     DateTime  @default(now())
+  completedAt    DateTime?
+  totalTimeSpent Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([userId, documentId])
   @@map("pdf_reading_progress")
 }
 
 model AmbassadorIntroduction {
-  id              String        @id @default(cuid())
-  coachId         String
-  coach           CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  id      String       @id @default(cuid())
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
   // Ambassador info
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String?
-  dateOfBirth     DateTime
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  dateOfBirth DateTime
 
   // Parent info (if under 18)
-  parentFirstName String?
-  parentLastName  String?
-  parentEmail     String?
-  parentPhone     String?
+  parentFirstName    String?
+  parentLastName     String?
+  parentEmail        String?
+  parentPhone        String?
   parentRelationship String?
 
   // Status
-  inviteSent      Boolean       @default(false)
-  inviteSentAt    DateTime?
+  inviteSent   Boolean   @default(false)
+  inviteSentAt DateTime?
 
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("ambassador_introductions")
 }
@@ -2465,16 +2473,16 @@ model AmbassadorIntroduction {
 // ============================================
 
 enum CalendarType {
-  BOOKING     // Allows slot booking (e.g., orientation)
-  EVENTS      // Display-only events (e.g., NowTransformed events)
+  BOOKING // Allows slot booking (e.g., orientation)
+  EVENTS // Display-only events (e.g., NowTransformed events)
 }
 
 enum CalendarVisibility {
-  GLOBAL        // Visible to all coaches and ambassadors
-  COACHES_ONLY  // Visible only to coaches
+  GLOBAL // Visible to all coaches and ambassadors
+  COACHES_ONLY // Visible only to coaches
   AMBASSADORS_ONLY // Visible only to ambassadors
-  CUSTOM        // Custom user-level access
-  PUBLIC        // Visible to public (prospects)
+  CUSTOM // Custom user-level access
+  PUBLIC // Visible to public (prospects)
 }
 
 enum BookingStatus {
@@ -2486,109 +2494,109 @@ enum BookingStatus {
 }
 
 model AdminCalendar {
-  id              String              @id @default(cuid())
-  name            String
-  description     String?             @db.Text
-  type            CalendarType        @default(EVENTS)
-  visibility      CalendarVisibility  @default(GLOBAL)
-  color           String              @default("#3B82F6") // Tailwind blue-500
+  id          String             @id @default(cuid())
+  name        String
+  description String?            @db.Text
+  type        CalendarType       @default(EVENTS)
+  visibility  CalendarVisibility @default(GLOBAL)
+  color       String             @default("#3B82F6") // Tailwind blue-500
 
   // For booking calendars
-  slotDurationMinutes Int?            @default(60)
-  bufferMinutes       Int?            @default(0)
-  maxBookingsPerSlot  Int?            @default(1)
-  requiresApproval    Boolean         @default(false)
+  slotDurationMinutes Int?    @default(60)
+  bufferMinutes       Int?    @default(0)
+  maxBookingsPerSlot  Int?    @default(1)
+  requiresApproval    Boolean @default(false)
 
   // Public access for prospects
-  isPublicBookable    Boolean         @default(false)
-  publicSlug          String?         @unique
+  isPublicBookable Boolean @default(false)
+  publicSlug       String? @unique
 
   // Default meeting link for bookings
-  meetingLink         String?
+  meetingLink String?
 
   // Max days in advance prospects can book (null = unlimited)
-  maxBookingDays      Int?            @default(14)
+  maxBookingDays Int? @default(14)
 
-  isActive        Boolean             @default(true)
-  createdBy       String
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  isActive  Boolean  @default(true)
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  slots           CalendarSlot[]
-  events          CalendarEvent[]     @relation("AdminCalendarEvents")
-  bookings        CalendarBooking[]
-  access          CalendarAccess[]
+  slots    CalendarSlot[]
+  events   CalendarEvent[]   @relation("AdminCalendarEvents")
+  bookings CalendarBooking[]
+  access   CalendarAccess[]
 
   @@map("admin_calendars")
 }
 
 model CalendarSlot {
-  id              String          @id @default(cuid())
-  calendarId      String
-  calendar        AdminCalendar   @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  id         String        @id @default(cuid())
+  calendarId String
+  calendar   AdminCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
 
   // Slot timing
-  dayOfWeek       Int             // 0=Sunday, 1=Monday, ..., 6=Saturday
-  startTime       String          // HH:MM format in calendar timezone
-  endTime         String          // HH:MM format
-  timezone        String          @default("America/Los_Angeles")
+  dayOfWeek Int // 0=Sunday, 1=Monday, ..., 6=Saturday
+  startTime String // HH:MM format in calendar timezone
+  endTime   String // HH:MM format
+  timezone  String @default("America/Los_Angeles")
 
   // Capacity
-  maxBookings     Int             @default(1)
+  maxBookings Int @default(1)
 
   // Recurring or specific date
-  isRecurring     Boolean         @default(true)
-  specificDate    DateTime?       // For one-time slots
+  isRecurring  Boolean   @default(true)
+  specificDate DateTime? // For one-time slots
 
-  isActive        Boolean         @default(true)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  bookings        CalendarBooking[]
+  bookings CalendarBooking[]
 
   @@map("calendar_slots")
 }
 
 model CalendarBooking {
-  id              String          @id @default(cuid())
-  calendarId      String
-  calendar        AdminCalendar   @relation(fields: [calendarId], references: [id], onDelete: Cascade)
-  slotId          String?
-  slot            CalendarSlot?   @relation(fields: [slotId], references: [id], onDelete: SetNull)
-  eventId         String?
-  event           CalendarEvent?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  id         String         @id @default(cuid())
+  calendarId String
+  calendar   AdminCalendar  @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  slotId     String?
+  slot       CalendarSlot?  @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  eventId    String?
+  event      CalendarEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   // Booking details
-  bookingDate     DateTime        // The actual date of the booking
-  startTime       DateTime
-  endTime         DateTime
-  timezone        String          @default("America/Los_Angeles")
+  bookingDate DateTime // The actual date of the booking
+  startTime   DateTime
+  endTime     DateTime
+  timezone    String   @default("America/Los_Angeles")
 
   // Who booked
-  userId          String?         // For logged-in users
-  prospectId      String?         // For prospects
-  prospect        Prospect?       @relation(fields: [prospectId], references: [id], onDelete: SetNull)
+  userId     String? // For logged-in users
+  prospectId String? // For prospects
+  prospect   Prospect? @relation(fields: [prospectId], references: [id], onDelete: SetNull)
 
   // Booker info (for guests or prospects)
-  bookerName      String
-  bookerEmail     String
-  bookerPhone     String?
+  bookerName  String
+  bookerEmail String
+  bookerPhone String?
 
   // Status
-  status          BookingStatus   @default(PENDING)
-  notes           String?         @db.Text
+  status BookingStatus @default(PENDING)
+  notes  String?       @db.Text
 
   // Admin actions
-  confirmedBy     String?
-  confirmedAt     DateTime?
-  cancelledBy     String?
-  cancelledAt     DateTime?
-  cancellationReason String?      @db.Text
+  confirmedBy        String?
+  confirmedAt        DateTime?
+  cancelledBy        String?
+  cancelledAt        DateTime?
+  cancellationReason String?   @db.Text
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([prospectId])
   @@index([calendarId])
@@ -2598,29 +2606,29 @@ model CalendarBooking {
 }
 
 model CalendarAccess {
-  id              String          @id @default(cuid())
-  calendarId      String
-  calendar        AdminCalendar   @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  id         String        @id @default(cuid())
+  calendarId String
+  calendar   AdminCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
 
   // Access for specific user
-  userId          String
-  canView         Boolean         @default(true)
-  canBook         Boolean         @default(true)
+  userId  String
+  canView Boolean @default(true)
+  canBook Boolean @default(true)
 
-  createdAt       DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([calendarId, userId])
   @@map("calendar_access")
 }
 
 model SitePage {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  title       String
-  content     String   @db.Text
-  updatedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String   @db.Text
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("site_pages")
 }
@@ -2645,10 +2653,10 @@ model PasswordResetToken {
 // ============================================
 
 enum ProgramStatus {
-  DRAFT          // never submitted, or sent back by an admin
+  DRAFT // never submitted, or sent back by an admin
   PENDING_REVIEW // awaiting admin approval
-  PUBLISHED      // publishedSnapshot is live at /p/[slug]
-  REJECTED       // admin sent it back with reviewNotes
+  PUBLISHED // publishedSnapshot is live at /p/[slug]
+  REJECTED // admin sent it back with reviewNotes
 }
 
 // Who the visitor is exploring the program for. Nullable on the lead because
@@ -2680,28 +2688,28 @@ enum ProgramLeadAssociation {
 }
 
 model CoachProgram {
-  id                  String        @id @default(cuid())
-  slug                String        @unique
+  id   String @id @default(cuid())
+  slug String @unique
 
   // Owner: a coach OR an ambassador (at most one is set). Both null only until an admin assigns it.
-  coachId             String?
-  coach               CoachProfile? @relation(fields: [coachId], references: [id], onDelete: SetNull)
-  ambassadorId        String?
-  ambassador          Ambassador?   @relation(fields: [ambassadorId], references: [id], onDelete: SetNull)
-  assignedAt          DateTime?
-  assignedBy          String?
+  coachId      String?
+  coach        CoachProfile? @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  ambassadorId String?
+  ambassador   Ambassador?   @relation(fields: [ambassadorId], references: [id], onDelete: SetNull)
+  assignedAt   DateTime?
+  assignedBy   String?
 
   // Grant deliverable facts. Coach-editable, admin-approved.
-  name                String
-  organization        String
-  targetMarket        String
-  internshipOffering  String
-  servicesDescription String        @db.Text
-  weeklyEngagement1   String
-  weeklyEngagement2   String
+  name                   String
+  organization           String
+  targetMarket           String
+  internshipOffering     String
+  servicesDescription    String  @db.Text
+  weeklyEngagement1      String
+  weeklyEngagement2      String
   // The grant sheet wording, kept verbatim as the record of what was agreed.
-  monthlyGrowthGoal   String
-  monthlyImpactGoal   String
+  monthlyGrowthGoal      String
+  monthlyImpactGoal      String
   // Parsed from the above so progress can actually be measured. Nullable
   // because not every goal is a countable number.
   monthlyGrowthGoalValue Int?
@@ -2712,67 +2720,70 @@ model CoachProgram {
   // Coach-authored public content
   // Public heading for the page. Falls back to `name` when unset, so the
   // grant programme name stays the record while the page can read differently.
-  pageTitle           String?
-  headline            String?
-  coachBio            String?       @db.Text
-  programDescription  String?       @db.Text
-  eventDatesText      String?       @db.Text
+  pageTitle          String?
+  headline           String?
+  coachBio           String? @db.Text
+  programDescription String? @db.Text
+  eventDatesText     String? @db.Text
   // Primary joining link, plus an optional second one for coaches who run
   // both Zoom and Google Meet. Labels let the page name them correctly.
-  zoomUrl             String?
-  zoomLabel           String?
-  secondMeetingUrl    String?
-  secondMeetingLabel  String?
-  zoomInstructions    String?       @db.Text
+  zoomUrl            String?
+  zoomLabel          String?
+  secondMeetingUrl   String?
+  secondMeetingLabel String?
+  zoomInstructions   String? @db.Text
   // Coach's switch for the joining details and session dates. The coach video
   // can stand in for the live meeting, so the meeting is optional. Defaults to
   // on so pages published before the video flow keep showing their link.
-  showMeetingDetails  Boolean       @default(true)
+  showMeetingDetails Boolean @default(true)
 
   // Video journey after signup: the coach explains their program, then a
   // NowTransformed video covers NT and the sponsorship opportunities for this
   // program. Coach or admin may set the NT video; like everything above it
   // reaches the public only through publishedSnapshot.
-  coachVideoUrl       String?
-  ntVideoUrl          String?
-  ntVideoIntro        String?       @db.Text
+  coachVideoUrl String?
+  ntVideoUrl    String?
+  ntVideoIntro  String? @db.Text
 
   // Page 2 - coach's ADDITIONAL questions. Core questions are code-defined.
-  extraQuestions      Json          @default("[]")
-  qualificationIntro  String?       @db.Text
+  extraQuestions     Json    @default("[]")
+  qualificationIntro String? @db.Text
 
   // Approval. The public page renders publishedSnapshot only, never the
   // live columns above, so a coach can edit freely without affecting the
   // live page until an admin approves.
-  status              ProgramStatus @default(DRAFT)
-  publishedSnapshot   Json?
-  submittedAt         DateTime?
-  reviewedAt          DateTime?
-  reviewedBy          String?
-  reviewNotes         String?       @db.Text
+  status            ProgramStatus @default(DRAFT)
+  publishedSnapshot Json?
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  reviewNotes       String?       @db.Text
 
   // Get Involved welcome email: the paragraph about this program. Drafted by AI or written by the owner;
   // emails use it only once approved (welcomeNoteApprovedAt set). Editing it clears the approval.
-  welcomeNote           String?     @db.Text
-  welcomeNoteSource     String?     // AI | MANUAL
-  welcomeNoteDraftedAt  DateTime?
-  welcomeNoteApprovedAt DateTime?
-  welcomeNoteApprovedBy String?
+  welcomeNote            String?    @db.Text
+  welcomeNoteSource      String? // AI | MANUAL
+  welcomeNoteDraftedAt   DateTime?
+  welcomeNoteApprovedAt  DateTime?
+  welcomeNoteApprovedBy  String?
   // Sponsored-seat offer. Prices: owner or admin. Reason + seats: admin only. Shown only when sponsoredSeatsPerMonth > 0.
   offerFullPrice         String?
   offerSponsoredPrice    String?
-  offerReason            String?       @db.Text
+  offerReason            String?    @db.Text
   sponsoredSeatsPerMonth Int?
   offerPricesUpdatedAt   DateTime?
   /// User id of whoever last changed the prices (owner or admin).
   offerPricesUpdatedById String?
   // Get Involved prospects who came in through this program's share link.
-  prospects           Prospect[]
+  prospects              Prospect[]
 
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  leads               ProgramLead[]
+  leads       ProgramLead[]
+  scripts     ProgramScript[]
+  playbook    ProgramPlaybook?
+  messageLine String? // one-line description used in messages ("helping teens in foster care ..."); falls back to the headline
 
   @@index([ambassadorId])
   @@index([coachId])
@@ -2781,22 +2792,22 @@ model CoachProgram {
 }
 
 model ProgramLead {
-  id           String                 @id @default(cuid())
-  programId    String
-  program      CoachProgram           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  id        String       @id @default(cuid())
+  programId String
+  program   CoachProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
 
   // Page 1
   fullName     String
   email        String
   profession   String
-  registeredAt DateTime               @default(now())
+  registeredAt DateTime @default(now())
 
   // Family signups. The adult who signs up is the parent or guardian and the
   // only contact. Children are kept to first name and age band - no child
   // email, phone, surname or date of birth - so a lead never holds more about
   // a minor than the coach needs for a first conversation with the parent.
   audience            ProgramLeadAudience?
-  children            Json?                 // [{ firstName, ageBand }]
+  children            Json? // [{ firstName, ageBand }]
   guardianConfirmedAt DateTime?
   phone               String?
   familyStage         FamilyFollowUpStage?
@@ -2805,19 +2816,19 @@ model ProgramLead {
   interestedAt DateTime?
 
   // Page 2
-  token        String                 @unique
-  answers      Json?
-  qualifiedAt  DateTime?
+  token       String    @unique
+  answers     Json?
+  qualifiedAt DateTime?
 
   // Coach classification
   association  ProgramLeadAssociation @default(UNCLASSIFIED)
   classifiedAt DateTime?
   coachNotes   String?                @db.Text
 
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  crmContact   CRMContact?
+  crmContact CRMContact?
 
   @@unique([programId, email])
   @@index([programId, association])
@@ -2846,14 +2857,14 @@ model ProgramCoreQuestion {
   type      ProgramQuestionKind
   label     String
   required  Boolean             @default(true)
-  options   Json?               // DROPDOWN | RADIO: string[]
-  likert    Json?               // LIKERT: { min, max, minLabel, maxLabel }
+  options   Json? // DROPDOWN | RADIO: string[]
+  likert    Json? // LIKERT: { min, max, minLabel, maxLabel }
   sortOrder Int                 @default(0)
   // Retire with isActive rather than deleting, so stored answers keep resolving.
   isActive  Boolean             @default(true)
 
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive, sortOrder])
   @@map("program_core_questions")
@@ -2865,12 +2876,12 @@ model ProgramCoreQuestion {
 // true. Individual questions keep their own isActive; this is the master
 // switch above them.
 model ProgramQuestionSettings {
-  id                       String   @id @default("global")
-  standardQuestionsEnabled Boolean  @default(false)
+  id                       String  @id @default("global")
+  standardQuestionsEnabled Boolean @default(false)
 
-  updatedBy                String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("program_question_settings")
 }
@@ -2893,26 +2904,26 @@ enum AssociateStatus {
 }
 
 model AssociateProfile {
-  id             String          @id @default(cuid())
-  userId         String          @unique
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type           AssociateType
-  status         AssociateStatus @default(ACTIVE)
+  type   AssociateType
+  status AssociateStatus @default(ACTIVE)
 
   firstName      String
   lastName       String
   phone          String?
   organization   String?
-  serviceOffered String?         @db.Text
-  notes          String?         @db.Text
+  serviceOffered String? @db.Text
+  notes          String? @db.Text
 
   // Coach who registered / sponsors them.
-  coachId        String?
-  coach          CoachProfile?   @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  coachId String?
+  coach   CoachProfile? @relation(fields: [coachId], references: [id], onDelete: SetNull)
 
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([type, status])
   @@map("associate_profiles")
@@ -2967,15 +2978,15 @@ model GetInvolvedRoleConfig {
   ageRanges             AgeRange[]
   active                Boolean         @default(true)
   priceCents            Int             @default(0)
-  priceNote             String?         // optional display override, e.g. "$29-399/mo"
+  priceNote             String? // optional display override, e.g. "$29-399/mo"
   billing               RoleBilling     @default(FREE)
-  questions             Json            // exactly 3: [{ text, type: SHORT_TEXT|CHOICE|SCALE_1_5, choices: string[] }]
+  questions             Json // exactly 3: [{ text, type: SHORT_TEXT|CHOICE|SCALE_1_5, choices: string[] }]
   orientationUrl        String?
   orientationMinutes    Int?
   orientationPoints     String[]        @default([])
   comprehensionCheck    Boolean         @default(false)
   comprehensionQuestion String?         @db.Text
-  handoffUrl            String?         // SPONSOR: the donation page
+  handoffUrl            String? // SPONSOR: the donation page
   updatedById           String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
@@ -3028,18 +3039,18 @@ model InvoWebhookEvent {
 
 /// One "I sent it" / "I posted it" / "I sent the link" from the share kit.
 model OutreachShare {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName   String?   // who they invited (null for a social post)
-  channel     String    // TEXT | WHATSAPP | EMAIL | DM | POST | PARENT
-  kind        String    @default("FIRST") // FIRST | AFTER_YES
-  programId   String?
-  sentAt      DateTime  @default(now())
-  outcome     String?   // YES | NO (said no: removed for good) | DONE
-  outcomeAt   DateTime?
-  nudgedAt    DateTime? // day 3-4 nudge copied
-  closedAt    DateTime? // day 10-14 close copied
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String? // who they invited (null for a social post)
+  channel   String // TEXT | WHATSAPP | EMAIL | DM | POST | PARENT
+  kind      String    @default("FIRST") // FIRST | AFTER_YES
+  programId String?
+  sentAt    DateTime  @default(now())
+  outcome   String? // YES | NO (said no: removed for good) | DONE
+  outcomeAt DateTime?
+  nudgedAt  DateTime? // day 3-4 nudge copied
+  closedAt  DateTime? // day 10-14 close copied
 
   @@index([userId, sentAt])
   @@map("outreach_shares")
@@ -3048,7 +3059,7 @@ model OutreachShare {
 /// Admin-edited share-kit wording. No row = the default in code.
 model OutreachTemplate {
   id          String   @id @default(cuid())
-  key         String   // TEXT | WHATSAPP | EMAIL | DM | POST | PARENT | AFTER_YES | NUDGE | CLOSE | FORM_NO_CALL
+  key         String // TEXT | WHATSAPP | EMAIL | DM | POST | PARENT | AFTER_YES | NUDGE | CLOSE | FORM_NO_CALL
   audience    String   @default("ALL") // ALL | COACH | AMBASSADOR
   subject     String?
   body        String   @db.Text
@@ -3063,7 +3074,7 @@ model OutreachTemplate {
 /// Monthly small groups of 5 (members only see their own group).
 model OutreachGroupMember {
   id        String   @id @default(cuid())
-  month     String   // YYYY-MM
+  month     String // YYYY-MM
   groupNo   Int
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -3076,16 +3087,84 @@ model OutreachGroupMember {
 
 /// One browser/phone that turned on notifications (Web Push). Removed when the push service says it expired.
 model PushSubscription {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  endpoint   String   @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String    @unique
   p256dh     String
   auth       String
   userAgent  String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
   lastSentAt DateTime?
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+// ---------- One-A-Day v2 ----------
+
+/// A program's message for one situation (scenario) and length (variant). The default is written by
+/// NowTransformed; the owner may replace it (owner*), and "Reset" clears owner* back to the default.
+/// No row = the general message in code (src/lib/get-involved/scripts-defaults.ts).
+model ProgramScript {
+  id               String       @id @default(cuid())
+  programId        String
+  program          CoachProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  scenario         String // see SCENARIOS in src/lib/get-involved/scripts.ts
+  variant          String // SHORT (text, WhatsApp, DM) | EMAIL | POST
+  defaultSubject   String?
+  defaultBody      String?      @db.Text
+  ownerSubject     String?
+  ownerBody        String?      @db.Text
+  ownerUpdatedAt   DateTime?
+  ownerUpdatedById String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([programId, scenario, variant])
+  @@map("program_scripts")
+}
+
+/// "How to pitch [program]": the thinking for one program. Same default/owner pattern as ProgramScript.
+model ProgramPlaybook {
+  id               String       @id @default(cuid())
+  programId        String       @unique
+  program          CoachProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  businessName     String? // how messages name the business, e.g. "DreamIt LiveIt"
+  defaultGuide     Json? // PlaybookGuide (scripts.ts)
+  ownerGuide       Json?
+  ownerUpdatedAt   DateTime?
+  ownerUpdatedById String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@map("program_playbooks")
+}
+
+/// "Email them for me": one invitation email our system sent on a member's behalf.
+model OutreachInvite {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programId    String?
+  firstName    String
+  email        String // lowercased
+  personalLine String?  @db.Text
+  status       String // SENT | SKIPPED | FAILED
+  skipReason   String? // RECENT (invited in the last 30 days) | STOPPED | ON_LIST | LIMIT
+  token        String   @unique // ties a sign-up back to this invite (?inv=)
+  sentAt       DateTime @default(now())
+
+  @@index([email, sentAt])
+  @@index([userId, sentAt])
+  @@map("outreach_invites")
+}
+
+/// Addresses that asked never to get invitation emails again (Stop link). Lowercased.
+model EmailSuppression {
+  email     String   @id
+  source    String // INVITE_STOP | PROSPECT_STOP | ADMIN
+  createdAt DateTime @default(now())
+
+  @@map("email_suppressions")
 }

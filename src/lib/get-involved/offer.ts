@@ -6,6 +6,7 @@
  */
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
+import { BUSINESS_TZ } from './core'
 
 // ---------- sponsored-seat offer ----------
 
@@ -18,27 +19,66 @@ export interface SignupOffer {
   seatsLeft: number
 }
 
-/** First instant of the current calendar month (UTC). Seat counts reset on the 1st. */
-export function monthStart(now = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+/** Milliseconds the zone is ahead of UTC at instant t (negative for the Americas). */
+function zoneOffsetMs(t: number, tz: string): number {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(t)).map((p) => [p.type, p.value]))
+  return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second) - Math.floor(t / 1000) * 1000
 }
 
-/** First instant of next month (UTC): when the seats reopen. */
-export function nextMonthStart(now = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+/** Midnight on the 1st of (year, month0) in the zone, as a UTC instant (handles DST). */
+function zoneMonthStart(year: number, month0: number, tz: string): Date {
+  const guess = Date.UTC(year, month0, 1)
+  let t = guess - zoneOffsetMs(guess, tz)
+  t = guess - zoneOffsetMs(t, tz)
+  return new Date(t)
+}
+
+function zoneYearMonth(now: Date, tz: string): [number, number] {
+  const [y, m] = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit' }).format(now).split('-').map(Number)
+  return [y, m - 1]
+}
+
+/** First instant of the current calendar month in US Central time. Seat counts reset on the 1st. */
+export function monthStart(now = new Date(), tz = BUSINESS_TZ): Date {
+  const [y, m] = zoneYearMonth(now, tz)
+  return zoneMonthStart(y, m, tz)
+}
+
+/** First instant of next month in US Central time: when the seats reopen. */
+export function nextMonthStart(now = new Date(), tz = BUSINESS_TZ): Date {
+  const [y, m] = zoneYearMonth(now, tz)
+  return zoneMonthStart(m === 11 ? y + 1 : y, (m + 1) % 12, tz)
 }
 
 /**
- * A sponsored seat is "used" when someone who came through this program books a discovery call this
- * month (cancelled calls give the seat back). One definition, kept here so it is easy to change.
+ * A sponsored seat is "used" when the admin team OFFERS it on the free call (Prospect.sponsoredSeatOfferedAt
+ * in this calendar month, for a prospect who came through this program). Booking a call uses nothing;
+ * "Undo offer" gives the seat back. One definition, kept here so it is easy to change.
  */
+export function seatsUsedWhere(now = new Date()) {
+  return { sponsoredSeatOfferedAt: { gte: monthStart(now), lt: nextMonthStart(now) } }
+}
+
 export async function seatsUsedThisMonth(programId: string, now = new Date()): Promise<number> {
-  return prisma.prospect.count({
-    where: {
-      programId,
-      discoveryCalls: { some: { createdAt: { gte: monthStart(now) }, status: { not: 'CANCELLED' } } },
-    },
-  })
+  return prisma.prospect.count({ where: { programId, ...seatsUsedWhere(now) } })
+}
+
+/** Seats left this month (never below 0). Pure. */
+export function seatsLeftOf(seatsPerMonth: number | null | undefined, used: number): number {
+  return Math.max(0, (seatsPerMonth ?? 0) - used)
+}
+
+/** Advisory-lock key for offering seats in one program in one month (two admins can't overbook). Pure. */
+export function seatLockKey(programId: string, now = new Date()): string {
+  const m = monthStart(now)
+  return `sponsored-seat:${programId}:${m.getUTCFullYear()}-${String(m.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+/** An offer can be undone only in the month it was made (seat counts reset on the 1st). Pure. */
+export function canUndoSeatOffer(offeredAt: Date | null | undefined, now = new Date()): boolean {
+  return !!offeredAt && offeredAt >= monthStart(now) && offeredAt < nextMonthStart(now)
 }
 
 /** The offer for a program, or null when the admin hasn't set one (seats 0 / unset): then no offer is shown anywhere. */
@@ -56,7 +96,7 @@ export async function getSignupOffer(programId: string | null | undefined, now =
     sponsoredPrice: p.offerSponsoredPrice,
     reason: p.offerReason,
     seatsPerMonth: p.sponsoredSeatsPerMonth,
-    seatsLeft: Math.max(0, p.sponsoredSeatsPerMonth - used),
+    seatsLeft: seatsLeftOf(p.sponsoredSeatsPerMonth, used),
   }
 }
 
@@ -146,12 +186,12 @@ export interface OfferProgramRow {
 
 export type OfferFilter = 'all' | 'offer' | 'none'
 
-/** Seats used this month for many programs in one query. */
+/** Seats offered this month for many programs in one query. */
 export async function seatsUsedByProgram(programIds: string[], now = new Date()): Promise<Map<string, number>> {
   if (programIds.length === 0) return new Map()
   const rows = await prisma.prospect.groupBy({
     by: ['programId'],
-    where: { programId: { in: programIds }, discoveryCalls: { some: { createdAt: { gte: monthStart(now) }, status: { not: 'CANCELLED' } } } },
+    where: { programId: { in: programIds }, ...seatsUsedWhere(now) },
     _count: { _all: true },
   })
   return new Map(rows.filter((r) => r.programId).map((r) => [r.programId as string, r._count._all]))

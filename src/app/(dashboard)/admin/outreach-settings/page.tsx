@@ -4,6 +4,7 @@ import { Search } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getOutreachSettings, listOfferPrograms, nextMonthStart, type OfferFilter } from '@/lib/get-involved/offer'
 import { Pager, parsePage } from '@/components/ui/pager'
+import { SPONSOR_LINE } from '@/lib/get-involved/scripts'
 import { ProgramOfferTable, SiteCard } from './outreach-settings-client'
 
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,7 @@ export default async function OutreachSettingsPage({ searchParams }: { searchPar
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="programs-h" className="text-lg font-bold text-gray-900">Program offers</h2>
-            <p className="text-sm text-gray-600">Owners set their own prices; you set the sponsored seats. Seats reset on the 1st (next: {reset}).</p>
+            <p className="text-sm text-gray-600">Owners set their own prices; you set the sponsored seats. &quot;Offered&quot; counts seats the team offered on calls this month. Seats reset on the 1st (next: {reset}).</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -77,11 +78,13 @@ export default async function OutreachSettingsPage({ searchParams }: { searchPar
         <details className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
           <summary className="cursor-pointer font-semibold text-gray-900">How sponsored seats work</summary>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>A seat is used when someone who came through that program books a discovery call this month. Cancelled calls give the seat back.</li>
-            <li>Seats reset on the 1st of each month. 0 or empty seats = no offer is shown anywhere for that program.</li>
-            <li>When no seats are left, pages offer the waiting list for next month. Never a fake countdown.</li>
-            <li>The offer shows on the sign-up page, the welcome and nudge emails, and the host&apos;s call guide.</li>
+            <li>Before the call, people only read: &quot;{SPONSOR_LINE}&quot; No prices, no seat counts, no promises.</li>
+            <li>The team qualifies them on the free call. If they&apos;re a good fit, the host presses &quot;Offer a sponsored seat&quot; on the call record.</li>
+            <li>A seat is used when the team offers it, not when a call is booked. &quot;Undo offer&quot; gives it back in the same month.</li>
+            <li>Seats reset on the 1st of each month. 0 or empty seats = no sponsorship line anywhere for that program.</li>
+            <li>When every seat has been offered, the sign-up page offers the waiting list for next month. Never a fake countdown.</li>
             <li>Program owners can change the two prices on their program page; each change shows here with who made it.</li>
+            <li>Payment isn&apos;t taken in this app: the program owner collects the fee.</li>
           </ul>
         </details>
       </section>

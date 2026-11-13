@@ -13,11 +13,12 @@
  */
 import crypto from 'crypto'
 
-export const EMAIL_ACTIONS = ['stop', 'delete', 'confirm', 'later', 'callme'] as const
+/** `istop` = "Stop" in an "Email them for me" invitation; its id is the OutreachInvite id. */
+export const EMAIL_ACTIONS = ['stop', 'delete', 'confirm', 'later', 'callme', 'istop'] as const
 export type EmailAction = (typeof EMAIL_ACTIONS)[number]
 
-/** Which id each action carries: a call id for `confirm`, a prospect id for the rest. */
-export const actionTarget = (a: EmailAction): 'call' | 'prospect' => (a === 'confirm' ? 'call' : 'prospect')
+/** Which id each action carries: a call id for `confirm`, an invitation id for `istop`, a prospect id for the rest. */
+export const actionTarget = (a: EmailAction): 'call' | 'prospect' | 'invite' => (a === 'confirm' ? 'call' : a === 'istop' ? 'invite' : 'prospect')
 
 const ID_RE = /^[A-Za-z0-9_-]{8,64}$/
 

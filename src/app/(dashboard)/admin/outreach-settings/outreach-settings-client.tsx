@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { ExternalLink, Loader2, Pencil, X } from 'lucide-react'
+import { SPONSOR_LINE } from '@/lib/get-involved/scripts'
 import { saveProgramOffer, saveSiteOutreach } from '@/lib/actions/outreach-settings'
 import type { OfferProgramRow, OutreachSettings } from '@/lib/get-involved/offer'
 
@@ -38,15 +39,15 @@ export function ProgramOfferTable({ programs, emptyText }: { programs: OfferProg
     return <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">{emptyText}</p>
   }
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="overflow-x-auto">
+    <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">Live programs and their sponsored-seat offers</caption>
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
               <th scope="col" className={th}>Program</th>
               <th scope="col" className={th}>Prices</th>
-              <th scope="col" className={th}>Sponsored seats this month</th>
+              <th scope="col" className={th}>Sponsored seats offered this month</th>
               <th scope="col" className={th}><span className="sr-only">Edit</span></th>
             </tr>
           </thead>
@@ -78,9 +79,9 @@ export function ProgramOfferTable({ programs, emptyText }: { programs: OfferProg
                         <span className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
                           <span className={`block h-full rounded-full ${left === 0 ? 'bg-amber-500' : 'bg-primary-600'}`} style={{ width: `${Math.min(100, (p.usedThisMonth / (p.seatsPerMonth || 1)) * 100)}%` }} />
                         </span>
-                        <span className={left === 0 ? 'font-semibold text-amber-800' : 'text-gray-900'}>{left} of {p.seatsPerMonth} left</span>
+                        <span className={left === 0 ? 'font-semibold text-amber-800' : 'text-gray-900'}>{p.usedThisMonth} offered · {left} of {p.seatsPerMonth} left</span>
                       </span>
-                    ) : <span className="text-gray-500">Off (no offer shown)</span>}
+                    ) : <span className="text-gray-500">Off (no sponsorship line shown)</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button type="button" onClick={() => setEditing(p)} className={`${btnSecondary} h-9`}>
@@ -144,7 +145,7 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
         <div className="min-w-0">
           <DialogPrimitive.Title className="text-lg font-bold text-gray-900">{p.name}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="text-sm text-gray-600">
-            {p.ownerName ? `Owner: ${p.ownerName}` : 'No owner'} · {p.usedThisMonth} seat{p.usedThisMonth === 1 ? '' : 's'} used this month
+            {p.ownerName ? `Owner: ${p.ownerName}` : 'No owner'} · {p.usedThisMonth} seat{p.usedThisMonth === 1 ? '' : 's'} offered on calls this month
           </DialogPrimitive.Description>
         </div>
         <DialogPrimitive.Close className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close"><X className="h-5 w-5" /></DialogPrimitive.Close>
@@ -152,7 +153,7 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
 
       <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
         <fieldset className="space-y-3">
-          <legend className="text-sm font-bold text-gray-900">Prices <span className="font-normal text-gray-500">(the owner can change these too)</span></legend>
+          <legend className="text-sm font-bold text-gray-900">Prices <span className="font-normal text-gray-500">(for the team on the call only; the owner can change these too)</span></legend>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl} htmlFor={id('full')}>Full price</label>
@@ -171,12 +172,12 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
           <div className="max-w-[12rem]">
             <label className={lbl} htmlFor={id('seats')}>Seats per month</label>
             <input id={id('seats')} className={inp} inputMode="numeric" type="number" min={0} max={1000} step={1} value={seats} onChange={(e) => setSeats(e.target.value)} placeholder="0" />
-            <p className={hint}>0 or empty = no offer shown.</p>
+            <p className={hint}>0 or empty = no sponsorship line shown. A seat is used when the team offers it on the call.</p>
           </div>
           <div>
-            <label className={lbl} htmlFor={id('reason')}>Why it&apos;s sponsored (shown to people signing up)</label>
+            <label className={lbl} htmlFor={id('reason')}>Why it&apos;s sponsored (one line shown to people signing up)</label>
             <textarea id={id('reason')} rows={2} className={`${inp} h-auto py-2 leading-normal`} value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)}
-              placeholder="NowTransformed, a nonprofit, pays part of the cost so more people can take part." />
+              placeholder="NowTransformed pays part of the cost so more people can take part." />
             <p className={hint}>{300 - reason.length} characters left.</p>
           </div>
         </fieldset>
@@ -185,18 +186,19 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
           <p className="text-sm font-bold text-gray-900">How it shows on the sign-up page</p>
           {showsOffer ? (
             <div className="rounded-xl border-2 border-primary-700 p-4 space-y-1.5">
-              <p className="text-xs font-bold text-sky-800 tracking-wide">SPONSORED SEAT</p>
-              <p className="flex flex-wrap items-baseline gap-2">
-                {fullPrice.trim() && <span className="text-gray-500 line-through">{fullPrice.trim()}</span>}
-                <strong className="text-xl text-gray-900">{sponsoredPrice.trim() || '[Sponsored price]'}</strong>
-              </p>
-              {reason.trim() && <p className="text-sm text-gray-700 break-words">{reason.trim()}</p>}
-              <p className="text-sm font-semibold text-amber-800">
-                {previewLeft > 0 ? `${previewLeft} of ${seatsNum} sponsored seats left this month` : "Join the waiting list for next month's seats"}
-              </p>
+              <p className="text-xs font-bold text-sky-800 tracking-wide">SPONSORED SEATS</p>
+              {previewLeft > 0 ? (
+                <>
+                  <p className="text-sm text-gray-900">{SPONSOR_LINE} We&apos;ll talk about it on your free call.</p>
+                  {reason.trim() && <p className="text-sm text-gray-700 break-words">{reason.trim()}</p>}
+                </>
+              ) : (
+                <p className="text-sm text-gray-900">Sponsored seats for this month have all been offered. Join the waiting list for next month.</p>
+              )}
+              <p className="text-sm text-gray-600">No prices or seat counts are shown before the call. The host sees the prices on the call record.</p>
             </div>
           ) : (
-            <p className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">No offer box is shown (seats are 0 or empty).</p>
+            <p className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">No sponsorship line is shown (seats are 0 or empty).</p>
           )}
         </div>
         <BannerView banner={banner} />
@@ -243,7 +245,7 @@ export function SiteCard({ site }: { site: OutreachSettings }) {
         <h2 id="site-title" className="text-lg font-bold text-gray-900">Email details</h2>
         <p className="text-sm text-gray-600">Used in every outreach email, for all programs.</p>
       </div>
-      <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>*]:min-w-0">
         <div>
           <label className={lbl} htmlFor="site-address">Mailing address</label>
           <input id="site-address" className={inp} value={mailingAddress} maxLength={300} onChange={(e) => setMailingAddress(e.target.value)} placeholder="NowTransformed, 123 Main St, Las Vegas, NV 89101" />

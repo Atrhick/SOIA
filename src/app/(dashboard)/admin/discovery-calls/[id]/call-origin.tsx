@@ -11,7 +11,7 @@ export function CallOriginCards({ o }: { o: CallOrigin }) {
   const rows: [string, string][] = [
     ['Invited by', o.inviter ? `${o.inviter.name} (${o.inviter.role})` : 'No inviter recorded'],
     ...(o.program ? [['Program', o.program] as [string, string]] : []),
-    ...(o.program ? [['Offer shown', o.offer ?? 'No sponsored seat set for this program'] as [string, string]] : []),
+    ...(o.program ? [['Sponsored seats', o.offer ? `${o.offer} (not shown to ${first})` : 'None for this program'] as [string, string]] : []),
     ['Channel', o.channel],
     ['Age', o.age],
     [`${first}'s time`, o.sameZone ? `${o.theirTime} (same as yours)` : `${o.theirTime} (yours: ${o.yourTime})`],
@@ -49,7 +49,7 @@ export function CallOriginCards({ o }: { o: CallOrigin }) {
           <li><strong>Listen first:</strong> {o.helpWith ? `ask about what ${first} wrote.` : `ask what ${first} would most like help with.`} Let {first} do most of the talking.</li>
           <li><strong>Explain the program in {first}&apos;s words:</strong> what happens each week.</li>
           <li>{o.hasOffer
-            ? <><strong>The sponsored seat:</strong> full price, {first}&apos;s price, and why NowTransformed sponsors it.</>
+            ? <><strong>Qualify first, then offer the sponsored seat if they&apos;re a good fit:</strong> {first} hasn&apos;t seen any prices. Use the Sponsored seat card (prices are shown to you only), say why NowTransformed sponsors it, then press &quot;Offer a sponsored seat&quot;.</>
             : <><strong>Cost:</strong> be clear about the price and what&apos;s included.</>}</li>
           <li><strong>Next step:</strong> agree it on the call. Record the outcome below.</li>
         </ol>

@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // Local only: lets several dev servers run side by side (NEXT_DIST_DIR=.next-a). Production uses .next.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   compress: true,
   images: {
     remotePatterns: [

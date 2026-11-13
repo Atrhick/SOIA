@@ -305,7 +305,7 @@ export function OnboardingConfigClient({ coachTasks, ambassadorTasks }: Onboardi
       <div className="flex gap-2 border-b">
         <button
           onClick={() => setActiveTab('coach')}
-          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
+          className={`flex flex-1 sm:flex-none items-center justify-center gap-2 whitespace-nowrap px-2 sm:px-4 py-2 text-sm sm:text-base border-b-2 transition-colors ${
             activeTab === 'coach'
               ? 'border-primary-500 text-primary-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -316,7 +316,7 @@ export function OnboardingConfigClient({ coachTasks, ambassadorTasks }: Onboardi
         </button>
         <button
           onClick={() => setActiveTab('ambassador')}
-          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
+          className={`flex flex-1 sm:flex-none items-center justify-center gap-2 whitespace-nowrap px-2 sm:px-4 py-2 text-sm sm:text-base border-b-2 transition-colors ${
             activeTab === 'ambassador'
               ? 'border-primary-500 text-primary-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -328,7 +328,7 @@ export function OnboardingConfigClient({ coachTasks, ambassadorTasks }: Onboardi
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{tasks.length}</div>
@@ -355,7 +355,7 @@ export function OnboardingConfigClient({ coachTasks, ambassadorTasks }: Onboardi
 
       {/* Task List */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>
               {activeTab === 'coach' ? 'Coach' : 'Ambassador'} Onboarding Tasks
@@ -398,38 +398,41 @@ export function OnboardingConfigClient({ coachTasks, ambassadorTasks }: Onboardi
                 return (
                   <div
                     key={task.id}
-                    className={`flex items-center gap-4 p-4 rounded-lg border ${
+                    className={`flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4 rounded-lg border ${
                       task.isActive ? 'bg-white' : 'bg-gray-50 opacity-60'
                     }`}
                   >
-                    <div className="flex flex-col gap-1">
+                    <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
+                    <div className="flex flex-none flex-col gap-1">
                       <button
                         onClick={() => handleMoveUp(index)}
                         disabled={index === 0}
-                        className="p-1 hover:bg-gray-100 rounded disabled:opacity-30"
+                        aria-label={`Move ${task.label} up`}
+                        className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-30"
                       >
-                        <ArrowUp className="h-3 w-3" />
+                        <ArrowUp className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleMoveDown(index)}
                         disabled={index === tasks.length - 1}
-                        className="p-1 hover:bg-gray-100 rounded disabled:opacity-30"
+                        aria-label={`Move ${task.label} down`}
+                        className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-30"
                       >
-                        <ArrowDown className="h-3 w-3" />
+                        <ArrowDown className="h-4 w-4" />
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-medium text-sm">
+                    <div className="flex flex-none items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-medium text-sm">
                       {task.sortOrder}
                     </div>
 
-                    <div className="p-2 rounded-lg bg-primary-50">
+                    <div className="hidden flex-none p-2 rounded-lg bg-primary-50 sm:block">
                       <Icon className="h-5 w-5 text-primary-600" />
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-gray-900">{task.label}</h3>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <h3 className="font-medium text-gray-900 break-words">{task.label}</h3>
                         {task.isRequired && (
                           <Badge variant="secondary" className="text-xs">Required</Badge>
                         )}
@@ -440,15 +443,17 @@ export function OnboardingConfigClient({ coachTasks, ambassadorTasks }: Onboardi
                       {task.description && (
                         <p className="text-sm text-gray-500 truncate">{task.description}</p>
                       )}
-                      <div className="flex items-center gap-4 mt-1 text-xs text-gray-400">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 mt-1 text-xs text-gray-500">
                         <span>Type: {getTaskTypeLabel(task.type)}</span>
-                        <span>{task.progressCount} users with progress</span>
+                        <span>{task.progressCount} {task.progressCount === 1 ? 'person' : 'people'} with progress</span>
                       </div>
                     </div>
+                    </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-none items-center justify-end gap-2 border-t border-gray-100 pt-2 sm:border-0 sm:pt-0">
                       <Switch
                         checked={task.isActive}
+                        aria-label={task.isActive ? `Turn off ${task.label}` : `Turn on ${task.label}`}
                         onCheckedChange={() => handleToggleActive(task.id)}
                       />
 

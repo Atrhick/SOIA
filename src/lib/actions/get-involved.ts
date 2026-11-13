@@ -67,6 +67,8 @@ const intakeSchema = z
     note: trimmed(1000).optional().default(''),
     via: z.string().optional(),
     waitlist: z.string().optional(),
+    /** ?inv= token of an "Email them for me" invite (OutreachInvite.token). Never echoed back. */
+    inv: z.string().trim().max(100).optional(),
   })
   .superRefine((d, ctx) => {
     // Adults must give a mobile number (hosts call or text before the call); 17 and under may leave it out.
@@ -128,6 +130,11 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
   const now = new Date()
   // The inviter's program page this came through (its link, or their latest with an approved note).
   const program = await programForSignup(inviterId, programSlug).catch(() => null)
+  // The "Email them for me" invite that brought them here (public form only; unknown tokens are ignored).
+  // Only an invite sent by the same member whose link this is.
+  const outreachInvite = source === 'INVITE_LINK' && data.inv && inviterId
+    ? await prisma.outreachInvite.findFirst({ where: { token: data.inv, userId: inviterId }, select: { id: true } }).catch(() => null)
+    : null
   const journeyToken = newToken()
   const parentConsentToken = minor ? newToken() : null
   let prospectId: string
@@ -144,6 +151,7 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
           smsConsentAt: smsEnabled() && data.phone && data.smsConsent === 'on' ? now : null,
           city: data.city || null,
           inviteChannel: channelFrom(data.via),
+          outreachInviteId: outreachInvite?.id ?? null,
           ageRange: data.ageRange,
           contactConsentAt: now,
           invitedById: inviterId,

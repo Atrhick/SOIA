@@ -19,20 +19,28 @@ export function DiscoveryClient({ token, view, framed = false }: { token: string
   return <Book token={token} v={view} card={card} variant="manage" />
 }
 
-function Expired({ card }: { card: string }) {
+/** Public "send me my booking link" form (also used at /book-call, linked from members' follow-up messages). */
+export function GetBookingLink({ card }: { card: string }) {
+  return (
+    <Expired card={card} title="Pick a time for your free call"
+      intro="Enter the email you signed up with and we'll send you your own link to pick a time. It only takes a minute." />
+  )
+}
+
+function Expired({ card, title = 'This link has expired', intro = "For your privacy, links in our emails work for 14 days. Enter your email and we'll send a fresh one that picks up where you left off." }: { card: string; title?: string; intro?: string }) {
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   return (
     <div className={card}>
-      <h1 className="text-2xl font-bold text-gray-900">This link has expired</h1>
-      <p className="text-gray-700">For your privacy, links in our emails work for 14 days. Enter your email and we&apos;ll send a fresh one that picks up where you left off.</p>
+      <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+      <p className="text-gray-700">{intro}</p>
       {sent ? (
         <p role="status" className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-green-800">If that email is in our system, a new link is on its way.</p>
       ) : (
         <form className="space-y-3" onSubmit={async (e) => { e.preventDefault(); setBusy(true); setError(null); const r = await requestNewLink(new FormData(e.currentTarget)); setBusy(false); if ('error' in r) setError(r.error); else setSent(true) }}>
           <label htmlFor="em" className="block text-sm font-semibold text-gray-700">Email</label>
-          <input id="em" name="email" type="email" required placeholder="name@example.com" aria-describedby={error ? 'em-err' : undefined} aria-invalid={!!error} className="w-full h-11 rounded-lg border border-gray-300 px-3" />
+          <input id="em" name="email" type="email" required placeholder="name@example.com" aria-describedby={error ? 'em-err' : undefined} aria-invalid={!!error} className="w-full h-12 rounded-lg border border-gray-300 px-3 text-base" />
           {error && <p id="em-err" role="alert" className="text-sm text-red-700">{error}</p>}
           <button className={btn} disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Send me a new link</button>
         </form>

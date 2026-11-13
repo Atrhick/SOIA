@@ -103,7 +103,7 @@ export function MyTeamClient({ data, rankLabel, firstName, oneADayPath }: { data
                     <th scope="col" className="py-2 pr-3 font-semibold">Role</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Joined</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Their invites (month)</th>
-                    <th scope="col" className="py-2 pr-3 font-semibold">Their streak</th>
+                    <th scope="col" className="py-2 pr-3 font-semibold">Their days in a row</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Their team</th>
                     <th scope="col" className="py-2 font-semibold"><span className="sr-only">Contact</span></th>
                   </tr>
@@ -138,7 +138,7 @@ export function MyTeamClient({ data, rankLabel, firstName, oneADayPath }: { data
                       <p className="font-semibold text-gray-900 min-w-0 truncate">{m.name}</p>
                       <span className={`flex-none text-xs font-semibold rounded-full px-2.5 py-1 ${BADGE[m.group]}`}>{m.roleLabel}</span>
                     </div>
-                    <p className="text-xs text-gray-600">Joined {dateLabel(m.joinedAt)} · {m.invitesThisMonth} invite{m.invitesThisMonth === 1 ? '' : 's'} this month · {m.streak > 0 ? `${m.streak}-day streak` : 'no streak'} · team of {m.theirTeam}</p>
+                    <p className="text-xs text-gray-600">Joined {dateLabel(m.joinedAt)} · {m.invitesThisMonth} invite{m.invitesThisMonth === 1 ? '' : 's'} this month · {m.streak > 0 ? `${m.streak} ${m.streak === 1 ? 'day' : 'days'} in a row` : '0 days in a row'} · team of {m.theirTeam}</p>
                     <a href={contact(m, isNew, firstName)} className={`inline-flex items-center gap-1.5 min-h-10 text-sm font-semibold text-primary-700 ${focus} rounded`}><Mail className="h-4 w-4" aria-hidden />{isNew ? 'Say welcome' : 'Message'}<span className="sr-only"> to {m.name}</span></a>
                   </li>
                 )

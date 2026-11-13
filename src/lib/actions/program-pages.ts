@@ -1183,7 +1183,7 @@ export async function getPublicProgram(slug: string) {
     program: {
       slug: program.slug,
       name: (snap.name as string) ?? '',
-      // The public heading, falling back to the grant programme name.
+      // The public heading, falling back to the grant program name.
       pageTitle: ((snap.pageTitle as string) || (snap.name as string)) ?? '',
       organization: (snap.organization as string) ?? '',
       headline: (snap.headline as string) ?? null,

@@ -19,7 +19,22 @@ interface EmailPayload {
   to: string
   subject: string
   html: string
+  /** Display name shown as the sender, e.g. "Maria via NowTransformed". The address stays EMAIL_FROM's. */
+  fromName?: string
+  /** Where replies go, e.g. the member who sent the invitation. */
+  replyTo?: string
 }
+
+/** "Maria Lopez" + "NowTransformed <noreply@x.org>" -> "Maria Lopez <noreply@x.org>". Strips characters that would break the header. */
+export function withDisplayName(from: string, name: string | undefined): string {
+  const clean = (name ?? '').replace(/[\r\n<>"]/g, '').trim().slice(0, 80)
+  if (!clean) return from
+  const m = from.match(/<([^>]+)>/)
+  const address = m ? m[1] : from.trim()
+  return `"${clean}" <${address}>`
+}
+
+const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/
 
 export interface SendResult {
   sent: boolean
@@ -32,15 +47,16 @@ export interface SendResult {
  * not fail because a provider is down or misconfigured. Check the return value
  * if the caller needs to know.
  */
-export async function sendEmail({ to, subject, html }: EmailPayload): Promise<SendResult> {
+export async function sendEmail({ to, subject, html, fromName, replyTo }: EmailPayload): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.EMAIL_FROM?.trim() || FALLBACK_FROM
+  const from = withDisplayName(process.env.EMAIL_FROM?.trim() || FALLBACK_FROM, fromName)
+  const reply = replyTo && EMAIL_RE.test(replyTo.trim()) ? replyTo.trim() : undefined
 
   // Keep the console trace in development so links are readable without
   // needing a mailbox.
   if (process.env.NODE_ENV !== 'production') {
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-    console.info(`[EMAIL] To: ${to} | Subject: ${subject}`)
+    console.info(`[EMAIL] To: ${to} | From: ${from}${reply ? ` | Reply-To: ${reply}` : ''} | Subject: ${subject}`)
     console.info(`[EMAIL] Body: ${text}`)
   }
 
@@ -56,7 +72,7 @@ export async function sendEmail({ to, subject, html }: EmailPayload): Promise<Se
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({ from, to: [to], subject, html, ...(reply ? { reply_to: reply } : {}) }),
     })
 
     if (!response.ok) {

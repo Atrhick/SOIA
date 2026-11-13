@@ -15,7 +15,13 @@ export function viaParam(v: string | string[] | undefined): string | null {
   return CHANNELS.includes(s) ? s : null
 }
 
-export async function loadSignupPage(inviter: { id: string; role: string }, slug: string, programSlug: string | null, via: string | null): Promise<SignupPageProps> {
+/** ?inv= token of an "Email them for me" invitation: shape check only (the sign-up action looks it up). */
+export function invParam(v: string | string[] | undefined): string | null {
+  const s = (Array.isArray(v) ? v[0] : v ?? '').trim()
+  return /^[A-Za-z0-9_-]{8,100}$/.test(s) ? s : null
+}
+
+export async function loadSignupPage(inviter: { id: string; role: string }, slug: string, programSlug: string | null, via: string | null, inv: string | null = null): Promise<SignupPageProps> {
   const [name, profile, settings] = await Promise.all([userDisplayName(inviter.id), getInviteProfile(inviter.id), getOutreachSettings()])
   // With a program link that program; otherwise the inviter's chosen program, then their latest with an approved note.
   const program = await programForSignup(inviter.id, programSlug).catch(() => null)
@@ -27,6 +33,7 @@ export async function loadSignupPage(inviter: { id: string; role: string }, slug
   return {
     slug,
     via,
+    inv,
     inviter: {
       name: full,
       first: name?.first ?? full,
@@ -40,11 +47,9 @@ export async function loadSignupPage(inviter: { id: string; role: string }, slug
       : null,
     offer: offer
       ? {
-          fullPrice: offer.fullPrice,
-          sponsoredPrice: offer.sponsoredPrice,
-          reason: offer.reason,
-          seatsLeft: offer.seatsLeft,
-          seatsPerMonth: offer.seatsPerMonth,
+          // No prices or seat counts: those are for the team on the call.
+          reason: offer.reason?.trim() || null,
+          seatsOpen: offer.seatsLeft > 0,
           reopens: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(nextMonthStart()),
         }
       : null,

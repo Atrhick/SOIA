@@ -110,14 +110,14 @@ export interface FillValues {
 }
 
 /** Fill-ins used when the sharer picks "Any program (main link)". */
-export const MAIN_LINK_PROGRAM = { program: 'NowTransformed', description: 'a nonprofit that helps people grow through small groups and coaching' }
+export const MAIN_LINK_PROGRAM = { program: 'NowTransformed', description: 'a youth leadership development program' }
 
 /** The sponsored-seat sentence. Empty when there's no offer or no seats left. */
 export function seatLine(key: TemplateKey, seatsLeft: number | null): string {
   if (seatsLeft == null || seatsLeft <= 0) return ''
-  if (key === 'POST') return `Thanks to NowTransformed, a nonprofit, there ${seatsLeft === 1 ? 'is 1 sponsored seat' : `are ${seatsLeft} sponsored seats`} this month.`
+  if (key === 'POST') return `Thanks to NowTransformed, there ${seatsLeft === 1 ? 'is 1 sponsored seat' : `are ${seatsLeft} sponsored seats`} this month.`
   // Messages to one person say "a few", so they stay true however many are left.
-  return 'NowTransformed, a nonprofit, is sponsoring a few seats this month.'
+  return 'NowTransformed is sponsoring a few seats this month.'
 }
 
 function fillValue(token: string, key: TemplateKey, v: FillValues): string {

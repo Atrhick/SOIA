@@ -4,12 +4,13 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BarChart3, Check, Copy, Loader2, Share2, UserPlus, X } from 'lucide-react'
+import { kit } from '@/components/ui/kit/styles'
 import { addPersonAsInviter } from '@/lib/actions/get-involved'
 import { ageRangeLabel } from '@/lib/get-involved/core'
 import type { PersonStage } from '@/lib/get-involved/inviter-people'
 import { IntakeFields } from './intake-fields'
 
-interface Person { id: string; name: string; ageRange: string | null; status: string; createdAt: string; added: boolean; nextCall: string | null; stage?: PersonStage }
+export interface Person { id: string; name: string; ageRange: string | null; status: string; createdAt: string; added: boolean; nextCall: string | null; stage?: PersonStage }
 export interface OneADayData {
   shareUrl: string
   programLinks?: { name: string; url: string; emailReady: boolean }[]
@@ -28,8 +29,8 @@ function stageOf(p: Person): PersonStage {
 }
 
 /**
- * The rest of One-A-Day under the share kit: links per program, "Add someone I talked to", my people and my team.
- * The member-facing leaderboard was removed in outreach round 2: members see their group of 5 on My results.
+ * The rest of One-A-Day under the share kit: links per program and "Add someone I talked to".
+ * v2: "My people" and "My team" moved to Your results (PeopleList below); members see their group of 5 there too.
  */
 export function OneADayClient({ data, resultsHref }: { data: OneADayData; resultsHref: string }) {
   const router = useRouter()
@@ -39,7 +40,6 @@ export function OneADayClient({ data, resultsHref }: { data: OneADayData; result
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [formKey, setFormKey] = useState(0)
   const team = data.people.filter((p) => p.status === 'ACCOUNT_CREATED')
-  const inProgress = data.people.filter((p) => p.status !== 'ACCOUNT_CREATED')
 
   async function copy() {
     try { await navigator.clipboard.writeText(data.shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { /* clipboard blocked */ }
@@ -99,30 +99,6 @@ export function OneADayClient({ data, resultsHref }: { data: OneADayData; result
             )}
           </section>
 
-          <section className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-bold text-gray-900">My people</h2>
-            {inProgress.length === 0 ? <p className="text-sm text-gray-600 mt-2">No one yet. Share your link to get started.</p> : (
-              <ul className="mt-2 divide-y divide-gray-100">
-                {inProgress.map((p) => (
-                  <li key={p.id} className="flex items-center gap-3 py-3">
-                    <span className="flex-none w-9 h-9 rounded-full bg-primary-50 text-primary-800 text-xs font-bold flex items-center justify-center">{p.name.split(' ').map((x) => (x?.[0] || '?').toUpperCase()).slice(0, 2).join('')}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm truncate">{p.name}</p>
-                      <p className="text-xs text-gray-600 break-words">{stageOf(p).detail} · {ageRangeLabel(p.ageRange)}</p>
-                    </div>
-                    <span className={`flex-none text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${stageOf(p).cls}`}><span className="sr-only">Stage: </span>{stageOf(p).label}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-bold text-gray-900">My team</h2>
-            {team.length === 0 ? <p className="text-sm text-gray-600 mt-2">People you invite appear here once they join.</p> : (
-              <ul className="mt-2 divide-y divide-gray-100">{team.map((p) => <li key={p.id} className="py-2.5 text-sm font-semibold text-gray-900">{p.name}</li>)}</ul>
-            )}
-          </section>
         </div>
       </div>
     </div>
@@ -145,5 +121,39 @@ function ProgramLink({ name, url, emailReady }: { name: string; url: string; ema
         <button type="button" onClick={copy} className="h-10 px-3 rounded-lg border border-sky-300 text-primary-700 font-semibold text-sm inline-flex items-center gap-1.5">{copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}{copied ? 'Copied' : 'Copy'}<span className="sr-only"> link for {name}</span></button>
       </div>
     </li>
+  )
+}
+
+/**
+ * "My people" (moved here from the One-A-Day page in v2, shown on Your results): the most recent people
+ * with their real step, and "See all" for the rest.
+ */
+export function PeopleList({ people, initial = 5, emptyHref }: { people: Person[]; initial?: number; emptyHref: string }) {
+  const [all, setAll] = useState(false)
+  if (people.length === 0) {
+    return <p className="text-base text-gray-700">No one yet. <Link href={emptyHref} className="font-semibold text-primary-700 underline">Invite someone today</Link> and they&apos;ll show up here when they sign up.</p>
+  }
+  const shown = all ? people : people.slice(0, initial)
+  return (
+    <>
+      <ul className="divide-y divide-gray-100">
+        {shown.map((p) => {
+          const st = stageOf(p)
+          return (
+            <li key={p.id} className="flex items-center gap-3 py-3">
+              <span aria-hidden className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-primary-50 text-sm font-bold text-primary-800">{p.name.split(' ').map((x) => (x?.[0] || '?').toUpperCase()).slice(0, 2).join('')}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base font-semibold text-gray-900">{p.name}</p>
+                <p className="break-words text-sm text-gray-600">{st.detail} · {ageRangeLabel(p.ageRange)}</p>
+              </div>
+              <span className={`flex-none whitespace-nowrap rounded-full px-2.5 py-1 text-sm font-semibold ${st.cls}`}><span className="sr-only">Step: </span>{st.label}</span>
+            </li>
+          )
+        })}
+      </ul>
+      {people.length > initial && (
+        <button type="button" className={`${kit.quiet} mt-2`} aria-expanded={all} onClick={() => setAll((a) => !a)}>{all ? 'Show fewer' : `See all ${people.length}`}</button>
+      )}
+    </>
   )
 }

@@ -51,12 +51,17 @@ export default async function DashboardLayout({
     }
   }
 
+  // The session keeps the admin's email while impersonating, so look up who is really being viewed.
+  const viewingEmail = isImpersonating
+    ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { email: true } }))?.email ?? null
+    : null
+
   return (
     <MobileNavProvider>
     <div className="min-h-screen bg-gray-50">
       <Sidebar role={role} />
       <Header user={{
-        email: session.user.email,
+        email: viewingEmail ?? session.user.email,
         role: session.user.role,
         name: profileName,
         isImpersonating,

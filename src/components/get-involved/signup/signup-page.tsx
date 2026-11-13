@@ -12,29 +12,33 @@ import { signupBookingView, submitGetInvolved } from '@/lib/actions/get-involved
 import { suggestEmail } from '@/lib/get-involved/email-typo'
 import { Book, BookView, btn, focusRing } from './booking'
 import { PhoneField } from './phone-field'
+import { SPONSOR_LINE } from '@/lib/get-involved/scripts'
 
 export interface SignupPageProps {
   slug: string
   /** Validated ?via= channel (lowercase) or null. */
   via: string | null
+  /** ?inv= token from an "Email them for me" invitation (shape-checked only; posted with the form). */
+  inv: string | null
   inviter: { name: string; first: string; roleLabel: string; photoUrl: string | null; initials: string; why: string | null }
   /** `slug` is set only on a program share link (it is posted with the form). */
   program: { slug: string | null; label: string; headline: string | null; bullets: string[] } | null
-  offer: { fullPrice: string | null; sponsoredPrice: string | null; reason: string | null; seatsLeft: number; seatsPerMonth: number; reopens: string } | null
+  /** The program has sponsored seats. No prices or counts reach the browser: the team offers seats on the call. */
+  offer: { reason: string | null; seatsOpen: boolean; reopens: string } | null
   smsOn: boolean
   mailingAddress: string
 }
 
 type Age = 'AGE_18_24' | 'AGE_25_55' | 'AGE_56_PLUS' | 'UNDER_18'
 const AGES: { value: Age; label: string }[] = [
+  { value: 'UNDER_18', label: '17 or under' },
   { value: 'AGE_18_24', label: '18 – 24' },
   { value: 'AGE_25_55', label: '25 – 55' },
   { value: 'AGE_56_PLUS', label: '56 or over' },
-  { value: 'UNDER_18', label: '17 or under' },
 ]
 
 const inputCls = (bad: boolean) => `w-full h-12 rounded-[10px] border px-3.5 text-base text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${bad ? 'border-2 border-red-700' : 'border-gray-400'}`
-const lbl = 'block text-sm font-semibold text-gray-900 mb-1.5'
+const lbl = 'block text-base font-semibold text-gray-900 mb-1.5'
 const cardCls = 'bg-white border border-gray-200 rounded-2xl p-5 md:p-6 space-y-5 min-w-0'
 
 type Stage =
@@ -46,7 +50,7 @@ type Stage =
 
 export function SignupPage(props: SignupPageProps) {
   const { inviter, program, offer, smsOn, mailingAddress } = props
-  const seatsFull = !!offer && offer.seatsLeft === 0
+  const seatsFull = !!offer && !offer.seatsOpen
   // Seats full (5b A): the person chooses the waiting list or a full-price call before the form shows.
   const [seatChoice, setSeatChoice] = useState<null | 'waitlist' | 'full'>(null)
   const [stage, setStage] = useState<Stage>({ kind: 'form' })
@@ -100,8 +104,8 @@ export function SignupPage(props: SignupPageProps) {
   }
 
   const footer = (
-    <footer className="pt-2 pb-4 text-xs leading-relaxed text-gray-600">
-      {program ? `${program.label} is run by ${inviter.name} through NowTransformed, a nonprofit.` : 'NowTransformed is a nonprofit.'}
+    <footer className="pt-2 pb-4 text-sm leading-relaxed text-gray-600">
+      {program ? `${program.label} is run by ${inviter.name} through NowTransformed, a youth leadership development program.` : 'NowTransformed is a youth leadership development program.'}
       {mailingAddress && <> {mailingAddress}</>}
     </footer>
   )
@@ -139,7 +143,7 @@ export function SignupPage(props: SignupPageProps) {
               <p className="text-gray-700">Sponsored seats open again on {offer?.reopens}. You&apos;ll be among the first to hear.</p>
               {stage.token && (
                 <>
-                  <p className="text-gray-700">Want to talk sooner? You can book a free call now{offer?.fullPrice ? ` (the program is ${offer.fullPrice} at full price)` : ''}.</p>
+                  <p className="text-gray-700">Want to talk sooner? You can book your free call now.</p>
                   <button type="button" className={btn} disabled={loadingBook} onClick={() => loadBooking(stage.token!, stage.first)}>{loadingBook && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Book a call anyway</button>
                 </>
               )}
@@ -154,7 +158,6 @@ export function SignupPage(props: SignupPageProps) {
   const formHeading = minor
     ? null
     : seatChoice === 'waitlist' ? 'Join the waiting list'
-    : offer && !seatsFull ? 'Ask for a sponsored seat'
     : 'Book your free call'
   const toForm = () => setTimeout(() => document.getElementById('f-ageRange')?.focus(), 0)
 
@@ -177,8 +180,8 @@ export function SignupPage(props: SignupPageProps) {
         </div>
         {inviter.why && (
           <figure className="rounded-xl border border-gray-200 bg-white px-4 py-3.5">
-            <blockquote className="text-[15px] leading-relaxed text-gray-700">&ldquo;{inviter.why}&rdquo;</blockquote>
-            <figcaption className="mt-1.5 text-xs text-gray-500">{inviter.first}&apos;s own words</figcaption>
+            <blockquote className="text-base leading-relaxed text-gray-700">&ldquo;{inviter.why}&rdquo;</blockquote>
+            <figcaption className="mt-1.5 text-sm text-gray-600">{inviter.first}&apos;s own words</figcaption>
           </figure>
         )}
       </section>
@@ -190,7 +193,7 @@ export function SignupPage(props: SignupPageProps) {
             <p className="text-sm font-bold uppercase tracking-wider text-primary-800">{program.label}</p>
             <h1 className="text-[28px] leading-tight font-extrabold text-gray-900">{program.headline ?? program.label}</h1>
             {program.bullets.length > 0 && (
-              <ul className="list-disc pl-5 text-[15px] leading-relaxed text-gray-700">
+              <ul className="list-disc pl-5 text-base leading-relaxed text-gray-700">
                 {program.bullets.map((b) => <li key={b}>{b}</li>)}
               </ul>
             )}
@@ -198,41 +201,35 @@ export function SignupPage(props: SignupPageProps) {
         ) : (
           <>
             <h1 className="text-[28px] leading-tight font-extrabold text-gray-900">Get Involved</h1>
-            <p className="text-[15px] text-gray-700">NowTransformed helps young people and adults grow, lead and build community.</p>
+            <p className="text-base text-gray-700">NowTransformed helps young people and adults grow, lead and build community.</p>
           </>
         )}
       </section>
 
-      {/* Sponsored seat (5) or seats full (5b A). No offer = no box. */}
+      {/* Sponsorship (5) or all seats offered (5b A). No seats = no box. Never prices or counts before the call. */}
       {offer && !minor && !seatsFull && (
         <section className="rounded-2xl border-2 border-primary-700 bg-white p-4 space-y-2.5" aria-labelledby="seat-h">
-          <h2 id="seat-h" className="text-sm font-bold text-primary-800">SPONSORED SEAT</h2>
-          {(offer.fullPrice || offer.sponsoredPrice) && (
-            <p className="flex flex-wrap items-baseline gap-x-2.5">
-              {offer.fullPrice && <span className="text-[15px] text-gray-600 line-through">Full price {offer.fullPrice}</span>}
-              {offer.sponsoredPrice && <span className="text-2xl font-extrabold text-gray-900">{offer.sponsoredPrice}</span>}
-            </p>
-          )}
-          <p className="text-sm leading-relaxed text-gray-700">{offer.reason || 'NowTransformed, a nonprofit, pays part of the cost so more people can take part.'}</p>
-          <p className="text-sm font-semibold text-amber-800">{offer.seatsLeft} of {offer.seatsPerMonth} sponsored seats left this month</p>
+          <h2 id="seat-h" className="text-sm font-bold uppercase tracking-wide text-primary-800">Sponsored seats</h2>
+          <p className="text-base leading-relaxed text-gray-900">{SPONSOR_LINE} We&apos;ll talk about it on your free call.</p>
+          {offer.reason && <p className="text-base leading-relaxed text-gray-700">{offer.reason}</p>}
         </section>
       )}
       {offer && !minor && seatsFull && (
         <section className="rounded-2xl border border-gray-200 bg-white p-4 space-y-2.5" aria-labelledby="full-h">
-          <p className="text-sm font-bold text-primary-800">SPONSORED SEATS</p>
-          <h2 id="full-h" className="text-lg font-bold text-gray-900">This month&apos;s sponsored seats are taken</h2>
-          <p className="text-sm leading-relaxed text-gray-700">
-            Next month&apos;s open on {offer.reopens}. Leave your details and you&apos;ll be first to hear, or book a call now{offer.fullPrice ? ` at the full price of ${offer.fullPrice}` : ''}.
+          <p className="text-sm font-bold uppercase tracking-wide text-primary-800">Sponsored seats</p>
+          <h2 id="full-h" className="text-lg font-bold text-gray-900">Sponsored seats for this month have all been offered</h2>
+          <p className="text-base leading-relaxed text-gray-700">
+            New ones open on {offer.reopens}. Join the waiting list and you&apos;ll be among the first to hear, or book your free call now.
           </p>
           <div className="grid gap-1">
             <button type="button" aria-pressed={seatChoice === 'waitlist'} className={`${btn} w-full`} onClick={() => { setSeatChoice('waitlist'); toForm() }}>Join the waiting list</button>
-            <button type="button" aria-pressed={seatChoice === 'full'} className={`min-h-[44px] font-semibold text-sm text-primary-700 underline rounded ${focusRing}`} onClick={() => { setSeatChoice('full'); toForm() }}>Book a call anyway</button>
+            <button type="button" aria-pressed={seatChoice === 'full'} className={`min-h-[44px] font-semibold text-base text-primary-700 underline rounded ${focusRing}`} onClick={() => { setSeatChoice('full'); toForm() }}>Book a free call now</button>
           </div>
         </section>
       )}
 
       {!minor && (
-        <p className="flex items-center gap-2 text-sm text-gray-700"><Check className="h-[18px] w-[18px] text-green-700 flex-none" strokeWidth={2.4} aria-hidden />Free 30-minute call first. No obligation.</p>
+        <p className="flex items-center gap-2 text-base text-gray-700"><Check className="h-[18px] w-[18px] text-green-700 flex-none" strokeWidth={2.4} aria-hidden />Free 30-minute call first. No obligation.</p>
       )}
 
       {(
@@ -243,12 +240,13 @@ export function SignupPage(props: SignupPageProps) {
           </div>
           {program?.slug && <input type="hidden" name="program" value={program.slug} />}
           {props.via && <input type="hidden" name="via" value={props.via} />}
+          {props.inv && <input type="hidden" name="inv" value={props.inv} />}
           {seatChoice === 'waitlist' && !minor && <input type="hidden" name="waitlist" value="on" />}
 
           {minor ? (
             <div className="space-y-2">
               <h2 id="form-h" className="text-[22px] leading-snug font-extrabold text-gray-900">You&apos;re 17 or under, so a parent or guardian says yes first</h2>
-              <p className="text-sm leading-relaxed text-gray-700">We&apos;ll email them. Once they agree, you both pick a call time. A parent joins the call too.</p>
+              <p className="text-base leading-relaxed text-gray-700">We&apos;ll email them. Once they agree, you both pick a call time. A parent joins the call too.</p>
             </div>
           ) : (
             <div>
@@ -261,14 +259,14 @@ export function SignupPage(props: SignupPageProps) {
             <legend className={lbl}>Your age</legend>
             <div className="grid grid-cols-2 gap-2">
               {AGES.map((a) => (
-                <label key={a.value} className={`h-12 rounded-[10px] flex items-center gap-2 px-3 text-[15px] cursor-pointer focus-within:ring-2 focus-within:ring-primary-600 focus-within:ring-offset-2 ${age === a.value ? 'border-2 border-primary-700 bg-primary-50 font-semibold' : 'border border-gray-400 bg-white'}`}>
-                  <input id={a.value === 'AGE_18_24' ? 'f-ageRange' : undefined} type="radio" name="ageRange" value={a.value} checked={age === a.value} onChange={() => { setAge(a.value); setError(null) }} className="h-5 w-5 accent-primary-700" />
+                <label key={a.value} className={`h-12 rounded-[10px] flex items-center gap-2 px-3 text-base cursor-pointer focus-within:ring-2 focus-within:ring-primary-600 focus-within:ring-offset-2 ${age === a.value ? 'border-2 border-primary-700 bg-primary-50 font-semibold' : 'border border-gray-400 bg-white'}`}>
+                  <input id={a.value === AGES[0].value ? 'f-ageRange' : undefined} type="radio" name="ageRange" value={a.value} checked={age === a.value} onChange={() => { setAge(a.value); setError(null) }} className="h-5 w-5 accent-primary-700" />
                   {a.label}
                 </label>
               ))}
             </div>
             {fieldErr('ageRange') ? <p id="ageRange-err" className="mt-2 text-sm text-red-800">{fieldErr('ageRange')}</p>
-              : !minor && <p className="mt-2 text-xs text-gray-600">17 or under: a parent says yes first and joins the call.</p>}
+              : !minor && <p className="mt-2 text-sm text-gray-600">17 or under: a parent says yes first and joins the call.</p>}
           </fieldset>
 
           <div>
@@ -303,7 +301,7 @@ export function SignupPage(props: SignupPageProps) {
             <PhoneField id="f-phone" className="h-12 text-base [&_input]:h-12 [&>button]:h-12" />
             {fieldErr('phone') && <p id="phone-err" className="mt-1.5 text-sm text-red-800">{fieldErr('phone')}</p>}
             {smsOn && !minor && (
-              <label className="mt-2 flex gap-2.5 items-start text-[13px] leading-snug text-gray-700">
+              <label className="mt-2 flex gap-2.5 items-start text-sm leading-snug text-gray-700">
                 <input type="checkbox" name="smsConsent" className="mt-0.5 h-5 w-5 flex-none accent-primary-700" />
                 Text me reminders about my call. Reply STOP any time.
               </label>
@@ -339,9 +337,12 @@ export function SignupPage(props: SignupPageProps) {
             {minor ? 'Send to my parent' : seatChoice === 'waitlist' ? 'Join the waiting list' : 'Next: pick a call time'}
           </button>
           {minor ? (
-            <p className="text-[13px] text-gray-600">Under 13? Please ask your parent to fill this in for you.</p>
+            <p className="text-sm text-gray-600">Under 13? Please ask your parent to fill this in for you.</p>
           ) : (
-            <p className="text-xs leading-relaxed text-gray-600">We use your details only to set up your call and send reminders about it. <Link href="/privacy" className="text-primary-700 underline">Privacy</Link></p>
+            <div className="text-sm leading-relaxed text-gray-600">
+              <p>We use your details only to set up your call and send reminders about it.</p>
+              <Link href="/privacy" className={`-mx-1 -mb-2 inline-flex min-h-[44px] items-center px-1 font-semibold text-primary-700 underline rounded ${focusRing}`}>Read our privacy policy</Link>
+            </div>
           )}
         </form>
       )}

@@ -4,6 +4,8 @@ import { auth } from '@/lib/auth'
 import { CallRecordClient } from '../../../admin/discovery-calls/[id]/call-record-client'
 import { loadCallOrigin, loadCallRecord, staffTimeZone } from '../../../admin/discovery-calls/call-data'
 import { CallOriginCards } from '../../../admin/discovery-calls/[id]/call-origin'
+import { loadSeatCard } from '../../../admin/discovery-calls/[id]/sponsored-seat-data'
+import { SponsoredSeatCard } from '../../../admin/discovery-calls/[id]/sponsored-seat-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +17,7 @@ export default async function CoachCallRecordPage({ params }: { params: { id: st
   const data = await loadCallRecord(params.id, { tz, admin: false })
   if (!data || data.hostId !== session.user.id) notFound()
   const { hostId: _hostId, ...record } = data
-  const origin = await loadCallOrigin(params.id, tz)
+  const [origin, seat] = await Promise.all([loadCallOrigin(params.id, tz), loadSeatCard(params.id)])
 
   return (
     <div className="space-y-5 max-w-6xl">
@@ -30,6 +32,7 @@ export default async function CoachCallRecordPage({ params }: { params: { id: st
         <p className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">Can&apos;t make this time? Ask an admin to move the call, or choose &quot;Reschedule&quot; below so {record.prospect.firstName} can pick a new time.</p>
       )}
       <CallRecordClient data={record} now={new Date().toISOString()}>
+        {seat && <SponsoredSeatCard d={seat} readOnly={!!session.user.isImpersonating} />}
         {origin && <CallOriginCards o={origin} />}
       </CallRecordClient>
     </div>

@@ -5,6 +5,8 @@ import { CallRecordClient } from './call-record-client'
 import { MoveCall } from '../move-call'
 import { loadCallOrigin, loadCallRecord, staffTimeZone } from '../call-data'
 import { CallOriginCards } from './call-origin'
+import { loadSeatCard } from './sponsored-seat-data'
+import { SponsoredSeatCard } from './sponsored-seat-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,7 @@ export default async function CallRecordPage({ params }: { params: { id: string 
   const session = await auth()
   if (!session || session.user.role !== 'ADMIN') redirect('/login')
   const tz = await staffTimeZone(session.user.id)
-  const [data, origin] = await Promise.all([loadCallRecord(params.id, { tz, admin: true }), loadCallOrigin(params.id, tz)])
+  const [data, origin, seat] = await Promise.all([loadCallRecord(params.id, { tz, admin: true }), loadCallOrigin(params.id, tz), loadSeatCard(params.id)])
   if (!data) notFound()
 
   return (
@@ -31,6 +33,7 @@ export default async function CallRecordPage({ params }: { params: { id: string 
         </div>
       )}
       <CallRecordClient data={data} now={new Date().toISOString()}>
+        {seat && <SponsoredSeatCard d={seat} readOnly={!!session.user.isImpersonating} />}
         {origin && <CallOriginCards o={origin} />}
       </CallRecordClient>
     </div>

@@ -23,7 +23,7 @@ describe('outreach templates', () => {
 
   it('renders the text message with a seat line', () => {
     expect(renderTemplate(DEFAULT_TEMPLATES.TEXT.body, 'TEXT', V)).toBe(
-      "Hi Sarah!\nYou mentioned wanting to give back more, so I thought of you.\nI'm involved with Health & Stress Management, a small group for busy people who want simpler ways to handle stress. NowTransformed, a nonprofit, is sponsoring a few seats this month. Would you be open to hearing about it?",
+      "Hi Sarah!\nYou mentioned wanting to give back more, so I thought of you.\nI'm involved with Health & Stress Management, a small group for busy people who want simpler ways to handle stress. NowTransformed is sponsoring a few seats this month. Would you be open to hearing about it?",
     )
   })
 

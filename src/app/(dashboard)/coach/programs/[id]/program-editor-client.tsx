@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +20,9 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toVideoEmbedUrl, VIDEO_LINK_HINT } from '@/lib/video-embed'
 import { EDIT_NAMES_EVENT } from '@/components/program-pages/events'
+import { SaveRule } from '@/components/program-pages/save-rule'
+import { kit } from '@/components/ui/kit/styles'
+import { useToast } from '@/components/ui/kit/toast'
 import {
   ArrowLeft,
   Check,
@@ -42,7 +45,6 @@ import {
 import {
   saveExtraQuestions,
   submitProgramForReview,
-  unpublishProgram,
   updateProgram,
 } from '@/lib/actions/program-pages'
 
@@ -111,8 +113,7 @@ export function ProgramEditorClient({
   standardQuestions: ProgramQuestion[]
 }) {
   const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const toast = useToast()
   const [copied, setCopied] = useState(false)
   const [tab, setTab] = useState('content')
   const nameRef = useRef<HTMLInputElement>(null)
@@ -162,24 +163,26 @@ export function ProgramEditorClient({
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }))
 
-  const run = (fn: () => Promise<{ error?: string; success?: boolean }>, okMessage: string) => {
-    setError(null)
-    setNotice(null)
+  const run = (fn: () => Promise<{ error?: string; success?: boolean }>, okMessage: string, after?: () => void) => {
     startTransition(async () => {
-      const result = await fn()
-      if (result?.error) setError(result.error)
-      else setNotice(okMessage)
+      try {
+        const result = await fn()
+        if (result?.error) toast.error(result.error)
+        else { toast.success(okMessage); after?.() }
+      } catch {
+        toast.error('That didn’t save. Check your connection and try again.')
+      }
     })
   }
 
   const saveContent = () =>
-    run(() => updateProgram(program.id, { ...form, showMeetingDetails }), 'Changes saved')
+    run(() => updateProgram(program.id, { ...form, showMeetingDetails }), 'Saved. Press "Submit for review" when you are ready for it to go live.')
   const saveQuestions = () =>
-    run(() => saveExtraQuestions(program.id, questions), 'Questions saved')
+    run(() => saveExtraQuestions(program.id, questions), 'Questions saved. Press "Submit for review" when you are ready.')
 
   const addQuestion = (type: ProgramQuestionType) => {
     if (questions.length >= MAX_EXTRA_QUESTIONS) {
-      setError(`You can add at most ${MAX_EXTRA_QUESTIONS} questions`)
+      toast.error(`You can add at most ${MAX_EXTRA_QUESTIONS} questions. Remove one to add another.`)
       return
     }
     const q: ProgramQuestion = {
@@ -200,72 +203,70 @@ export function ProgramEditorClient({
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/p/${program.slug}`)
       setCopied(true)
+      toast.success('Link copied. Paste it wherever you share it.')
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      /* link is visible on the page anyway */
+      toast.error('Couldn’t copy. Open the live page and copy its address instead.')
     }
   }
 
+  const submitDisabled = isPending || readOnly || program.status === 'PENDING_REVIEW'
+  const submit = () => run(() => submitProgramForReview(program.id), 'Sent for review. We’ll email you when it’s approved.')
+  const submitLabel = program.status === 'PENDING_REVIEW' ? 'Waiting for review' : 'Submit for review'
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <div>
         <Link
           href={basePath}
-          className="text-sm text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"
+          className={`${kit.quiet} -ml-2 text-gray-700`}
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" aria-hidden />
           All programs
         </Link>
       </div>
 
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-gray-900">{program.name}</h1>
+      <div className="space-y-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-2xl font-bold text-gray-900 break-words min-w-0">{program.name}</h1>
             <Badge variant={meta.variant}>{meta.label}</Badge>
           </div>
-          <p className="text-gray-500 mt-1">{program.organization}</p>
+          <p className="mt-1 text-base text-gray-700">Keep your program page right. Most changes need a quick review; prices and message details go live at once.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <a
-            href={`/p/${program.slug}?preview=1`}
-            target="_blank"
-            rel="noreferrer"
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
-            <Eye className="h-3.5 w-3.5 mr-1.5" />
+        <div className="flex flex-wrap items-center gap-2">
+          <a href={`/p/${program.slug}?preview=1`} target="_blank" rel="noreferrer" className={kit.secondary}>
+            <Eye className="h-4 w-4" aria-hidden />
             Preview
           </a>
           {program.hasLiveVersion && (
             <>
-              <a
-                href={`/p/${program.slug}`}
-                target="_blank"
-                rel="noreferrer"
-                className={buttonVariants({ variant: 'outline', size: 'sm' })}
-              >
+              <a href={`/p/${program.slug}`} target="_blank" rel="noreferrer" className={kit.secondary}>
                 View live
-                <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                <ExternalLink className="h-4 w-4" aria-hidden />
               </a>
-              <Button size="sm" variant="outline" onClick={copyLink}>
-                {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-              </Button>
+              <button type="button" onClick={copyLink} className={kit.secondary} aria-label="Copy the link to your live page">
+                {copied ? <Check className="h-4 w-4 text-green-600" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+                <span className="hidden sm:inline">Copy link</span>
+              </button>
             </>
           )}
-          <Button
-            size="sm"
-            disabled={isPending || readOnly || program.status === 'PENDING_REVIEW'}
-            onClick={() => run(() => submitProgramForReview(program.id), 'Sent for review')}
-          >
-            {isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
-            )}
-            Submit for review
-          </Button>
+          <button type="button" className={`${kit.primary} hidden sm:inline-flex`} disabled={submitDisabled} onClick={submit}>
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
+            {submitLabel}
+          </button>
         </div>
       </div>
+
+      {/* Phones: "Submit for review" always within reach at the bottom of the screen. */}
+      {!readOnly && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
+          <button type="button" className={kit.primaryBlock} disabled={submitDisabled} onClick={submit}>
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
+            {submitLabel}
+          </button>
+        </div>
+      )}
 
       {readOnly && (
         <AlertBanner
@@ -278,7 +279,7 @@ export function ProgramEditorClient({
       {program.hasLiveVersion && (
         <AlertBanner
           variant="info"
-          message="Your edits here do not change the live page. An administrator publishes a new version when they approve your next submission."
+          message="Your edits to the page don't change the live page until an admin approves them. Save, then press Submit for review."
         />
       )}
 
@@ -290,28 +291,15 @@ export function ProgramEditorClient({
         />
       )}
 
-      {error && (
-        <AlertBanner variant="error" message={error} dismissible onDismiss={() => setError(null)} />
-      )}
-      {notice && (
-        <AlertBanner
-          variant="success"
-          message={notice}
-          dismissible
-          onDismiss={() => setNotice(null)}
-        />
-      )}
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="max-w-full justify-start overflow-x-auto">
-          <TabsTrigger value="content">Page content</TabsTrigger>
-          <TabsTrigger value="videos">Videos</TabsTrigger>
-          <TabsTrigger value="event">Event &amp; Zoom</TabsTrigger>
-          <TabsTrigger value="questions">Questions</TabsTrigger>
-          <TabsTrigger value="grant">Grant details</TabsTrigger>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 p-1">
+          {[['content', 'Page content'], ['videos', 'Videos'], ['event', 'Event & Zoom'], ['questions', 'Questions'], ['details', 'Program details']].map(([v, l]) => (
+            <TabsTrigger key={v} value={v} className="min-h-[44px] px-3 text-base">{l}</TabsTrigger>
+          ))}
         </TabsList>
 
-        <fieldset disabled={readOnly} className="min-w-0">
+        <fieldset disabled={readOnly} className="min-w-0 [&_input:not([type=checkbox]):not([type=radio])]:h-12 [&_input]:text-base [&_textarea]:text-base [&_label]:text-base [&_button[role=combobox]]:h-12 [&_button[role=combobox]]:text-base">
         {/* ---- Page content ---- */}
         <TabsContent value="content" className="space-y-4">
           <Card id="program-names" className="scroll-mt-24">
@@ -319,10 +307,10 @@ export function ProgramEditorClient({
               <CardTitle className="text-base">Program and company</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-500">
+              <p className="text-base text-gray-700">
                 Two separate names: what the program is called, and the company or organization that
-                runs it. The welcome email uses both as soon as you save; the public page changes after
-                an administrator approves.
+                runs it. The welcome email uses both as soon as you save; your public page changes after
+                an admin approves.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Program name" htmlFor="name" hint="For example: Health & Stress Management">
@@ -347,7 +335,7 @@ export function ProgramEditorClient({
               <Field
                 label="Page title"
                 htmlFor="pageTitle"
-                hint="The big heading visitors see. Leave blank to use the programme name."
+                hint={`The name in big letters at the top of your page. Leave blank to use the program name. Example: "${program.name}"`}
               >
                 <Input
                   id="pageTitle"
@@ -356,7 +344,11 @@ export function ProgramEditorClient({
                   placeholder={program.name}
                 />
               </Field>
-              <Field label="Headline" htmlFor="headline">
+              <Field
+                label="Headline"
+                htmlFor="headline"
+                hint='One sentence under the title that says what people get. Example: "Build a business that serves your community"'
+              >
                 <Input
                   id="headline"
                   value={form.headline}
@@ -390,7 +382,7 @@ export function ProgramEditorClient({
               </Field>
             </CardContent>
           </Card>
-          <SaveBar onSave={saveContent} isPending={isPending} />
+          <SaveBar onSave={saveContent} isPending={isPending} note="Names: the welcome email uses them at once. Everything else shows on your page after an admin approves." />
         </TabsContent>
 
         {/* ---- Videos ---- */}
@@ -400,7 +392,7 @@ export function ProgramEditorClient({
               <CardTitle className="text-base">What people watch after signing up</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              <p className="text-sm text-gray-500">
+              <p className="text-base text-gray-700">
                 After signing up, visitors watch your video, then the NowTransformed video, and
                 then choose <span className="font-medium text-gray-700">I&apos;m interested</span>{' '}
                 to answer your questions. A step without a video is skipped.
@@ -416,14 +408,14 @@ export function ProgramEditorClient({
                 <VideoField
                   label="NowTransformed and sponsorship video"
                   htmlFor="ntVideoUrl"
-                  hint={`Introduces NowTransformed and the sponsorship opportunities for this program. An administrator may also set this for you. ${VIDEO_LINK_HINT}`}
+                  hint={`Introduces NowTransformed and sponsored seats for this program. An admin may also set this for you. ${VIDEO_LINK_HINT}`}
                   value={form.ntVideoUrl}
                   onChange={(v) => set('ntVideoUrl', v)}
                 />
                 <Field
                   label="Text above the NowTransformed video"
                   htmlFor="ntVideoIntro"
-                  hint="Optional. A line or two about the sponsorship available for this program."
+                  hint="Optional. A line or two about NowTransformed sponsored seats. Don't promise a seat or a price: families who are a good fit may qualify."
                 >
                   <Textarea
                     id="ntVideoIntro"
@@ -448,7 +440,7 @@ export function ProgramEditorClient({
               <div className="flex items-start justify-between gap-4 rounded-md border border-gray-200 p-3">
                 <div>
                   <Label htmlFor="showMeetingDetails">Show the live meeting</Label>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-sm text-gray-600 mt-0.5">
                     {showMeetingDetails
                       ? 'Your dates and joining link appear on your page.'
                       : 'Off: your program video takes the place of the live meeting. Dates and links are hidden, and your video is required before you can submit.'}
@@ -471,7 +463,7 @@ export function ProgramEditorClient({
                   rows={5}
                   value={form.eventDatesText}
                   onChange={(e) => set('eventDatesText', e.target.value)}
-                  placeholder={'Thursday 12 March, 7pm ET\nThursday 19 March, 7pm ET'}
+                  placeholder={'Thursday, March 12, 7pm ET\nThursday, March 19, 7pm ET'}
                 />
               </Field>
               <Field
@@ -501,8 +493,8 @@ export function ProgramEditorClient({
               </Field>
 
               <div className="pt-4 mt-2 border-t border-gray-100">
-                <p className="text-sm font-medium text-gray-900">Second meeting link</p>
-                <p className="text-xs text-gray-500 mt-0.5 mb-3">
+                <p className="text-base font-semibold text-gray-900">Second meeting link</p>
+                <p className="text-sm text-gray-600 mt-0.5 mb-3">
                   Optional. Add one if you also run the session on Google Meet, Teams or another
                   platform. Both links are shown to people who sign up.
                 </p>
@@ -556,11 +548,11 @@ export function ProgramEditorClient({
                 <CardTitle className="text-base">Standard questions</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-gray-500 mb-3">
+                <p className="text-base text-gray-700 mb-3">
                   Every program asks these. They cannot be edited or removed, so leads stay
                   comparable across coaches.
                 </p>
-                <ol className="space-y-2 text-sm">
+                <ol className="space-y-2 text-base">
                   {standardQuestions.map((q, i) => (
                     <li key={q.id} className="flex gap-2 text-gray-700">
                       <span className="text-gray-400 tabular-nums">{i + 1}.</span>
@@ -594,7 +586,7 @@ export function ProgramEditorClient({
               </Field>
 
               {questions.length === 0 && (
-                <p className="text-sm text-gray-500">
+                <p className="text-base text-gray-600">
                   No extra questions yet. Add one below to learn more about who is signing up.
                 </p>
               )}
@@ -611,36 +603,37 @@ export function ProgramEditorClient({
 
               <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
                 {PROGRAM_QUESTION_TYPES.map((type) => (
-                  <Button key={type} size="sm" variant="outline" onClick={() => addQuestion(type)}>
-                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  <button key={type} type="button" className={kit.secondary} onClick={() => addQuestion(type)}>
+                    <Plus className="h-4 w-4" aria-hidden />
                     {QUESTION_TYPE_LABELS[type]}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={saveContent} disabled={isPending}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <SaveRule live={false} />
+            <button type="button" className={`${kit.secondary} w-full sm:w-auto`} onClick={saveContent} disabled={isPending}>
               Save intro text
-            </Button>
-            <Button onClick={saveQuestions} disabled={isPending}>
-              {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            </button>
+            <button type="button" className={`${kit.primary} w-full sm:w-auto`} onClick={saveQuestions} disabled={isPending}>
+              {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
               Save questions
-            </Button>
+            </button>
           </div>
         </TabsContent>
 
-        {/* ---- Grant details ---- */}
-        <TabsContent value="grant" className="space-y-4">
+        {/* ---- Program details (from the original program sheet) ---- */}
+        <TabsContent value="details" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Grant deliverable details</CardTitle>
+              <CardTitle className="text-base">Program details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-500">
-                These came from the grant deliverables sheet. You can change them, but an
-                administrator has to approve the change before it appears publicly.
+              <p className="text-base text-gray-700">
+                These came from your original program sheet. You can change them; an admin approves
+                the change before it appears publicly.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Target market" htmlFor="targetMarket">
@@ -701,18 +694,6 @@ export function ProgramEditorClient({
         </fieldset>
       </Tabs>
 
-      {program.hasLiveVersion && (
-        <div className="pt-4 border-t border-gray-100">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={isPending || readOnly}
-            onClick={() => run(() => unpublishProgram(program.id), 'Page taken offline')}
-          >
-            Take my page offline
-          </Button>
-        </div>
-      )}
     </div>
   )
 }
@@ -730,8 +711,8 @@ function Field({
 }) {
   return (
     <div>
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {hint && <p className="text-xs text-gray-500 mb-1">{hint}</p>}
+      <Label htmlFor={htmlFor} className="text-base font-semibold text-gray-900">{label}</Label>
+      {hint && <p className="text-sm text-gray-600 mt-0.5 mb-1.5">{hint}</p>}
       {children}
     </div>
   )
@@ -764,7 +745,7 @@ function VideoField({
         aria-invalid={invalid}
       />
       {invalid && (
-        <p className="text-xs text-red-600 mt-1">
+        <p className="text-sm text-red-700 mt-1">
           This link cannot be played on your page. {VIDEO_LINK_HINT}
         </p>
       )}
@@ -784,13 +765,14 @@ function VideoField({
   )
 }
 
-function SaveBar({ onSave, isPending }: { onSave: () => void; isPending: boolean }) {
+function SaveBar({ onSave, isPending, note }: { onSave: () => void; isPending: boolean; note?: string }) {
   return (
-    <div className="flex justify-end">
-      <Button onClick={onSave} disabled={isPending}>
-        {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+      <SaveRule live={false}>{note}</SaveRule>
+      <button type="button" className={`${kit.primary} w-full sm:w-auto`} onClick={onSave} disabled={isPending}>
+        {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
         Save changes
-      </Button>
+      </button>
     </div>
   )
 }
@@ -811,11 +793,11 @@ function QuestionEditor({
   return (
     <div className="rounded-lg border border-gray-200 p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <span className="text-xs uppercase tracking-wide text-gray-500 pt-2">
+        <span className="text-sm font-semibold text-gray-600 pt-2.5">
           Question {index + 1} · {QUESTION_TYPE_LABELS[question.type]}
         </span>
-        <Button size="sm" variant="ghost" onClick={onRemove} aria-label="Remove question">
-          <Trash2 className="h-4 w-4 text-red-500" />
+        <Button variant="ghost" onClick={onRemove} aria-label="Remove question" className="h-11 w-11 p-0">
+          <Trash2 className="h-5 w-5 text-red-600" />
         </Button>
       </div>
 
@@ -841,30 +823,30 @@ function QuestionEditor({
                 aria-label={`Question ${index + 1} option ${i + 1}`}
               />
               <Button
-                size="sm"
                 variant="ghost"
+                className="h-11 w-11 flex-none p-0"
                 onClick={() =>
                   onChange({ options: (question.options ?? []).filter((_, x) => x !== i) })
                 }
                 aria-label={`Remove option ${i + 1}`}
               >
-                <Trash2 className="h-3.5 w-3.5 text-gray-400" />
+                <Trash2 className="h-4 w-4 text-gray-500" />
               </Button>
             </div>
           ))}
-          <Button
-            size="sm"
-            variant="outline"
+          <button
+            type="button"
+            className={kit.secondary}
             onClick={() => onChange({ options: [...(question.options ?? []), ''] })}
           >
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            <Plus className="h-4 w-4" aria-hidden />
             Add option
-          </Button>
+          </button>
         </div>
       )}
 
       {question.type === 'LIKERT' && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           <Input
             value={question.likert?.minLabel ?? ''}
             onChange={(e) =>

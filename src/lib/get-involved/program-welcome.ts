@@ -67,7 +67,7 @@ export function exampleWelcomeNote(programName: string, companyName?: string | n
 
 /** A finished example, so people can see what a good paragraph reads like. */
 export const SAMPLE_WELCOME_NOTE =
-  "Bright Futures Mentoring helps teens aged 13 to 17 find direction and confidence. Through weekly group sessions and one-to-one check-ins, you'll set goals, practise speaking up and build habits that stick. It's built for young people who want more from school and life, so you can see real progress every month."
+  "Bright Futures Mentoring helps teens aged 13 to 17 find direction and confidence. Through weekly group sessions and one-to-one check-ins, you'll set goals, practice speaking up and build habits that stick. It's built for young people who want more from school and life, so you can see real progress every month."
 
 /** Clean up a note (from a person or from AI): one paragraph, no markdown, no wrapping quotes. */
 export function cleanWelcomeNote(raw: string): string {

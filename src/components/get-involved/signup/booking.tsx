@@ -170,7 +170,7 @@ export function Book({ token, v, card, variant = 'manage' }: { token: string; v:
             {cancelOpen && (
               <div id="cancel-panel" className="rounded-xl border border-gray-200 p-4 space-y-3">
                 <label htmlFor="why" className="block text-sm font-semibold text-gray-700">Reason (optional, helps us)</label>
-                <select id="why" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-11 rounded-lg border border-gray-300 px-3">
+                <select id="why" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-11 rounded-lg border border-gray-300 px-3 text-base">
                   <option value="">Choose one</option><option>Something came up</option><option>Not interested right now</option><option>Other</option>
                 </select>
                 <button type="button" className={`h-11 px-5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-semibold inline-flex items-center gap-2 disabled:opacity-60 ${focusRing}`} disabled={busy} onClick={cancel}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Yes, cancel the call</button>
@@ -236,13 +236,13 @@ export function Book({ token, v, card, variant = 'manage' }: { token: string; v:
                 return (
                   <button key={d.key} type="button" aria-pressed={on} aria-label={d.full} onClick={() => { setDay(d.key); setSlot(null) }}
                     className={`flex-none min-w-[4rem] px-2 h-[68px] rounded-xl border flex flex-col items-center justify-center gap-0.5 ${focusRing} ${on ? 'border-2 border-primary-700 bg-primary-50' : 'border-gray-300 bg-white'}`}>
-                    <span className={`text-xs ${on ? 'text-primary-800 font-semibold' : 'text-gray-600'}`}>{d.top}</span>
+                    <span className={`text-sm ${on ? 'text-primary-800 font-semibold' : 'text-gray-600'}`}>{d.top}</span>
                     <span className="text-lg font-bold text-gray-900">{d.num}</span>
                   </button>
                 )
               })}
             </div>
-            {weekOnly && <p className="mt-2 text-xs text-gray-600">Showing the next 7 days. People who book soon are much more likely to make the call.</p>}
+            {weekOnly && <p className="mt-2 text-sm text-gray-600">Showing the next 7 days. People who book soon are much more likely to make the call.</p>}
           </fieldset>
 
           {current && (
@@ -251,7 +251,7 @@ export function Book({ token, v, card, variant = 'manage' }: { token: string; v:
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {current.list.map((s) => (
                   <button key={s} type="button" aria-pressed={slot === s} onClick={() => setSlot(s)}
-                    className={`h-12 rounded-lg border font-semibold text-[15px] ${focusRing} ${slot === s ? 'border-primary-700 bg-primary-700 text-white' : 'border-primary-700 bg-white text-primary-800 hover:bg-primary-50'}`}>{fmt(s, tz, { hour: 'numeric', minute: '2-digit' })}</button>
+                    className={`h-12 rounded-lg border font-semibold text-base ${focusRing} ${slot === s ? 'border-primary-700 bg-primary-700 text-white' : 'border-primary-700 bg-white text-primary-800 hover:bg-primary-50'}`}>{fmt(s, tz, { hour: 'numeric', minute: '2-digit' })}</button>
                 ))}
               </div>
             </fieldset>
@@ -369,15 +369,15 @@ function Booked({ token, v, card, call, moved, headingRef, onChange }: {
         <ol className="list-decimal pl-5 text-sm leading-7 text-gray-700">
           <li>A confirmation email is on its way now{v.minor ? ` to you and ${parentFirst}` : ''}.</li>
           <li>We remind you the day before (and 3 days before, if the call is further off), by email{v.textReminders ? ' and by text' : ''}.</li>
-          <li>On the call: what you&apos;d like help with, how {v.programName ? 'the program' : 'NowTransformed'} works{v.sponsored ? ', and your sponsored seat' : ''}.</li>
+          <li>On the call: what you&apos;d like help with, how {v.programName ? 'the program' : 'NowTransformed'} works{v.sponsored ? ', and whether a sponsored seat is a fit' : ''}.</li>
         </ol>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
         <label htmlFor="help-with" className="block text-sm font-semibold text-gray-900">Optional: what would you most like help with?</label>
         <textarea id="help-with" rows={3} maxLength={1000} value={help} onChange={(e) => { setHelp(e.target.value); setMsg(null) }} aria-describedby="help-with-hint"
-          className="w-full rounded-lg border border-gray-400 px-3 py-2 text-[15px] focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="For example: sleeping better, work stress" />
-        <p id="help-with-hint" className="text-xs text-gray-600">Your host reads this before the call.</p>
+          className="w-full rounded-lg border border-gray-400 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="For example: sleeping better, work stress" />
+        <p id="help-with-hint" className="text-sm text-gray-600">Your host reads this before the call.</p>
         <button type="button" className={btnOutline} onClick={save} disabled={saving || !help.trim()}>{saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Save</button>
         {msg && <p role={msg.ok ? 'status' : 'alert'} className={`text-sm ${msg.ok ? 'text-green-800' : 'text-red-700'}`}>{msg.text}</p>}
       </div>
@@ -420,7 +420,7 @@ function NoSlots({ token, requested, replyWithin }: { token: string; requested: 
         </button>
       </div>
       {msg && <p role={msg.ok ? 'status' : 'alert'} className={`text-sm ${msg.ok ? 'text-green-800' : 'text-red-700'}`}>{msg.text}</p>}
-      <p className="text-xs text-gray-600">Admins are alerted at once, so they can add times.</p>
+      <p className="text-sm text-gray-600">Admins are alerted at once, so they can add times.</p>
     </div>
   )
 }

@@ -50,6 +50,14 @@ export default async function EmailLinkPage({ params }: { params: { token: strin
     )
   }
 
+  if (v.action === 'istop') {
+    const inv = await prisma.outreachInvite.findUnique({ where: { id: v.id }, select: { email: true, firstName: true } })
+    if (!inv) return <Card title="This link no longer applies"><p>If you need help, reply to the person who invited you.</p></Card>
+    const already = await prisma.emailSuppression.findUnique({ where: { email: inv.email }, select: { email: true } })
+    if (already) return <Card title="You're all set"><p>You won&apos;t get invitations like this from anyone at NowTransformed again.</p></Card>
+    return <EmailLinkClient kind="invite-stop" token={token} title="Stop invitations like this?" lines={[`Hi ${inv.firstName}, press the button and nobody at NowTransformed will be able to send you an invitation like this again.`]} button="Stop invitations" />
+  }
+
   const p = await prisma.prospect.findUnique({ where: { id: v.id }, select: { firstName: true, status: true, emailOptOutAt: true, checkInAt: true, checkInSentAt: true } })
 
   switch (v.action) {

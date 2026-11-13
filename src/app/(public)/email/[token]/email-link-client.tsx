@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import { runEmailLink } from '@/lib/actions/email-links'
+import { stopInvites } from './actions'
 
 export function EmailLinkClient(props: {
   token: string
@@ -12,6 +13,8 @@ export function EmailLinkClient(props: {
   button: string
   danger?: boolean
   secondary?: { label: string; href: string } | null
+  /** 'invite-stop' = the Stop link in an "Email them for me" invitation. */
+  kind?: 'invite-stop'
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +22,7 @@ export function EmailLinkClient(props: {
 
   async function go() {
     setBusy(true); setError(null)
-    const r = await runEmailLink(props.token)
+    const r = props.kind === 'invite-stop' ? await stopInvites(props.token) : await runEmailLink(props.token)
     setBusy(false)
     if ('error' in r) setError(r.error)
     else setDone(r.message)

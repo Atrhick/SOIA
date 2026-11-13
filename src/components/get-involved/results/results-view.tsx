@@ -1,136 +1,147 @@
 import Link from 'next/link'
-import type { MemberResults } from '@/lib/get-involved/outreach-stats'
+import { ArrowRight } from 'lucide-react'
 import { channelLabel } from '@/lib/get-involved/outreach-stats'
 import type { StreakDayState } from '@/lib/get-involved/outreach-streak'
+import { TaskHeader } from '@/components/ui/kit/task-header'
+import { HelpTip } from '@/components/ui/kit/help-tip'
+import { kit } from '@/components/ui/kit/styles'
+import { OneADayNav } from '@/components/get-involved/share-kit/one-a-day-nav'
+import { PeopleList } from '@/components/get-involved/one-a-day-client'
+import type { ResultsData } from './results-data'
 
-/** "My results" for a coach or ambassador (shared by /coach and /ambassador one-a-day/results). Server-rendered, no client code. */
+/**
+ * "Your results" (One-A-Day v2), shared by /coach and /ambassador one-a-day/results. One job: "Am I doing
+ * OK, and what should I do next?" One sentence + one suggested step first, then the detail.
+ */
 
-const card = 'bg-white border border-gray-200 rounded-xl p-5 min-w-0'
-const th = 'py-2 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 whitespace-nowrap'
-const td = 'py-2.5 pr-4 text-sm text-gray-900'
-const focus = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
-
-const DOT: Record<StreakDayState, { cls: string; label: string }> = {
-  sent: { cls: 'bg-primary-700', label: 'sent' },
-  free: { cls: 'bg-sky-200', label: 'free miss used' },
-  missed: { cls: 'bg-gray-200', label: 'missed' },
-  today: { cls: 'bg-white border-2 border-dashed border-gray-300', label: 'today, not done yet' },
+const DAY: Record<StreakDayState, { cls: string; label: string }> = {
+  sent: { cls: 'bg-primary-700', label: 'Invited someone' },
+  free: { cls: 'bg-sky-200', label: 'Missed, but allowed' },
+  missed: { cls: 'bg-gray-200', label: 'Missed' },
+  today: { cls: 'bg-white border-2 border-dashed border-gray-400', label: 'Today, not yet' },
 }
+const at = (key: string) => new Date(`${key}T12:00:00Z`)
+const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-US', { ...o, timeZone: 'UTC' })
+const wk = fmt({ weekday: 'short' })
+const dayNo = fmt({ day: 'numeric' })
+const full = fmt({ weekday: 'long', month: 'long', day: 'numeric' })
 
-const dayName = (key: string) =>
-  new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${key}T12:00:00Z`))
-
-export function ResultsView({ data, basePath }: { data: MemberResults; basePath: '/coach/one-a-day' | '/ambassador/one-a-day' }) {
-  const { streak, funnel, group } = data
+export function ResultsView({ data, role }: { data: ResultsData; role: 'COACH' | 'AMBASSADOR' }) {
+  const base = role === 'COACH' ? '/coach' : '/ambassador'
+  const hrefs = { invite: `${base}/one-a-day`, 'follow-ups': `${base}/one-a-day/follow-ups`, playbook: `${base}/one-a-day/playbook` }
+  const { streak, funnel, next } = data
   const steps: [string, number][] = [
-    ['Messages sent', funnel.sent], ['Said yes', funnel.saidYes], ['Filled the form', funnel.forms],
-    ['Booked a call', funnel.booked], ['Came to the call', funnel.attended], ['Joined', funnel.joined],
+    ['Invited', funnel.sent], ['Signed up', funnel.forms], ['Booked a call', funnel.booked], ['Came to the call', funnel.attended], ['Joined', funnel.joined],
   ]
-  const nothingYet = steps.every(([, v]) => v === 0)
 
   return (
-    <div className="space-y-6">
-      <div>
-        <nav aria-label="Breadcrumb" className="text-sm mb-1">
-          <ol className="flex flex-wrap items-center gap-1.5 text-gray-600">
-            <li><Link href={basePath} className={`font-semibold text-primary-700 hover:underline ${focus}`}>One-A-Day</Link></li>
-            <li aria-hidden>/</li>
-            <li aria-current="page" className="font-semibold text-gray-900">My results</li>
-          </ol>
-        </nav>
-        <h1 className="text-2xl font-bold text-gray-900">My results · {data.monthLabel}</h1>
-      </div>
+    <div className="max-w-4xl space-y-6">
+      <OneADayNav role={role} current="results" followUpsDue={data.followUpsDue} />
+      <TaskHeader title="Your results" doThis={`How your invites are going in ${data.monthLabel}, and what to do next.`} />
+
+      <section aria-label="Your next step" className="rounded-2xl border border-primary-200 bg-primary-50 p-4 sm:p-5 space-y-3">
+        <p className="text-lg font-semibold leading-snug text-gray-900">{next.sentence}</p>
+        <Link href={hrefs[next.to]} className={kit.primary}>{next.button}<ArrowRight className="h-5 w-5" aria-hidden /></Link>
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <section aria-labelledby="streak-h" className={card}>
-          <h2 id="streak-h" className="font-bold text-gray-900">My streak</h2>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{streak.streak} day{streak.streak === 1 ? '' : 's'}</p>
-          <p className="text-sm text-gray-600">
-            {streak.doneToday ? 'Done for today.' : 'Send one message today to keep it going.'} {streak.freeMissesLeft} free miss{streak.freeMissesLeft === 1 ? '' : 'es'} left this month.
+        <section aria-labelledby="days-h" className={kit.card}>
+          <h2 id="days-h" className="flex items-center gap-1 text-lg font-bold text-gray-900">
+            Days in a row
+            <HelpTip label="What counts as a day?">
+              <p>A day counts when you invite at least one person: a message you sent from Invite, an email we sent for you, or someone signing up from your link. Days run on US Central time.</p>
+              <p>You can miss 2 days each month and still keep your count. A 3rd missed day in the same month starts it again from zero.</p>
+            </HelpTip>
+          </h2>
+          <p className="mt-1 text-3xl font-bold text-gray-900">{streak.streak} {streak.streak === 1 ? 'day' : 'days'}</p>
+          <p className="text-base text-gray-700">
+            {streak.doneToday ? 'Today counts already.' : 'Invite someone today to add a day.'}{' '}
+            {streak.freeMissesLeft > 0
+              ? `You can still miss ${streak.freeMissesLeft} ${streak.freeMissesLeft === 1 ? 'day' : 'days'} this month and keep your count.`
+              : 'A missed day this month starts your count again.'}
           </p>
-          <ol aria-label="The last 14 days" className="flex flex-wrap gap-1.5 mt-4">
+          <ol aria-label="The last 14 days" className="mt-4 grid grid-cols-7 gap-x-1.5 gap-y-3">
             {streak.last14.map((d) => (
-              <li key={d.day} className={`w-6 h-6 rounded-md ${DOT[d.state].cls}`} title={`${dayName(d.day)}: ${DOT[d.state].label}`}>
-                <span className="sr-only">{dayName(d.day)}: {DOT[d.state].label}</span>
+              <li key={d.day} className="flex flex-col items-center gap-1">
+                <span aria-hidden className={`h-8 w-full max-w-[40px] rounded-md ${DAY[d.state].cls}`} />
+                <span aria-hidden className="text-center text-sm leading-tight text-gray-700">{wk.format(at(d.day))}<br /><span className="font-semibold text-gray-900">{dayNo.format(at(d.day))}</span></span>
+                <span className="sr-only">{full.format(at(d.day))}: {DAY[d.state].label}</span>
               </li>
             ))}
           </ol>
-          <ul className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-600" aria-label="Legend">
+          <ul aria-label="What the colors mean" className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
             {(['sent', 'free', 'missed'] as const).map((k) => (
-              <li key={k} className="inline-flex items-center gap-1.5"><span aria-hidden className={`inline-block w-3 h-3 rounded ${DOT[k].cls}`} />{k === 'sent' ? 'Sent' : k === 'free' ? 'Free miss used' : 'Missed'}</li>
+              <li key={k} className="inline-flex items-center gap-1.5"><span aria-hidden className={`inline-block h-3.5 w-3.5 rounded ${DAY[k].cls}`} />{DAY[k].label}</li>
             ))}
           </ul>
-          <p className="text-sm text-gray-600 mt-3">A day counts when you send a message from the share kit or someone fills in your form. You get 2 free misses a month, so one busy day doesn&apos;t reset everything.</p>
         </section>
 
-        <section aria-labelledby="funnel-h" className={card}>
-          <h2 id="funnel-h" className="font-bold text-gray-900">Where my invites went</h2>
-          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-            {steps.map(([label, v]) => (
-              <div key={label} className="rounded-lg bg-gray-50 px-3 py-2.5 min-w-0 flex flex-col-reverse">
-                <dt className="text-sm text-gray-600 break-words">{label}</dt>
-                <dd className="text-2xl font-bold text-gray-900">{v}</dd>
-              </div>
+        <section aria-labelledby="steps-h" className={kit.card}>
+          <h2 id="steps-h" className="flex items-center gap-1 text-lg font-bold text-gray-900">
+            Where your invites got to
+            <HelpTip label="How these are counted">
+              <p>&ldquo;Invited&rdquo; is every invite you sent this month. The next steps follow the people who signed up this month, so each number is part of the one above it.</p>
+            </HelpTip>
+          </h2>
+          <ol className="mt-3 space-y-2">
+            {steps.map(([label, v], i) => (
+              <li key={label} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3.5 py-2.5">
+                <span aria-hidden className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-white text-sm font-bold text-gray-700 ring-1 ring-gray-300">{i + 1}</span>
+                <span className="flex-1 text-base text-gray-800">{label}</span>
+                <span className="text-xl font-bold text-gray-900">{v}</span>
+              </li>
             ))}
-          </dl>
-          <p className="text-sm text-gray-600 mt-3">
-            {nothingYet ? 'Nothing yet this month. Your numbers show up here as you send messages. ' : ''}
-            &quot;Said yes&quot; counts when you tap &quot;After a yes&quot; in the share kit. The last three steps follow the people who filled your form this month.
-          </p>
+          </ol>
         </section>
       </div>
 
-      <section aria-labelledby="channel-h" className={card}>
-        <h2 id="channel-h" className="font-bold text-gray-900 mb-3">Which channel works for me</h2>
-        {data.channels.length === 0 ? (
-          <p className="text-sm text-gray-600">No messages or forms yet this month. Once you send a few, you&apos;ll see which way of reaching people brings you calls.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <caption className="sr-only">Messages sent, forms and calls booked by channel, {data.monthLabel}</caption>
-              <thead><tr className="border-b border-gray-200">{['Channel', 'Sent', 'Forms', 'Calls', 'Calls per 10 sent'].map((h) => <th key={h} scope="col" className={th}>{h}</th>)}</tr></thead>
-              <tbody>
-                {data.channels.map((r) => (
-                  <tr key={r.channel} className="border-b border-gray-100">
-                    <th scope="row" className={`${td} font-semibold text-left`}>{channelLabel(r.channel)}</th>
-                    <td className={td}>{r.sent}</td>
-                    <td className={td}>{r.forms}</td>
-                    <td className={td}>{r.calls}</td>
-                    <td className={td}>{r.per10 === null ? '–' : r.per10}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {data.takeaway
-          ? <p className="text-sm font-semibold text-gray-900 mt-3">{data.takeaway}</p>
-          : data.channels.length > 0 && <p className="text-sm text-gray-600 mt-3">Not enough yet to say which channel works best. That needs at least 5 messages and a booked call in one channel.</p>}
+      {data.channels.length > 0 && (
+        <section aria-labelledby="channel-h" className={kit.card}>
+          <h2 id="channel-h" className="text-lg font-bold text-gray-900">How you reached people</h2>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {data.channels.map((r) => (
+              <li key={r.channel} className="rounded-xl border border-gray-200 px-3.5 py-3">
+                <p className="text-base font-semibold text-gray-900">{channelLabel(r.channel)}</p>
+                <p className="text-base text-gray-700">{r.sent} invited · {r.forms} signed up · {r.calls} booked a call</p>
+              </li>
+            ))}
+          </ul>
+          {data.takeaway && <p className="mt-3 text-base font-semibold text-gray-900">{data.takeaway}</p>}
+        </section>
+      )}
+
+      <section aria-labelledby="people-h" className={kit.card}>
+        <h2 id="people-h" className="mb-1 text-lg font-bold text-gray-900">My people</h2>
+        <PeopleList people={data.people} emptyHref={hrefs.invite} />
       </section>
 
-      <section aria-labelledby="group-h" className={card}>
-        <h2 id="group-h" className="font-bold text-gray-900">My group this month</h2>
-        {!group ? (
-          <p className="text-sm text-gray-600 mt-2">You&apos;re not in a group this month. Admins set new groups of 5 at the start of each month, so you&apos;ll be in next month&apos;s.</p>
+      {data.team.length > 0 && (
+        <section aria-labelledby="team-h" className={kit.card}>
+          <h2 id="team-h" className="text-lg font-bold text-gray-900">My team <span className="font-semibold text-gray-600">({data.team.length})</span></h2>
+          <p className="text-base text-gray-700">People you invited who have joined.</p>
+          <ul className="mt-2 divide-y divide-gray-100">{data.team.slice(0, 5).map((p) => <li key={p.id} className="py-2.5 text-base font-semibold text-gray-900">{p.name}</li>)}</ul>
+          <Link href={`${base}/my-team`} className={`${kit.quiet} mt-1`}>{data.team.length > 5 ? `See all ${data.team.length} on My team` : 'Open My team'}<ArrowRight className="h-4 w-4" aria-hidden /></Link>
+        </section>
+      )}
+
+      <section aria-labelledby="group-h" className={kit.card}>
+        <h2 id="group-h" className="flex items-center gap-1 text-lg font-bold text-gray-900">
+          Your group this month
+          <HelpTip label="What is my group?"><p>Each month you&apos;re in a small group of up to 5 people who invite too, so you can cheer each other on. Only your group sees this. New groups start each month.</p></HelpTip>
+        </h2>
+        {!data.group ? (
+          <p className="mt-1 text-base text-gray-700">You&apos;re not in a group this month. New groups start on the 1st, and you&apos;ll be in next month&apos;s.</p>
         ) : (
           <>
-            <p className="text-sm text-gray-600">Group {group.groupNo} · {group.rows.length} members, new groups each month. Only your group sees this.</p>
-            <div className="overflow-x-auto mt-3">
-              <table className="w-full">
-                <caption className="sr-only">My group: streak and calls booked this month</caption>
-                <thead><tr className="border-b border-gray-200">{['Member', 'Streak', 'Calls booked'].map((h) => <th key={h} scope="col" className={th}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {group.rows.map((r, i) => (
-                    <tr key={i} className={`border-b border-gray-100 ${r.me ? 'bg-sky-50' : ''}`} aria-current={r.me ? 'true' : undefined}>
-                      <th scope="row" className={`${td} text-left ${r.me ? 'font-bold text-primary-800' : 'font-semibold'}`}>{r.name}</th>
-                      <td className={td}>{r.streak > 0 ? `${r.streak} day${r.streak === 1 ? '' : 's'}` : '–'}</td>
-                      <td className={td}>{r.callsBooked}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {group.encouragement && <p className="text-sm font-semibold text-gray-900 mt-3">{group.encouragement}</p>}
+            <ul className="mt-2 divide-y divide-gray-100">
+              {data.group.rows.map((r, i) => (
+                <li key={i} className={`flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2.5 ${r.me ? '-mx-2 rounded-lg bg-sky-50 px-2' : ''}`} aria-current={r.me ? 'true' : undefined}>
+                  <span className={`text-base ${r.me ? 'font-bold text-primary-800' : 'font-semibold text-gray-900'}`}>{r.label}</span>
+                  <span className="text-base text-gray-700">{r.daysInARow} {r.daysInARow === 1 ? 'day' : 'days'} in a row · {r.callsBooked} {r.callsBooked === 1 ? 'call' : 'calls'} booked</span>
+                </li>
+              ))}
+            </ul>
+            {data.group.encouragement && <p className="mt-3 text-base font-semibold text-gray-900">{data.group.encouragement}</p>}
           </>
         )}
       </section>

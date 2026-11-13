@@ -25,7 +25,7 @@ const ENDPOINT = 'https://api.openai.com/v1/chat/completions'
 export const aiDraftingAvailable = () => Boolean(process.env.OPENAI_API_KEY)
 
 export const SYSTEM_PROMPT = [
-  'You write one short paragraph for a welcome email from NowTransformed, a grant-funded youth empowerment nonprofit.',
+  'You write one short paragraph for a welcome email from NowTransformed, a grant-funded youth leadership development program.',
   'The paragraph tells the reader what they personally get from one partner program. Rules:',
   '- 2 or 3 sentences, 45 to 90 words, plain text only: no headings, lists, markdown, quotes, emojis or links.',
   '- Speak to the reader as "you". Warm, clear and specific. Start with the program name.',

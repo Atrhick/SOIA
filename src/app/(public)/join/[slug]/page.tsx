@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
 import { inviterBySlug } from '@/lib/get-involved/server'
 import { SignupPage } from '@/components/get-involved/signup/signup-page'
-import { loadSignupPage, viaParam } from './load'
+import { invParam, loadSignupPage, viaParam } from './load'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Get Involved | NowTransformed', robots: { index: false } }
 
-export default async function JoinPage({ params, searchParams }: { params: { slug: string }; searchParams: { via?: string | string[] } }) {
+export default async function JoinPage({ params, searchParams }: { params: { slug: string }; searchParams: { via?: string | string[]; inv?: string | string[] } }) {
   const inviter = await inviterBySlug(params.slug)
   if (!inviter) {
     return (
@@ -16,5 +16,5 @@ export default async function JoinPage({ params, searchParams }: { params: { slu
       </div>
     )
   }
-  return <SignupPage {...await loadSignupPage(inviter, params.slug, null, viaParam(searchParams?.via))} />
+  return <SignupPage {...await loadSignupPage(inviter, params.slug, null, viaParam(searchParams?.via), invParam(searchParams?.inv))} />
 }

@@ -18,7 +18,8 @@ export function ConsentClient(props: {
   relationship: 'Parent' | 'Legal guardian'
   inviter: { name: string; photoUrl: string | null; initials: string; line: string } | null
   programName: string | null
-  offer: { sponsoredPrice: string; fullPrice: string | null } | null
+  /** The program offers sponsored seats this month (no prices before the call). */
+  offer: boolean
   alreadyGiven: boolean
   bookPath: string | null
 }) {
@@ -88,7 +89,7 @@ export function ConsentClient(props: {
       )}
       <ul className="list-disc pl-5 text-sm leading-7 text-gray-700">
         <li>First step: a free 30-minute video call. You join it with {childFirst}.</li>
-        {offer && <li>Sponsored seat: <strong>{offer.sponsoredPrice}</strong>{offer.fullPrice ? ` instead of ${offer.fullPrice}` : ''}.</li>}
+        {offer && <li>Families who are a good fit may qualify for a NowTransformed sponsored seat. The team will talk about it on the free call.</li>}
         <li>We use {childFirst}&apos;s details only for this. You can ask us to delete them any time.</li>
       </ul>
 

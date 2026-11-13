@@ -13,3 +13,15 @@ export async function templateRows(): Promise<TemplateRow[]> {
 export async function getOutreachTemplates(role: string): Promise<Record<TemplateKey, ResolvedTemplate>> {
   return resolveAll(await templateRows(), role)
 }
+
+/** The admin's saved general messages (live and draft), keyed `${scenario}:${variant}`, for /admin/outreach-templates. */
+import type { GeneralScriptRow } from '@/components/get-involved/playbook/helpers'
+export type { GeneralScriptRow }
+
+export async function generalScriptRows(): Promise<GeneralScriptRow[]> {
+  const rows = await prisma.outreachTemplate.findMany({
+    where: { audience: 'ALL', key: { contains: ':' } },
+    select: { key: true, subject: true, body: true, status: true, updatedAt: true },
+  })
+  return rows.map((r) => ({ key: r.key, subject: r.subject, body: r.body, status: r.status === 'DRAFT' ? 'DRAFT' : 'LIVE', updatedAt: r.updatedAt.toISOString() }))
+}
