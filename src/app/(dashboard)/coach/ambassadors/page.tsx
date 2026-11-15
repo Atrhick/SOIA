@@ -84,7 +84,7 @@ export default async function AmbassadorsPage({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="stat-grid grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="py-4">
             <div className="flex items-center gap-4">

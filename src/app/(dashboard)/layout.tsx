@@ -77,7 +77,7 @@ export default async function DashboardLayout({
         originalAdminId: session.user.originalAdminId,
         views,
       }} />
-      <main className={`lg:ml-64 ${isImpersonating ? 'pt-24' : 'pt-16'} px-4 pb-6 sm:px-6`}>
+      <main className={`lg:ml-64 ${isImpersonating ? 'pt-[7.25rem] sm:pt-[7.75rem]' : 'pt-20 sm:pt-[5.5rem]'} px-4 pb-6 sm:px-6`}>
         {children}
       </main>
       <InstallPrompt />

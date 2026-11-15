@@ -100,7 +100,7 @@ export function AmbassadorOnboardingClient({
       case 'BUSINESS_IDEA':
         return '/ambassador/business-idea'
       case 'CLASS_SELECTION':
-        return '/ambassador/classes'
+        return '/ambassador/learning'
       default:
         return null
     }

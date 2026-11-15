@@ -453,13 +453,13 @@ export function Sidebar({ role }: SidebarProps) {
         prefetch={true}
         onClick={handleTopLevelClick}
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-2',
+          'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 mb-1',
           pathname === basePath
-            ? 'bg-amber-50 text-amber-700 shadow-sm'
-            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            ? 'bg-amber-50 text-amber-700'
+            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
         )}
       >
-        <LayoutDashboard className="h-5 w-5" />
+        <LayoutDashboard className="h-4 w-4" />
         Dashboard
       </Link>
 
@@ -469,13 +469,13 @@ export function Sidebar({ role }: SidebarProps) {
         prefetch={true}
         onClick={handleTopLevelClick}
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',
+          'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 mb-1',
           pathname === '/ambassador/onboarding' || pathname.startsWith('/ambassador/onboarding/')
-            ? 'bg-amber-50 text-amber-700 shadow-sm'
-            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            ? 'bg-amber-50 text-amber-700'
+            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
         )}
       >
-        <ClipboardList className="h-5 w-5" />
+        <ClipboardList className="h-4 w-4" />
         Onboarding
       </Link>
 
@@ -503,13 +503,13 @@ export function Sidebar({ role }: SidebarProps) {
         prefetch={true}
         onClick={handleTopLevelClick}
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',
+          'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 mb-1',
           pathname === basePath
-            ? 'bg-primary-50 text-primary-700 shadow-sm'
-            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            ? 'bg-primary-50 text-primary-700'
+            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
         )}
       >
-        <LayoutDashboard className="h-5 w-5" />
+        <LayoutDashboard className="h-4 w-4" />
         Dashboard
       </Link>
 
@@ -520,13 +520,13 @@ export function Sidebar({ role }: SidebarProps) {
           prefetch={true}
           onClick={handleTopLevelClick}
           className={cn(
-            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 mb-4',
+            'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 mb-1',
             pathname === '/coach/onboarding' || pathname.startsWith('/coach/onboarding/')
-              ? 'bg-primary-50 text-primary-700 shadow-sm'
-              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              ? 'bg-primary-50 text-primary-700'
+              : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
           )}
         >
-          <CheckSquare className="h-5 w-5" />
+          <CheckSquare className="h-4 w-4" />
           Onboarding
         </Link>
       )}

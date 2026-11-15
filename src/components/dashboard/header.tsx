@@ -155,9 +155,8 @@ export function Header({ user }: HeaderProps) {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <h1 className="truncate text-lg font-semibold text-gray-900">
-              Welcome back!
-            </h1>
+            {/* Each page has its own title and the home pages greet by name, so the bar only names the app (phones; the sidebar shows it on desktop). */}
+            <p className="truncate text-lg font-semibold text-gray-900 lg:hidden">NowTransformed</p>
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">

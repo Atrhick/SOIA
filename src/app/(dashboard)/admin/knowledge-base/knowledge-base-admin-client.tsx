@@ -159,7 +159,7 @@ export function KnowledgeBaseAdminClient({
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="stat-grid grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">

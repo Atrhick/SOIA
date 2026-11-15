@@ -137,7 +137,7 @@ export function AdminSponsorshipClient({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4 lg:grid-cols-7">
+      <div className="stat-grid grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
         <Card>
           <CardContent className="py-4">
             <div className="text-center">

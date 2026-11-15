@@ -521,7 +521,7 @@ export function BusinessExcellenceClient({
           {/* Weekly Progress */}
           <div className="mb-6">
             <h3 className="font-medium mb-3">Weekly Progress</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="stat-grid grid grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {weeklyProgress.map((item) => {
                 const Icon = item.icon
                 return (

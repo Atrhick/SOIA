@@ -109,8 +109,8 @@ export function ProfileForm({ ambassador }: ProfileFormProps) {
     <div className="space-y-6">
       {/* Profile Header */}
       <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
             <div className="relative">
               {formData.photoUrl ? (
                 <Image

@@ -370,6 +370,29 @@ html {
   }
 }
 
+/* Rows of small number cards (add `stat-grid` to the grid) show two per row on phones. At about 156px a card has
+   no room for an icon beside the number, so below 640px the icon sits above it, the side padding shrinks and the
+   number is a size smaller. Long words and big figures wrap instead of running past the card's edge. */
+@media (max-width: 639px) {
+  .stat-grid .p-6 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .stat-grid .flex.items-center:has(> :first-child > svg) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .stat-grid .text-2xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+  .stat-grid p {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 /* Screen-reader-only labels in tables (captions, an "Actions" column heading) are position:absolute. Without a
    positioned ancestor they escape the table's sideways scroll box and widen the whole page on phones.
    Making the table their anchor keeps them inside it. */

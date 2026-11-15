@@ -245,7 +245,7 @@ export default async function AmbassadorDashboardPage() {
               icon={GraduationCap}
               iconClassName="text-amber-500"
               actions={
-                <Link href="/ambassador/classes">
+                <Link href="/ambassador/learning">
                   <Button variant="ghost" size="sm">
                     Browse <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -290,8 +290,8 @@ export default async function AmbassadorDashboardPage() {
                 icon={GraduationCap}
                 message="No classes enrolled yet"
                 action={{
-                  label: 'Browse Classes',
-                  href: '/ambassador/classes',
+                  label: 'Browse courses',
+                  href: '/ambassador/learning',
                 }}
               />
             )}
