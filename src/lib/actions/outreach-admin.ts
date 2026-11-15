@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
+import { sendPushToUser } from '@/lib/push'
 import { canInvite } from '@/lib/get-involved/core'
 import { P, appUrl, esc, layout } from '@/lib/get-involved/emails'
 import { userDisplayName } from '@/lib/get-involved/server'
@@ -51,6 +52,8 @@ async function checkInOne(adminId: string, userId: string): Promise<CheckInOutco
   )
   const sent = await sendEmail({ to: name.email, subject: 'Checking in on your One-A-Day', html })
   if (!sent.sent) return 'failed'
+  // Also a phone notification, for people who turned notifications on. A push failure never fails the check-in.
+  await sendPushToUser(user.id, { title: 'Checking in on your One-A-Day', body: 'One short message to one person is all it takes. Your words are ready.', url: path, tag: 'outreach-check-in' }).catch(() => 0)
   await prisma.auditLog.create({
     data: { userId: adminId, action: CHECK_IN_ACTION, entityType: 'User', entityId: user.id, details: JSON.stringify({ to: 'member' }) },
   })

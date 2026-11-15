@@ -97,7 +97,7 @@ export function NudgeList({ data, canAct, needsHelpDays }: { data: AdminGroupsDa
         <div className="min-w-0 max-w-2xl">
           <h2 id="nudge-h" className="text-lg font-bold text-gray-900">Who could use a nudge</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Coaches and ambassadors with no invite in {NEEDS_HELP_DAYS}+ days. A check-in is a short, friendly email from the team with a link to their share kit; each person gets at most one every 3 days.
+            Coaches and ambassadors with no invite in {NEEDS_HELP_DAYS}+ days. A check-in is a short, friendly email from the team with a link to their share kit, plus a phone notification if they have turned notifications on. Each person gets at most one every 3 days.
           </p>
         </div>
         {canAct && pending.length > 0 && !confirmAll && (

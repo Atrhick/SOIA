@@ -68,27 +68,33 @@ export default async function AdminOneADayPage({ searchParams }: { searchParams:
           <h2 id="board-h" className="text-lg font-bold text-gray-900">Leaderboard · {period.label}</h2>
           <nav aria-label="Leaderboard boards" className="flex flex-wrap gap-1.5">
             {ADMIN_BOARDS.map((b) => (
-              <Link key={b.value} href={boardHref('/admin/one-a-day', b.value, period.key)} aria-current={board === b.value ? 'page' : undefined}
+              <Link key={b.value} href={boardHref('/admin/one-a-day', b.value, period.key)} scroll={false} aria-current={board === b.value ? 'page' : undefined}
                 className={`h-8 px-3 rounded-full text-sm font-semibold border inline-flex items-center ${focusRing} ${board === b.value ? 'bg-primary-700 border-primary-700 text-white' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
                 {b.label}
               </Link>
             ))}
           </nav>
         </div>
-        <p className="text-sm text-gray-600 mt-1">Ranked by people who joined, then forms filled. Members see this same board on their One-A-Day page.</p>
+        <p className="text-sm text-gray-600 mt-1">
+          Who is bringing the most people in. Click a name to see everyone that person invited and where each one is up to, so you can thank them or help with a follow-up.
+        </p>
         {rows.length === 0 ? <p className="text-sm text-gray-600 mt-3">No invites in this period yet.</p> : (
           <div className="overflow-x-auto mt-3">
             <table className="w-full text-sm">
               <caption className="sr-only">{boardLabel} leaderboard, {period.label}</caption>
-              <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-600 border-b border-gray-200">{['#', 'Name', 'Role', 'Joined', 'Forms', 'Calls kept', 'Streak', 'Team size'].map((h) => <th key={h} scope="col" className="py-2 pr-4 font-semibold whitespace-nowrap">{h}</th>)}</tr></thead>
+              <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-600 border-b border-gray-200">{['#', 'Name', 'Role', 'Signed up', 'Came to a call', 'Joined', 'Streak', 'Team size'].map((h) => <th key={h} scope="col" className="py-2 pr-4 font-semibold whitespace-nowrap">{h}</th>)}</tr></thead>
               <tbody>{pageRows.map((r) => (
                 <tr key={r.userId} className="border-b border-gray-100">
                   <td className="py-2.5 pr-4 font-bold text-primary-800">{r.rank}</td>
-                  <th scope="row" className="py-2.5 pr-4 font-semibold text-gray-900 whitespace-nowrap text-left">{r.name}</th>
+                  <th scope="row" className="py-2.5 pr-4 font-semibold whitespace-nowrap text-left">
+                    <Link href={`/admin/prospects?inviter=${encodeURIComponent(r.userId)}`} className={`text-primary-700 hover:underline rounded ${focusRing}`}>
+                      {r.name}<span className="sr-only">: see the people they invited</span>
+                    </Link>
+                  </th>
                   <td className="py-2.5 pr-4 whitespace-nowrap text-gray-700">{memberKindLabel(r.kind)}</td>
-                  <td className="py-2.5 pr-4">{r.joined}</td>
                   <td className="py-2.5 pr-4">{r.forms}</td>
                   <td className="py-2.5 pr-4">{r.callsKept}</td>
+                  <td className="py-2.5 pr-4">{r.joined}</td>
                   <td className="py-2.5 pr-4 whitespace-nowrap">{r.streak > 0 ? `${r.streak} day${r.streak === 1 ? '' : 's'}` : '–'}</td>
                   <td className="py-2.5 pr-4">{r.teamSize}</td>
                 </tr>
@@ -99,6 +105,10 @@ export default async function AdminOneADayPage({ searchParams }: { searchParams:
         <div className="mt-3"><Pager page={lp} pageSize={BOARD_PAGE} total={rows.length} basePath="/admin/one-a-day" paramName="lp" params={{ role: board === 'ALL' ? undefined : board, period: searchParams.period }} label="members" /></div>
         <details className="mt-3 text-sm text-gray-600">
           <summary className="cursor-pointer font-semibold text-gray-700">How this is counted</summary>
+          <p className="mt-2">
+            Signed up = people they invited who filled in the form. Came to a call = of those, how many turned up to their discovery call. Joined = how many went on to get a login.
+            The list is ranked by Joined, then Signed up. Coaches and ambassadors see this same ranking on their One-A-Day page.
+          </p>
           <p className="mt-2">
             Streak = days in a row (Central Time) with at least one form or added person{period.current ? '' : `, as of the last day of ${period.label}`}. Team size = everyone they invited who now has a login (all time).
             Youth ambassadors joined through the Youth ambassador role or are 17 and under; the Ambassadors board shows the rest.

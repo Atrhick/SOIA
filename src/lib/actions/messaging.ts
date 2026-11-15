@@ -16,6 +16,12 @@ const replySchema = z.object({
   content: z.string().min(1, 'Message is required'),
 })
 
+/** Which support threads someone may use: an admin, any thread (the admin inbox lists them all, including
+ *  ones sent before that person became an admin); anyone else, only threads they belong to. */
+function threadAccessWhere(user: { id: string; role: string }, threadId: string) {
+  return user.role === 'ADMIN' ? { id: threadId } : { id: threadId, participants: { some: { id: user.id } } }
+}
+
 // Helper to get current user
 async function getCurrentUser() {
   const session = await auth()
@@ -92,15 +98,7 @@ export async function replyToThread(threadId: string, formData: FormData) {
     return { error: validated.error.issues[0]?.message || 'Invalid input' }
   }
 
-  // Verify user is a participant
-  const thread = await prisma.messageThread.findFirst({
-    where: {
-      id: threadId,
-      participants: {
-        some: { id: user.id },
-      },
-    },
-  })
+  const thread = await prisma.messageThread.findFirst({ where: threadAccessWhere(user, threadId) })
 
   if (!thread) {
     return { error: 'Thread not found or access denied' }
@@ -115,10 +113,10 @@ export async function replyToThread(threadId: string, formData: FormData) {
       },
     })
 
-    // Update thread timestamp
+    // Update thread timestamp. An admin who replies to a thread they weren't on joins it.
     await prisma.messageThread.update({
       where: { id: threadId },
-      data: { updatedAt: new Date() },
+      data: { updatedAt: new Date(), ...(user.role === 'ADMIN' ? { participants: { connect: { id: user.id } } } : {}) },
     })
 
     revalidatePath('/coach/messages')
@@ -135,6 +133,12 @@ export async function markMessagesAsRead(threadId: string) {
   const user = await getCurrentUser()
   if (!user) {
     return { error: 'Unauthorized' }
+  }
+
+  // Only someone who may open the thread can mark it read.
+  const thread = await prisma.messageThread.findFirst({ where: threadAccessWhere(user, threadId), select: { id: true } })
+  if (!thread) {
+    return { error: 'Thread not found or access denied' }
   }
 
   try {

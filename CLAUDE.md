@@ -258,6 +258,8 @@ and every custom migration re-runs.
 
 ## Demo Credentials
 
+Local/seeded databases only. On production these three accounts have different, strong passwords (changed 2026-11-14), held by the owner.
+
 - **Admin:** admin@stageoneinaction.com / admin123
 - **Coach:** coach@stageoneinaction.com / coach123
 - **Ambassador:** ambassador@stageoneinaction.com / ambassador123

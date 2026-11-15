@@ -88,7 +88,10 @@ export function AdminMessagesClient({
   currentUserId: string
   stats: Stats
 }) {
-  const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
+  // Keep only the id: the thread itself comes from the latest server data, so a reply or status change
+  // shows straight away instead of after closing and reopening the thread.
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
+  const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? null
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<StatusFilter>('ALL')
@@ -252,7 +255,7 @@ export function AdminMessagesClient({
                   return (
                     <button
                       key={thread.id}
-                      onClick={() => setSelectedThread(thread)}
+                      onClick={() => setSelectedThreadId(thread.id)}
                       className="w-full text-left py-4 hover:bg-gray-50 -mx-6 px-6 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -325,7 +328,7 @@ export function AdminMessagesClient({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedThread(null)}>
+          <Button variant="ghost" size="icon" onClick={() => setSelectedThreadId(null)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

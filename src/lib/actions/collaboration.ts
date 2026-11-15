@@ -803,9 +803,11 @@ export async function getDirectMessageHistory(channelId: string) {
       },
       include: {
         members: true,
+        // The newest 100, flipped below so the conversation reads top to bottom. Taking the first 100 in date
+        // order (as this used to) froze long conversations: new messages, even your own, never appeared.
         posts: {
-          orderBy: { createdAt: 'asc' },
-          take: 100, // Last 100 messages
+          orderBy: { createdAt: 'desc' },
+          take: 100,
         }
       }
     })
@@ -849,7 +851,7 @@ export async function getDirectMessageHistory(channelId: string) {
           role: userMap.get(m.userId)?.role || '',
           isCurrentUser: m.userId === session.user.id,
         })),
-        messages: dm.posts.map(p => ({
+        messages: [...dm.posts].reverse().map(p => ({
           id: p.id,
           content: p.content,
           authorId: p.authorId,
