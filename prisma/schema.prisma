@@ -2726,6 +2726,8 @@ model CoachProgram {
   pageTitle          String?
   headline           String?
   coachBio           String? @db.Text
+  // Off = the "About your coach" card is hidden on the public page and "About you" is not required.
+  showCoachBio       Boolean @default(true)
   programDescription String? @db.Text
   eventDatesText     String? @db.Text
   // Primary joining link, plus an optional second one for coaches who run

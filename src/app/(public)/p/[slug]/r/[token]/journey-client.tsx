@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { twoSessions } from '@/lib/meeting-labels'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -450,7 +451,9 @@ function MeetingCard({ meeting }: { meeting: NonNullable<JourneyData['meeting']>
             )}
             {meeting.zoomUrl && meeting.secondMeetingUrl && (
               <p className="text-xs text-gray-500">
-                Either link gets you into the same session. Use whichever you prefer.
+                {twoSessions(meeting.zoomLabel, meeting.secondMeetingLabel)
+                  ? 'These are two different sessions. Join the one that fits you.'
+                  : 'Either link gets you into the same session. Use whichever you prefer.'}
               </p>
             )}
           </div>

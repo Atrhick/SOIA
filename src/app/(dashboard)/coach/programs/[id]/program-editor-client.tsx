@@ -66,6 +66,7 @@ interface EditableProgram {
   secondMeetingUrl: string | null
   secondMeetingLabel: string | null
   coachBio: string | null
+  showCoachBio: boolean
   programDescription: string | null
   eventDatesText: string | null
   zoomUrl: string | null
@@ -157,6 +158,7 @@ export function ProgramEditorClient({
     ntVideoIntro: program.ntVideoIntro ?? '',
   })
   const [showMeetingDetails, setShowMeetingDetails] = useState(program.showMeetingDetails)
+  const [showCoachBio, setShowCoachBio] = useState(program.showCoachBio)
   const [questions, setQuestions] = useState<ProgramQuestion[]>(program.extraQuestions)
 
   const meta = STATUS_META[program.status] ?? { label: program.status, variant: 'outline' as const }
@@ -176,7 +178,7 @@ export function ProgramEditorClient({
   }
 
   const saveContent = () =>
-    run(() => updateProgram(program.id, { ...form, showMeetingDetails }), 'Saved. Press "Submit for review" when you are ready for it to go live.')
+    run(() => updateProgram(program.id, { ...form, showMeetingDetails, showCoachBio }), 'Saved. Press "Submit for review" when you are ready for it to go live.')
   const saveQuestions = () =>
     run(() => saveExtraQuestions(program.id, questions), 'Questions saved. Press "Submit for review" when you are ready.')
 
@@ -356,18 +358,31 @@ export function ProgramEditorClient({
                   placeholder="Build a business that serves your community"
                 />
               </Field>
-              <Field
-                label="About you"
-                htmlFor="coachBio"
-                hint="A short introduction. Required before you can submit."
-              >
-                <Textarea
-                  id="coachBio"
-                  rows={4}
-                  value={form.coachBio}
-                  onChange={(e) => set('coachBio', e.target.value)}
-                />
-              </Field>
+              <div className="flex items-start justify-between gap-4 rounded-md border border-gray-200 p-3">
+                <div>
+                  <Label htmlFor="showCoachBio">Show &quot;About you&quot; on the page</Label>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    {showCoachBio
+                      ? 'Your introduction appears on your page. Required before you can submit.'
+                      : 'Off: the page has no "About your coach" section. Turn it off when the program speaks for itself.'}
+                  </p>
+                </div>
+                <Switch id="showCoachBio" checked={showCoachBio} onCheckedChange={setShowCoachBio} />
+              </div>
+              <fieldset disabled={!showCoachBio} className="disabled:opacity-60">
+                <Field
+                  label="About you"
+                  htmlFor="coachBio"
+                  hint={showCoachBio ? 'A short introduction. Required before you can submit.' : 'Hidden on the page. What you write here is kept.'}
+                >
+                  <Textarea
+                    id="coachBio"
+                    rows={4}
+                    value={form.coachBio}
+                    onChange={(e) => set('coachBio', e.target.value)}
+                  />
+                </Field>
+              </fieldset>
               <Field
                 label="Program description"
                 htmlFor="programDescription"

@@ -51,6 +51,7 @@ export interface InvitePageData {
   myFirstName: string
   myFullName: string
   programs: InviteProgramOption[]
+  /** Index into programs; -1 = not chosen yet (two or more own programs and no default set). */
   defaultProgram: number
   /** Under 18: no messages to people they haven't met. */
   minor: boolean
@@ -146,7 +147,9 @@ export async function loadInvitePage(userId: string, role: 'COACH' | 'AMBASSADOR
     myFirstName: name?.first ?? '',
     myFullName: name?.full ?? name?.first ?? '',
     programs: list,
-    defaultProgram: chosen >= 0 ? chosen : 0,
+    // Two or more programs of their own and no default chosen: -1 = they must pick one first, so nobody
+    // sends the wrong program without noticing.
+    defaultProgram: chosen >= 0 ? chosen : list.filter((p) => p.id).length >= 2 ? -1 : 0,
     minor: amb?.dateOfBirth ? ageOn(amb.dateOfBirth, now) < 18 : false,
     mailingAddress: settings.mailingAddress,
     photoUrl: profile?.photoUrl ?? null,

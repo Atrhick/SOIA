@@ -19,8 +19,8 @@ RUN npx prisma generate
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application. One version stamp for the whole build (see next.config.js / AppUpdateWatcher).
+RUN APP_VERSION=$(date -u +%Y%m%d%H%M%S) npm run build
 
 # Production stage
 FROM node:18-alpine AS runner

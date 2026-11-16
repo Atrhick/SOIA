@@ -1,6 +1,10 @@
 // One id per build. The page keeps the id it loaded with; /api/version reports the live one, so a
 // home-screen app that was only paused can tell a new version is out (AppUpdateWatcher).
 const APP_VERSION = process.env.APP_VERSION || new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
+// next build loads this file several times (and in worker processes), each a few seconds or minutes
+// apart. Without this line each load made its own timestamp, so the page and /api/version never matched
+// and every open app kept saying "A new version of the app is ready". Workers inherit process.env.
+process.env.APP_VERSION = APP_VERSION
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

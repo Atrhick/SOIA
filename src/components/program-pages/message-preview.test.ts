@@ -8,7 +8,9 @@ describe('messagePreview', () => {
   })
   it('falls back to the program name and leaves out an empty line', () => {
     expect(messagePreview({ businessName: '  ', programName: 'Vision Development', messageLine: '' }))
-      .toBe('I run Vision Development, and one of our programs is Vision Development.')
+      .toBe('I run Vision Development.')
+    expect(messagePreview({ businessName: 'ExploreNation', programName: 'explorenation', messageLine: 'a local magazine' }))
+      .toBe('I run explorenation: a local magazine.')
   })
   it('tidies spaces', () => {
     expect(messagePreview({ businessName: ' A  B ', programName: 'P', messageLine: ' x   y ' })).toBe('I run A B, and one of our programs is P: x y.')

@@ -101,6 +101,7 @@ const programContentSchema = z.object({
   pageTitle: z.string().max(150).nullable().optional(),
   headline: z.string().max(200).nullable().optional(),
   coachBio: z.string().max(4000).nullable().optional(),
+  showCoachBio: z.boolean().optional(),
   programDescription: z.string().max(8000).nullable().optional(),
   eventDatesText: z.string().max(2000).nullable().optional(),
   zoomUrl: z.string().url().max(500).nullable().optional().or(z.literal('')),
@@ -179,6 +180,7 @@ const SNAPSHOT_FIELDS = [
   'pageTitle',
   'headline',
   'coachBio',
+  'showCoachBio',
   'programDescription',
   'eventDatesText',
   'zoomUrl',
@@ -379,6 +381,7 @@ export async function getMyProgram(programId: string) {
       pageTitle: p.pageTitle,
       headline: p.headline,
       coachBio: p.coachBio,
+      showCoachBio: p.showCoachBio,
       programDescription: p.programDescription,
       eventDatesText: p.eventDatesText,
       zoomUrl: p.zoomUrl,
@@ -466,7 +469,7 @@ export async function submitProgramForReview(programId: string) {
 
   const missing: string[] = []
   if (!p.programDescription?.trim()) missing.push('program description')
-  if (!p.coachBio?.trim()) missing.push('about you')
+  if (p.showCoachBio && !p.coachBio?.trim()) missing.push('about you (or switch it off)')
   if (p.showMeetingDetails) {
     if (!p.zoomUrl?.trim()) missing.push('Zoom link')
     if (!p.eventDatesText?.trim()) missing.push('at least one event date')
@@ -633,7 +636,7 @@ export async function getAllPrograms() {
       submittedAt: p.submittedAt?.toISOString() ?? null,
       reviewNotes: p.reviewNotes,
       programDescription: p.programDescription,
-      coachBio: p.coachBio,
+      coachBio: p.showCoachBio ? p.coachBio : null,
       eventDatesText: p.eventDatesText,
       zoomUrl: p.zoomUrl,
       showMeetingDetails: p.showMeetingDetails,
@@ -1187,7 +1190,8 @@ export async function getPublicProgram(slug: string) {
       pageTitle: ((snap.pageTitle as string) || (snap.name as string)) ?? '',
       organization: (snap.organization as string) ?? '',
       headline: (snap.headline as string) ?? null,
-      coachBio: (snap.coachBio as string) ?? null,
+      // Snapshots from before the switch have no showCoachBio: shown.
+      coachBio: snap.showCoachBio === false ? null : ((snap.coachBio as string) ?? null),
       programDescription: (snap.programDescription as string) ?? null,
       targetMarket: (snap.targetMarket as string) ?? '',
       servicesDescription: (snap.servicesDescription as string) ?? '',
@@ -1319,7 +1323,7 @@ export async function getProgramPreview(slug: string) {
       pageTitle: program.pageTitle || program.name,
       organization: program.organization,
       headline: program.headline,
-      coachBio: program.coachBio,
+      coachBio: program.showCoachBio ? program.coachBio : null,
       programDescription: program.programDescription,
       targetMarket: program.targetMarket,
       servicesDescription: program.servicesDescription,

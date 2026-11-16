@@ -14,5 +14,7 @@ export function messagePreview(p: { businessName: string; programName: string; m
   const program = tidy(p.programName) || 'your program'
   const business = tidy(p.businessName) || program
   const line = tidy(p.messageLine).replace(/[.\s]+$/, '')
-  return `I run ${business}, and one of our programs is ${program}${line ? `: ${line}` : ''}.`
+  const what = `${program}${line ? `: ${line}` : ''}`
+  // Same rule as introLine in scripts.ts: one name only once.
+  return business.toLowerCase() === program.toLowerCase() ? `I run ${what}.` : `I run ${business}, and one of our programs is ${what}.`
 }
