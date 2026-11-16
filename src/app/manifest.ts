@@ -4,9 +4,9 @@ import type { MetadataRoute } from 'next'
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
-    name: 'NowTransformed Back Office',
-    short_name: 'NowTransformed',
-    description: 'Coach, ambassador and admin portal for NowTransformed',
+    name: 'NowTRANSFORMED Back Office',
+    short_name: 'NowTRANSFORMED',
+    description: 'Coach, ambassador and admin portal for NowTRANSFORMED',
     start_url: '/',
     scope: '/',
     display: 'standalone',

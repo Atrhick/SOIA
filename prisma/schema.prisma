@@ -31,16 +31,16 @@ enum UserStatus {
 }
 
 model User {
-  id        String     @id @default(cuid())
-  email     String     @unique
-  password  String
-  role      UserRole   @default(COACH)
+  id         String     @id @default(cuid())
+  email      String     @unique
+  password   String
+  role       UserRole   @default(COACH)
   // Other roles this login can switch to (ADMIN, COACH, AMBASSADOR). `role` is always the highest one held,
   // so "all admins" queries still find them; the active view lives in the session (see role-view.ts).
   extraRoles UserRole[] @default([])
-  status    UserStatus @default(ACTIVE)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  status     UserStatus @default(ACTIVE)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   // Relations
   coachProfile        CoachProfile?
@@ -3172,4 +3172,44 @@ model EmailSuppression {
   createdAt DateTime @default(now())
 
   @@map("email_suppressions")
+}
+
+// ─── Admin notifications to the team (Admin > Send a notification) ────────────
+// One row per message an admin sends; one delivery row per person it goes to.
+// A person with notifications on gets a phone/desktop notification; anyone else
+// (or anyone whose devices all failed) gets the same message by email when
+// emailFallback is on. Sending runs in batches; unfinished ones can be continued.
+model Broadcast {
+  id            String    @id @default(cuid())
+  createdById   String
+  title         String
+  body          String    @db.Text
+  /// "home", "one-a-day" or a path inside the app such as "/coach/learning".
+  link          String
+  /// { groups: string[] } or { userIds: string[] }
+  audience      Json
+  emailFallback Boolean   @default(true)
+  finishedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  deliveries BroadcastDelivery[]
+
+  @@index([createdAt])
+  @@map("broadcasts")
+}
+
+model BroadcastDelivery {
+  id          String    @id @default(cuid())
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  userId      String
+  /// PENDING, SENDING, PUSH, EMAIL, NO_DEVICE (no notifications on and email off), FAILED
+  status      String    @default("PENDING")
+  /// When a sender took this row; a row stuck in SENDING for 5+ minutes is retried.
+  claimedAt   DateTime?
+  sentAt      DateTime?
+
+  @@unique([broadcastId, userId])
+  @@index([broadcastId, status])
+  @@map("broadcast_deliveries")
 }

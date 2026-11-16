@@ -12,10 +12,10 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'NowTransformed Back Office',
-  description: 'Coach and Administrator portal for NowTransformed',
-  applicationName: 'NowTransformed',
-  appleWebApp: { capable: true, title: 'NowTransformed', statusBarStyle: 'default' },
+  title: 'NowTRANSFORMED Back Office',
+  description: 'Coach and Administrator portal for NowTRANSFORMED',
+  applicationName: 'NowTRANSFORMED',
+  appleWebApp: { capable: true, title: 'NowTRANSFORMED', statusBarStyle: 'default' },
 }
 
 export const viewport: Viewport = {

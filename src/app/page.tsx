@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { isAssociateRole } from '@/lib/roles'
+import prisma from '@/lib/prisma'
 
 export default async function Home() {
   const session = await auth()
@@ -12,7 +13,14 @@ export default async function Home() {
   const role = session.user.role
 
   if (role === 'ADMIN') redirect('/admin')
-  if (role === 'COACH') redirect('/coach')
+  if (role === 'COACH') {
+    // Coaches still onboarding start on the onboarding page. Sending them here, before any
+    // page streams, matters: /coach would redirect them itself, and a redirect from inside
+    // that streaming page flashed "Application error" for a moment on a fresh load
+    // (switching views, viewing as someone, opening the home-screen app).
+    const coach = await prisma.coachProfile.findUnique({ where: { userId: session.user.id }, select: { coachStatus: true } })
+    redirect(coach?.coachStatus === 'ONBOARDING_INCOMPLETE' ? '/coach/onboarding' : '/coach')
+  }
   if (role === 'AMBASSADOR') redirect('/ambassador')
   if (isAssociateRole(role)) redirect('/associate')
 

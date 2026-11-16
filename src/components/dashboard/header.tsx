@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { signOut, useSession } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 import { LogOut, Search, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu, Smartphone, Bell, BellOff } from 'lucide-react'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
 import { Button } from '@/components/ui/button'
@@ -15,12 +15,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getUsersForImpersonation, getImpersonationData } from '@/lib/actions/impersonation'
-import { useRouter } from 'next/navigation'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { OPEN_INSTALL_EVENT, isInstalled } from '@/components/pwa/install-prompt'
 import { pushState, turnOnPush, turnOffPush, type PushState } from '@/components/pwa/push-client'
-import { ROLE_VIEW_NAMES, homeForRole, isSwitchableRole } from '@/lib/roles'
+import { ROLE_VIEW_NAMES, isSwitchableRole } from '@/lib/roles'
 import { useToast } from '@/components/ui/kit/toast'
+import { updateSession } from '@/lib/session-update'
 
 interface HeaderProps {
   user: {
@@ -44,8 +44,6 @@ interface ImpersonationUser {
 }
 
 export function Header({ user }: HeaderProps) {
-  const { update } = useSession()
-  const router = useRouter()
   const mobileNav = useMobileNav()
   const [users, setUsers] = useState<ImpersonationUser[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
@@ -64,6 +62,8 @@ export function Header({ user }: HeaderProps) {
     setPushBusy(false)
   }
 
+  const toast = useToast()
+
   const loadUsers = async () => {
     if (user.role !== 'ADMIN' || user.isImpersonating) return
     setIsLoadingUsers(true)
@@ -77,38 +77,28 @@ export function Header({ user }: HeaderProps) {
   const handleImpersonate = async (targetUser: ImpersonationUser) => {
     const result = await getImpersonationData(targetUser.id)
     if (result.impersonateData) {
-      await update({
-        impersonate: result.impersonateData
-      })
-      // Redirect to the appropriate dashboard. Always navigate somewhere the
-      // impersonated role can actually load: staying put on an admin-only page
-      // bounces to /login, which renders no header and therefore no way back.
-      if (result.impersonateData.role === 'COACH') {
-        router.push('/coach')
-      } else if (result.impersonateData.role === 'AMBASSADOR') {
-        router.push('/ambassador')
-      } else {
-        router.push('/')
-      }
-      router.refresh()
+      const s = await updateSession({ impersonate: result.impersonateData })
+      if (!s?.user?.isImpersonating) { toast.error('We couldn’t open that account. Please try again.'); return }
+      // A full load of the start page, which sends the viewed role to its own home (staying on
+      // an admin-only page would bounce to /login, which has no header and so no way back).
+      window.location.assign('/')
     }
   }
 
-  const toast = useToast()
   const [switching, setSwitching] = useState(false)
   const otherViews = (user.views ?? []).filter((r) => r !== user.role && isSwitchableRole(r))
   const handleSwitchView = async (role: string) => {
     setSwitching(true)
-    const s = await update({ switchRole: role })
+    const s = await updateSession({ switchRole: role })
     if (s?.user?.role !== role) { setSwitching(false); toast.error('We couldn’t switch your view. Sign out and back in, then try again.'); return }
-    // A full load, so every part of the page is drawn for the new view.
-    window.location.assign(homeForRole(role))
+    // A full load of the start page, which sends each view to its own home (a coach still
+    // onboarding goes straight to onboarding), so every part of the page is drawn for the new view.
+    window.location.assign('/')
   }
 
   const handleStopImpersonating = async () => {
-    await update({
-      stopImpersonating: true
-    })
+    const s = await updateSession({ stopImpersonating: true })
+    if (!s || s.user?.isImpersonating) { toast.error('We couldn’t switch back. Please try again.'); return }
     // A full load: router.push + refresh raced and left the address on the coach/ambassador page.
     window.location.assign('/admin')
   }
@@ -156,7 +146,7 @@ export function Header({ user }: HeaderProps) {
               <Menu className="h-5 w-5" />
             </button>
             {/* Each page has its own title and the home pages greet by name, so the bar only names the app (phones; the sidebar shows it on desktop). */}
-            <p className="truncate text-lg font-semibold text-gray-900 lg:hidden">NowTransformed</p>
+            <p className="truncate text-lg font-semibold text-gray-900 lg:hidden">NowTRANSFORMED</p>
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">

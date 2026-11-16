@@ -56,7 +56,7 @@ export default function LoginPage() {
             Welcome Back
           </h1>
           <p className="mt-2 text-gray-600 animate-slide-up animation-delay-200">
-            Sign in to your NowTransformed account
+            Sign in to your NowTRANSFORMED account
           </p>
         </div>
 

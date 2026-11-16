@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import {
+import { BellRing,
   LayoutDashboard,
   Users,
   CheckSquare,
@@ -263,6 +263,7 @@ const adminNavSections: NavSection[] = [
     title: 'Communication',
     icon: Megaphone,
     items: [
+      { href: '/admin/notifications', label: 'Send a notification', icon: BellRing },
       { href: '/admin/collaboration/channels', label: 'Channels', icon: Hash },
       { href: '/admin/collaboration/messages', label: 'Direct Messages', icon: Mail },
       { href: '/admin/collaboration/files', label: 'Files', icon: FileText },
@@ -579,7 +580,7 @@ export function Sidebar({ role }: SidebarProps) {
           <Link href={getHomeLink()} className="flex items-center gap-3">
             <Image src="/brand/nowtransformed-mark.png" alt="" width={40} height={40} className="w-10 h-10" />
             <div className="flex flex-col">
-              <span className="text-sm font-semibold text-gray-900">NowTransformed</span>
+              <span className="text-sm font-semibold text-gray-900">NowTRANSFORMED</span>
               <span className="text-xs text-gray-500">{getPortalLabel()}</span>
             </div>
           </Link>
@@ -599,7 +600,7 @@ export function Sidebar({ role }: SidebarProps) {
         {/* Footer */}
         <div className="border-t border-gray-100 p-4">
           <p className="text-xs text-gray-400 text-center">
-            NowTransformed Back Office
+            NowTRANSFORMED Back Office
           </p>
         </div>
       </div>

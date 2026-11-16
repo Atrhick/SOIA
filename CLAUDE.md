@@ -21,6 +21,8 @@ This is a **Next.js 14** web application for managing coaches and ambassadors in
 - **User Management**: Admins can create user accounts and configure per-user feature permissions (grant/deny access)
 - **Coach Program Pages**: Public landing page per program at `/p/[slug]` with a two-step signup — interest form, then a Zoom link plus a coach-customizable qualification form. Leads flow into the coach's Business Excellence area for classification. Admin-approved before publishing
 - **Associate Roles**: SERVICE_PROVIDER, BUSINESS_AFFILIATE and VOLUNTEER logins sharing one `/associate` dashboard, managed at `/admin/associates`
+- **Send a notification** (`/admin/notifications`): admins message groups (coaches, ambassadors, admins, associates) or chosen people. Push where notifications are on, else email (optional, replies go to the sender). `Broadcast` + `BroadcastDelivery` rows; rules in `src/lib/broadcast/core.ts` (tested), sending in `server.ts` (claimed rows, 40 per batch, the page calls `continueBroadcast` until done; unfinished sends can be continued). Audit action `BROADCAST_SENT`.
+- **Public pages show a "Back to my dashboard" bar to signed-in people** (`BackToAppBar` in the public layout): the home-screen app has no back button.
 - **Get Involved / One-A-Day** (phase 1, phase 2/3 foundation): coaches and ambassadors share `/join/[slug]` invite links, prospects book discovery calls with admin or coach hosts; see the Get Involved section below
 
 
@@ -324,7 +326,7 @@ Admins can view the app as any coach or ambassador:
 
 1. Click profile dropdown in header
 2. Select "Login as User" → choose a coach or ambassador
-3. Session is updated via `useSession().update()` with impersonation data
+3. Session is updated via `updateSession()` (`src/lib/session-update.ts`, a direct POST to `/api/auth/session`; never `useSession().update()`, which silently does nothing while the session is still loading) and the page then loads `/` in full, which sends each role to its own home (coaches still onboarding go straight to `/coach/onboarding`; a redirect from inside the streaming `/coach` page flashed "Application error")
 4. An amber banner appears in the header showing "Viewing as: [email] ([role])"
 5. To switch back, click "Switch Back" button in banner or profile dropdown → "Switch Back to Admin"
 6. **Auto-expiry**: impersonation sessions are automatically reverted after 30 minutes; `impersonatingAt` timestamp in JWT is checked on every JWT callback

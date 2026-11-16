@@ -1,4 +1,6 @@
 import Image from 'next/image'
+import { BackToAppBar } from '@/components/back-to-app-bar'
+
 export default function PublicLayout({
   children,
 }: {
@@ -6,6 +8,7 @@ export default function PublicLayout({
 }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <BackToAppBar />
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
