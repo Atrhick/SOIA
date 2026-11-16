@@ -297,3 +297,15 @@ describe('railSteps', () => {
     expect(done[done.length - 1].state).toBe('current')
   })
 })
+
+describe('inviterRoleOf', () => {
+  it('counts extra roles: an Admin who is also a Coach invites as a coach', async () => {
+    const { inviterRoleOf } = await import('./core')
+    expect(inviterRoleOf({ role: 'ADMIN', extraRoles: ['COACH'] })).toBe('COACH')
+    expect(inviterRoleOf({ role: 'ADMIN', extraRoles: ['AMBASSADOR'] })).toBe('AMBASSADOR')
+    expect(inviterRoleOf({ role: 'COACH', extraRoles: ['AMBASSADOR'] })).toBe('COACH')
+    expect(inviterRoleOf({ role: 'ADMIN', extraRoles: [] })).toBeNull()
+    expect(inviterRoleOf({ role: 'PARENT' })).toBeNull()
+    expect(inviterRoleOf(null)).toBeNull()
+  })
+})

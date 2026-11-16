@@ -1,7 +1,7 @@
 /**
  * Monthly One-A-Day groups of 5 (outreach round 2). Members only ever see their own group.
  *
- * Who: every ACTIVE user who can invite (COACH, AMBASSADOR; `canInvite`).
+ * Who: every ACTIVE user who can invite (COACH or AMBASSADOR, main or extra role; `INVITER_WHERE`).
  * How: shuffled, then dealt round-robin with experienced members first, so each group gets a fair
  * share of them. Experienced = anyone they invited has ever joined (joinedAt / ACCOUNT_CREATED), or a
  * streak is running now. Sizes: groups of 5; leftovers are absorbed so every group has 4 to 6 people
@@ -13,7 +13,7 @@
  * create groups. Server only, not 'use server'.
  */
 import prisma from '@/lib/prisma'
-import { INVITER_ROLES } from './core'
+import { INVITER_WHERE } from './server'
 import { getOutreachStreaks } from './outreach-streak'
 
 export const GROUP_SIZE = 5
@@ -68,7 +68,7 @@ export const isMonthKey = (v: string) => MONTH_KEY.test(v)
 /** Everyone who belongs in groups, flagged experienced or new. */
 async function eligibleMembers(now: Date): Promise<{ userId: string; experienced: boolean }[]> {
   const users = await prisma.user.findMany({
-    where: { status: 'ACTIVE', role: { in: INVITER_ROLES as ('COACH' | 'AMBASSADOR')[] } },
+    where: { status: 'ACTIVE', ...INVITER_WHERE },
     select: { id: true },
   })
   const ids = users.map((u) => u.id)
@@ -133,7 +133,7 @@ export function planNewcomers(sizes: Map<number, number>, newcomers: readonly st
 export async function placeNewcomers(month: string): Promise<number> {
   if (!isMonthKey(month)) return 0
   const [eligible, placed] = await Promise.all([
-    prisma.user.findMany({ where: { status: 'ACTIVE', role: { in: INVITER_ROLES as ('COACH' | 'AMBASSADOR')[] } }, select: { id: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.user.findMany({ where: { status: 'ACTIVE', ...INVITER_WHERE }, select: { id: true }, orderBy: { createdAt: 'asc' } }),
     prisma.outreachGroupMember.findMany({ where: { month }, select: { userId: true } }),
   ])
   const have = new Set(placed.map((p) => p.userId))

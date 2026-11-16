@@ -2,8 +2,8 @@
 import { invitePrograms } from './program-welcome-server'
 import { TZDate } from '@date-fns/tz'
 import prisma from '@/lib/prisma'
-import { BUSINESS_TZ, computeStreak, isGetInvolvedRole, rankLeaderboard, roleConfigFromRow, roleLabel } from './core'
-import { ensureInviteSlug, userDisplayName } from './server'
+import { BUSINESS_TZ, computeStreak, inviterRoleOf, isGetInvolvedRole, rankLeaderboard, roleConfigFromRow, roleLabel } from './core'
+import { INVITER_WHERE, ensureInviteSlug, userDisplayName } from './server'
 import { appUrl } from './emails'
 
 export type BoardRole = 'ALL' | 'COACH' | 'AMBASSADOR'
@@ -35,7 +35,12 @@ export async function leaderboard(opts: { since: Date | null; role: BoardRole; n
   ])
   const ids = Array.from(new Set([...forms.map((r) => r.invitedById!), ...Array.from(joined.keys())]))
   if (ids.length === 0) return []
-  const users = await prisma.user.findMany({ where: { id: { in: ids }, status: 'ACTIVE', ...(opts.role === 'ALL' ? { role: { in: ['COACH', 'AMBASSADOR'] } } : { role: opts.role }) }, select: { id: true, role: true } })
+  const found = await prisma.user.findMany({
+    where: { id: { in: ids }, status: 'ACTIVE', ...(opts.role === 'ALL' ? INVITER_WHERE : { OR: [{ role: opts.role }, { extraRoles: { has: opts.role } }] }) },
+    select: { id: true, role: true, extraRoles: true },
+  })
+  // Board role: the one asked for, else the inviter role they hold (an Admin + Coach shows as a coach).
+  const users = found.map((u) => ({ id: u.id, role: opts.role === 'ALL' ? (inviterRoleOf(u) ?? u.role) : opts.role }))
   const recent = await prisma.prospect.findMany({ where: { invitedById: { in: users.map((u) => u.id) }, createdAt: { gte: new Date(now.getTime() - 120 * 86400_000) } }, select: { invitedById: true, createdAt: true } })
   const kept = await prisma.discoveryCall.groupBy({ by: ['prospectId'], where: { status: 'KEPT', prospect: { invitedById: { in: users.map((u) => u.id) } }, outcomeAt: created }, _count: true })
   const keptByProspect = kept.length ? await prisma.prospect.findMany({ where: { id: { in: kept.map((k) => k.prospectId) } }, select: { invitedById: true } }) : []

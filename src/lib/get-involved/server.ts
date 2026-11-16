@@ -10,7 +10,7 @@ import { Prisma, ProspectStatus } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import {
-  AgeRangeValue, BusyBlock, HostForSlots, Slot, ageRangeLabel, canInvite, canMoveStatus, computeStreak, generateSlots,
+  AgeRangeValue, BusyBlock, HostForSlots, Slot, ageRangeLabel, canMoveStatus, inviterRoleOf, computeStreak, generateSlots,
   linkStillValid, slugifyName,
 } from './core'
 import * as mail from './emails'
@@ -66,10 +66,15 @@ export async function ensureInviteSlug(userId: string): Promise<string> {
 
 export async function inviterBySlug(slug: string) {
   if (!slug) return null
-  const u = await prisma.user.findUnique({ where: { inviteSlug: slug }, select: { id: true, status: true, role: true } })
-  // Only coaches and ambassadors have a One-A-Day page, leaderboard place and My Team to receive invites.
-  if (!u || u.status !== 'ACTIVE' || !canInvite(u.role)) return null
+  const u = await prisma.user.findUnique({ where: { inviteSlug: slug }, select: { id: true, status: true, role: true, extraRoles: true } })
+  // Only coaches and ambassadors (main or extra role) have a One-A-Day page, leaderboard place and My Team.
+  if (!u || u.status !== 'ACTIVE' || !inviterRoleOf(u)) return null
   return u
+}
+
+/** Users who can invite: Coach or Ambassador as their main role or an extra one. */
+export const INVITER_WHERE: Prisma.UserWhereInput = {
+  OR: [{ role: { in: ['COACH', 'AMBASSADOR'] } }, { extraRoles: { hasSome: ['COACH', 'AMBASSADOR'] } }],
 }
 
 // ---------- rate limiting (in-memory, per instance, same approach as login) ----------

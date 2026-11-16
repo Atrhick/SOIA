@@ -688,6 +688,16 @@ export function canInvite(userRole: string | null | undefined): boolean {
   return !!userRole && INVITER_ROLES.includes(userRole)
 }
 
+/**
+ * The inviter role a login holds, counting its extra roles: an Admin who is also a Coach still invites as
+ * a coach (User.role is the HIGHEST role, so checking it alone shut such people's links). Coach wins.
+ */
+export function inviterRoleOf(u: { role: string; extraRoles?: readonly string[] | null } | null | undefined): 'COACH' | 'AMBASSADOR' | null {
+  if (!u) return null
+  const all = [u.role, ...(u.extraRoles ?? [])]
+  return all.includes('COACH') ? 'COACH' : all.includes('AMBASSADOR') ? 'AMBASSADOR' : null
+}
+
 /** Statuses where a fresh link may be emailed on request (booking or a later step still to do). */
 export function canResendLink(status: string): boolean {
   return journeyOpen(status) || laterJourneyOpen(status)

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
-import { canInvite, journeyPosition, stagePath } from '@/lib/get-involved/core'
+import { inviterRoleOf, journeyPosition, stagePath } from '@/lib/get-involved/core'
 import { CLOSED_BODY, CLOSED_TITLE } from '@/lib/get-involved/journey-page'
 import { appUrl } from '@/lib/get-involved/emails'
 import { journeyFactsFor, journeyLinkUsable, prospectForJourney } from '@/lib/get-involved/journey'
@@ -41,7 +41,7 @@ export default async function WelcomePage({ params }: { params: { token: string 
     )
   }
 
-  const user = await prisma.user.findUnique({ where: { id: p.userId }, select: { role: true, status: true } })
+  const user = await prisma.user.findUnique({ where: { id: p.userId }, select: { role: true, extraRoles: true, status: true } })
   const signInPath = user?.role === 'AMBASSADOR' ? '/ambassador-login' : '/login'
   // Past the 14 days: keep it to a plain "you're all set" without names or links.
   if (!journeyLinkUsable(p) || user?.status !== 'ACTIVE') {
@@ -57,7 +57,7 @@ export default async function WelcomePage({ params }: { params: { token: string 
   const inviter = p.invitedById ? (await userDisplayName(p.invitedById))?.full ?? null : null
   let inviteUrl: string | null = null
   // Only coaches and ambassadors have a One-A-Day page and leaderboard for their invites.
-  if (canInvite(user?.role)) {
+  if (inviterRoleOf(user)) {
     try { inviteUrl = appUrl(`/join/${await ensureInviteSlug(p.userId)}`) } catch { inviteUrl = null }
   }
   const paid = p.payment?.status === 'COMPLETED'
@@ -70,7 +70,7 @@ export default async function WelcomePage({ params }: { params: { token: string 
       paymentReceived={paid}
       businessRole={BUSINESS_ROLES.includes(p.journeyRole ?? '')}
       signInPath={signInPath}
-      inviter={canInvite(user?.role)}
+      inviter={!!inviterRoleOf(user)}
     />
   )
 }

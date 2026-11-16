@@ -11,7 +11,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import { sendPushToUser } from '@/lib/push'
-import { canInvite } from '@/lib/get-involved/core'
+import { inviterRoleOf } from '@/lib/get-involved/core'
 import { P, appUrl, esc, layout } from '@/lib/get-involved/emails'
 import { userDisplayName } from '@/lib/get-involved/server'
 import { assignGroups, isMonthKey } from '@/lib/get-involved/outreach-groups'
@@ -33,14 +33,15 @@ type CheckInOutcome = 'sent' | 'recent' | 'unreachable' | 'failed'
 
 /** Sends one check-in (no auth check: callers do it). Skips people checked in on in the last few days. */
 async function checkInOne(adminId: string, userId: string): Promise<CheckInOutcome> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, status: true } })
-  if (!user || user.status !== 'ACTIVE' || !canInvite(user.role)) return 'unreachable'
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, extraRoles: true, status: true } })
+  const inviterRole = inviterRoleOf(user)
+  if (!user || user.status !== 'ACTIVE' || !inviterRole) return 'unreachable'
   const since = new Date(Date.now() - CHECK_IN_EVERY_DAYS * 86400_000)
   const recent = await prisma.auditLog.findFirst({ where: { action: CHECK_IN_ACTION, entityId: user.id, createdAt: { gte: since } }, select: { createdAt: true } })
   if (recent) return 'recent'
   const name = await userDisplayName(user.id)
   if (!name) return 'unreachable'
-  const path = user.role === 'COACH' ? '/coach/one-a-day' : '/ambassador/one-a-day'
+  const path = inviterRole === 'COACH' ? '/coach/one-a-day' : '/ambassador/one-a-day'
   const html = layout(
     `<p style="${P}">Hi ${esc(name.first)},</p>
      <p style="${P}">Just checking in. We noticed it's been a few days since your last One-A-Day message, and that's completely okay. Busy weeks happen.</p>

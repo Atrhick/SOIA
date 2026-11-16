@@ -4,8 +4,8 @@
  * 'use server', so nothing here is a public endpoint; callers check the session first.
  */
 import prisma from '@/lib/prisma'
-import { computeStreak, rankLeaderboard } from './core'
-import { userDisplayName } from './server'
+import { computeStreak, inviterRoleOf, rankLeaderboard } from './core'
+import { INVITER_WHERE, userDisplayName } from './server'
 import { AdminBoard, AdminBoardRow, Period, businessDayStart, memberKind, onBoard, streakAsOf } from './leaderboard-period'
 import { InviterPersonFacts, inviterPersonStage, PersonStage } from './inviter-people'
 
@@ -35,11 +35,11 @@ export async function adminLeaderboard(opts: { period: Period; board: AdminBoard
   const ids = Array.from(new Set([...forms.map((r) => r.invitedById!), ...Array.from(joined.keys())]))
   if (ids.length === 0) return []
   const users = await prisma.user.findMany({
-    where: { id: { in: ids }, status: 'ACTIVE', role: { in: ['COACH', 'AMBASSADOR'] } },
-    select: { id: true, role: true, journeyProspect: { select: { journeyRole: true } }, ambassadorProfile: { select: { dateOfBirth: true } } },
+    where: { id: { in: ids }, status: 'ACTIVE', ...INVITER_WHERE },
+    select: { id: true, role: true, extraRoles: true, journeyProspect: { select: { journeyRole: true } }, ambassadorProfile: { select: { dateOfBirth: true } } },
   })
   const members = users
-    .map((u) => ({ id: u.id, kind: memberKind({ role: u.role, journeyRole: u.journeyProspect?.journeyRole ?? null, dateOfBirth: u.ambassadorProfile?.dateOfBirth ?? null }, now) }))
+    .map((u) => ({ id: u.id, kind: memberKind({ role: inviterRoleOf(u) ?? u.role, journeyRole: u.journeyProspect?.journeyRole ?? null, dateOfBirth: u.ambassadorProfile?.dateOfBirth ?? null }, now) }))
     .filter((m) => onBoard(opts.board, m.kind))
   if (members.length === 0) return []
   const memberIds = members.map((m) => m.id)
@@ -87,7 +87,7 @@ export async function adminBoardTotals(p: Period, now = new Date()) {
     prisma.discoveryCall.count({ where: { status: 'KEPT', outcomeAt: created } }),
     // People active today = coaches and ambassadors with at least one form or added person today (business time).
     prisma.prospect.findMany({
-      where: { createdAt: { gte: businessDayStart(now) }, invitedBy: { status: 'ACTIVE', role: { in: ['COACH', 'AMBASSADOR'] } } },
+      where: { createdAt: { gte: businessDayStart(now) }, invitedBy: { status: 'ACTIVE', ...INVITER_WHERE } },
       distinct: ['invitedById'],
       select: { invitedById: true },
     }),
