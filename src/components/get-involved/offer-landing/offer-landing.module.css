@@ -20,6 +20,10 @@
 .polaroid { position: relative; background: #fff; padding: 10px 10px 0; border-radius: 6px; box-shadow: 0 10px 24px rgba(15, 23, 42, .16); margin: -46px 8px 18px; }
 .polaroid img { display: block; width: 100%; height: 210px; object-fit: cover; object-position: 50% 30%; border-radius: 3px; }
 .polaroid .hand { display: block; text-align: center; font-size: 24px; padding: 6px 0 8px; }
+/* Four option cards sit two by two (one per row on phones), never three plus one stretched. */
+.optHalf { flex: 1 1 calc(50% - 10px); }
+@container lp (max-width: 720px) { .optHalf { flex-basis: 100%; } }
+
 /* Printed magazine pages, laid overlapping like a magazine open on a table. Tap opens the full page. */
 .spread { display: flex; justify-content: center; align-items: flex-start; padding: 22px 0 6px; }
 .printPage { width: 300px; margin: 0; flex: none; transition: transform .25s ease; }

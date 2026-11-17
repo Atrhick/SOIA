@@ -1,0 +1,133 @@
+{
+  "eyebrow": "Padayon Connect · A youth hub in Catarman, Northern Samar",
+  "hook": "Thinking about working abroad one day? Take your first step here in Catarman.",
+  "intro": "Padayon Connect is a youth hub in Catarman, Northern Samar, for young people who want more from their future. If you have thought about working in another country one day, this is a place to start. You meet other young people with the same hope, and you take a first step close to home. Book a free 15-minute call to hear how it works and ask your questions.",
+  "bullets": [
+    {
+      "lead": "Close to home.",
+      "text": "The hub is in Catarman, so you can start without leaving Northern Samar."
+    },
+    {
+      "lead": "Honest from the start.",
+      "text": "We won't promise you a job, a visa or travel. We'll tell you what the first step is."
+    },
+    {
+      "lead": "Parents included.",
+      "text": "If you're 17 or younger, a parent or guardian agrees first and joins the call."
+    }
+  ],
+  "hostNote": "Padayon Connect, Catarman, Northern Samar",
+  "heroImage": {
+    "src": "/offers/padayon-connect/laughing-at-table.webp",
+    "alt": "Stock photo: four young people laughing around a table with laptops and papers",
+    "sample": true,
+    "handNote": "Start where you are ↙"
+  },
+  "why": {
+    "title": "Padayon means keep going.",
+    "paragraphs": [
+      "In Visayan, padayon means keep going. It's a good word for young people in Northern Samar who want to build a future and are ready to put in the work.",
+      "Working in another country is a big step. Most young people don't know where to begin, and it is hard to know whom to trust. Padayon Connect starts with the first step, near home, with people you can meet face to face."
+    ]
+  },
+  "options": {
+    "title": "What Padayon Connect gives you",
+    "items": [
+      {
+        "label": "The hub",
+        "title": "A place to meet and learn",
+        "text": "A space in Catarman where young people meet, share their plans and learn from each other.",
+        "image": {
+          "src": "/offers/padayon-connect/three-students-talking.webp",
+          "alt": "Stock photo: three students talking at a table in a classroom",
+          "sample": true,
+          "note": "people with the same hope",
+          "focus": "50% 50%"
+        }
+      },
+      {
+        "label": "Your first step",
+        "title": "Start toward international work experience",
+        "text": "Padayon Connect is your first step to international work experience. We don't promise a job, a visa or travel. On your call, ask what the next steps would be for you.",
+        "image": {
+          "src": "/offers/padayon-connect/team-laptops.webp",
+          "alt": "Stock photo: four young adults working together on laptops at a long table",
+          "sample": true,
+          "note": "one step at a time",
+          "focus": "50% 40%"
+        },
+        "featured": true
+      }
+    ],
+    "footnote": "Not sure where you fit? Ask on your free call.",
+    "cta": "Ask about my first step"
+  },
+  "story": {
+    "title": "A word from Vicky",
+    "paragraphs": [
+      "Vicky is a NowTRANSFORMED Coach and runs Padayon Connect in Catarman. Bring your questions about the hub to your free call."
+    ]
+  },
+  "sponsorship": {
+    "title": "You may qualify for a NowTRANSFORMED sponsorship",
+    "text": "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. We'll explain how it works on your free call.",
+    "cta": "See if I qualify"
+  },
+  "steps": [
+    {
+      "title": "Tell us who you are",
+      "text": "Your first name, email and age. Then pick a time for the call."
+    },
+    {
+      "title": "Free 15-minute call",
+      "text": "Talk with the NowTRANSFORMED team about your plans and ask anything. If you're 17 or younger, a parent or guardian joins."
+    },
+    {
+      "title": "Decide your next step",
+      "text": "If Padayon Connect fits you, we'll tell you how to start and whether you may qualify for a sponsorship. If it doesn't fit, that's fine too."
+    }
+  ],
+  "gallery": {
+    "title": "Learning side by side",
+    "text": "This is the kind of thing we mean: young people learning, planning and working things out together.",
+    "images": [
+      {
+        "src": "/offers/padayon-connect/students-outdoors.webp",
+        "alt": "Stock photo: four students in school uniforms reading together on a mat on the grass"
+      },
+      {
+        "src": "/offers/padayon-connect/group-at-screen.webp",
+        "alt": "Stock photo: four young adults looking at a computer screen together"
+      }
+    ],
+    "caption": "Photos from Pexels, for illustration. They do not show the Padayon Connect hub."
+  },
+  "testimonials": [],
+  "faqs": [
+    {
+      "q": "Will Padayon Connect get me a job abroad?",
+      "a": "No one can promise that, and we won't. Padayon Connect is a first step toward international work experience. On the call, ask what that step includes and what could come after it for you."
+    },
+    {
+      "q": "How much does it cost?",
+      "a": "The call is free. Ask on the call what Padayon Connect costs. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. We'll explain it on the call."
+    },
+    {
+      "q": "Who can join?",
+      "a": "Padayon Connect is for young people who want more from their future. If you're not sure it fits you, book the call and ask."
+    },
+    {
+      "q": "I'm a parent. What should I know?",
+      "a": "If your child is 17 or younger, we email you first and ask for your okay. You join the 15-minute call with them, so you hear everything they hear and can ask your own questions. Nothing goes ahead without you."
+    },
+    {
+      "q": "What happens on the call?",
+      "a": "The NowTRANSFORMED team asks about your plans, explains how Padayon Connect works and answers your questions. There's no obligation to join."
+    }
+  ],
+  "closing": {
+    "title": "Padayon. Start with one call.",
+    "text": "A free 15-minute call. Pick a time that works for you.",
+    "cta": "Book my free call"
+  }
+}

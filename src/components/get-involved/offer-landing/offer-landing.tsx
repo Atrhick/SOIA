@@ -151,7 +151,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
               <h2 id="get-h" className={`mb-[70px] text-center ${h2}`}>{page.options.title}</h2>
               <div className="flex flex-wrap gap-x-5 gap-y-16">
                 {page.options.items.map((o, i) => (
-                  <div key={o.title} className={`min-w-0 flex-[1_1_280px] rounded-2xl bg-white p-[22px] ${o.featured ? 'border-2 border-sky-700' : 'border border-slate-200'}`}>
+                  <div key={o.title} className={`min-w-0 rounded-2xl bg-white p-[22px] ${page.options!.items.length === 4 ? s.optHalf : 'flex-[1_1_280px]'} ${o.featured ? 'border-2 border-sky-700' : 'border border-slate-200'}`}>
                     {o.image && (
                       <div className={`${s.polaroid} ${TILTS[i % TILTS.length]}`}>
                         {o.image.sample && <span className={s.sample}>SAMPLE</span>}

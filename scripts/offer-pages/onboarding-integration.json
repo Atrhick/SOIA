@@ -1,0 +1,132 @@
+{
+  "eyebrow": "K.A.P.I.T Global · Onboarding & Integration · Mentoring and business growth",
+  "hook": "Have a business idea you keep putting off? Start here.",
+  "intro": "K.A.P.I.T Global is a mentoring platform for people with a business idea, new entrepreneurs, emerging leaders and anyone working on their own growth. Onboarding & Integration is how you get started: a short screening to check it's a good fit, then your paperwork and setup, then orientation and training. An internship is part of it too.",
+  "bullets": [
+    {
+      "lead": "A short screening first,",
+      "text": "so you and K.A.P.I.T Global both know it's a good fit before anything else."
+    },
+    {
+      "lead": "Paperwork and setup",
+      "text": "sorted at the start, so they don't hold you up later."
+    },
+    {
+      "lead": "Orientation and training,",
+      "text": "plus two weekly intro sessions: one on onboarding, one on the internship."
+    }
+  ],
+  "hostNote": "brings K.A.P.I.T Global's Onboarding & Integration to NowTRANSFORMED",
+  "heroImage": {
+    "src": "/offers/onboarding-integration/hero-welcome.webp",
+    "alt": "A woman stands to shake hands with a man across a table while four colleagues smile, in a bright office meeting",
+    "sample": true,
+    "handNote": "This could be you ↙"
+  },
+  "why": {
+    "title": "Most ideas stall at the first step.",
+    "paragraphs": [
+      "You know what you want to build, or who you want to become. What's usually missing is the next concrete step, and someone to check your thinking with.",
+      "K.A.P.I.T Global helps people turn what they know, their ideas and their potential into action and results, through mentorship, personal development and business growth opportunities. In its own words, the mission is to transform potential into progress. Onboarding & Integration is where that starts."
+    ]
+  },
+  "options": {
+    "title": "What you get",
+    "items": [
+      {
+        "label": "Weekly session",
+        "title": "Intro to Onboarding",
+        "text": "A weekly session that explains how onboarding works and what you'll need for it. A good place to start if you're still deciding.",
+        "image": {
+          "src": "/offers/onboarding-integration/intro-onboarding.webp",
+          "alt": "A man in glasses points at a whiteboard while a small group listens from their chairs",
+          "sample": true,
+          "note": "start here"
+        }
+      },
+      {
+        "label": "The offer",
+        "title": "Onboarding & Integration",
+        "text": "The full start with K.A.P.I.T Global: screening, paperwork, setup, then orientation and training.",
+        "image": {
+          "src": "/offers/onboarding-integration/onboarding-paperwork.webp",
+          "alt": "Hands with pens working through printed charts on a wooden table, next to a tablet and a cup of coffee",
+          "sample": true,
+          "note": "the full start"
+        },
+        "featured": true
+      },
+      {
+        "label": "Weekly session",
+        "title": "Intro to Internship",
+        "text": "A weekly session about K.A.P.I.T Global's internship, with time for your questions.",
+        "image": {
+          "src": "/offers/onboarding-integration/intro-internship.webp",
+          "alt": "A man leans over to help a young woman at her laptop in a shared office with other people working",
+          "sample": true,
+          "note": "then the internship"
+        }
+      }
+    ],
+    "footnote": "Not sure where to begin? Ask on your free call.",
+    "cta": "Ask which one fits me"
+  },
+  "steps": [
+    {
+      "title": "Tell us who you are",
+      "text": "Your first name, email and age, then pick a time."
+    },
+    {
+      "title": "Free 15-minute call",
+      "text": "The NowTRANSFORMED team asks about your goals, explains Onboarding & Integration and checks whether you qualify for a sponsorship."
+    },
+    {
+      "title": "Start your onboarding",
+      "text": "If it fits, you begin with screening, paperwork and setup, then orientation and training."
+    }
+  ],
+  "sponsorship": {
+    "title": "You may qualify for a NowTRANSFORMED sponsorship",
+    "text": "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. We'll explain how it works on your free call.",
+    "cta": "See if I qualify"
+  },
+  "story": {
+    "title": "Who you'll be working with",
+    "paragraphs": [
+      "K.A.P.I.T Global (also written KAPIT Global) is a transformation and mentoring platform. It works with aspiring entrepreneurs, people with business ideas, emerging leaders, and anyone who wants to grow personally and professionally.",
+      "Your free call is with the NowTRANSFORMED team. Criztal, a NowTRANSFORMED Coach, brings this offer to NowTRANSFORMED."
+    ],
+    "image": {
+      "src": "/offers/onboarding-integration/about-kapit.webp",
+      "alt": "A smiling woman in glasses stands with her arms folded in front of a team working at a long table"
+    }
+  },
+  "testimonials": [],
+  "faqs": [
+    {
+      "q": "Who is this for?",
+      "a": "Aspiring entrepreneurs, people with a business idea, emerging leaders, and anyone working on their personal and professional growth."
+    },
+    {
+      "q": "What happens on the call?",
+      "a": "The team asks what you're hoping to do, explains how Onboarding & Integration works and answers your questions. There's no obligation to sign up."
+    },
+    {
+      "q": "How much does it cost?",
+      "a": "You'll get the exact price on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer, and we'll explain that on the call too."
+    },
+    {
+      "q": "What does the internship involve?",
+      "a": "The weekly Intro to Internship session covers it, and you can ask on your free call too."
+    },
+    {
+      "q": "When are the weekly sessions?",
+      "a": "Intro to Onboarding and Intro to Internship each run once a week. Ask on your free call for the day, time and how to join."
+    }
+  ],
+  "closing": {
+    "title": "Ready to act on your idea?",
+    "text": "A free 15-minute call. Pick a time that works for you.",
+    "cta": "Book my free call"
+  }
+}
