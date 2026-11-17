@@ -53,7 +53,7 @@ export function nextMonthStart(now = new Date(), tz = BUSINESS_TZ): Date {
 }
 
 /**
- * A sponsored seat is "used" when the admin team OFFERS it on the free call (Prospect.sponsoredSeatOfferedAt
+ * A sponsorship is "used" when the admin team OFFERS it on the free call (Prospect.sponsoredSeatOfferedAt
  * in this calendar month, for a prospect who came through this program). Booking a call uses nothing;
  * "Undo offer" gives the seat back. One definition, kept here so it is easy to change.
  */
@@ -185,6 +185,8 @@ export interface OfferProgramRow {
   sponsoredPrice: string
   reason: string
   seatsPerMonth: number | null
+  /** "explorenation" (offering requests a founding-rate code) or "" (none). */
+  partnerCodeSource: string
   usedThisMonth: number
   /** Who last changed the prices and when (null before anyone has). */
   pricesUpdatedAt: string | null
@@ -226,7 +228,7 @@ export async function listOfferPrograms(opts: { q?: string; filter?: OfferFilter
       take: pageSize,
       select: {
         id: true, name: true, slug: true, organization: true, coachId: true, ambassadorId: true,
-        offerFullPrice: true, offerSponsoredPrice: true, offerReason: true, sponsoredSeatsPerMonth: true,
+        offerFullPrice: true, offerSponsoredPrice: true, offerReason: true, sponsoredSeatsPerMonth: true, partnerCodeSource: true,
         offerPricesUpdatedAt: true, offerPricesUpdatedById: true,
         coach: { select: { firstName: true, lastName: true, userId: true, user: { select: { inviteSlug: true } } } },
         ambassador: { select: { firstName: true, lastName: true, userId: true, user: { select: { inviteSlug: true } } } },
@@ -261,6 +263,7 @@ export async function listOfferPrograms(opts: { q?: string; filter?: OfferFilter
       sponsoredPrice: p.offerSponsoredPrice ?? '',
       reason: p.offerReason ?? '',
       seatsPerMonth: p.sponsoredSeatsPerMonth,
+      partnerCodeSource: p.partnerCodeSource ?? '',
       usedThisMonth: used.get(p.id) ?? 0,
       pricesUpdatedAt: p.offerPricesUpdatedAt?.toISOString() ?? null,
       pricesUpdatedBy: by ? { name: editorName.get(by) ?? 'Someone', isOwner: by === owner?.userId } : null,

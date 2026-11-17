@@ -42,12 +42,12 @@ export function ProgramOfferTable({ programs, emptyText }: { programs: OfferProg
     <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white">
       <div className="relative overflow-x-auto">
         <table className="w-full text-sm">
-          <caption className="sr-only">Live programs and their sponsored-seat offers</caption>
+          <caption className="sr-only">Live programs and their sponsorship offers</caption>
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
               <th scope="col" className={th}>Program</th>
               <th scope="col" className={th}>Prices</th>
-              <th scope="col" className={th}>Sponsored seats offered this month</th>
+              <th scope="col" className={th}>Sponsorships offered this month</th>
               <th scope="col" className={th}><span className="sr-only">Edit</span></th>
             </tr>
           </thead>
@@ -118,6 +118,7 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
   const [sponsoredPrice, setSponsoredPrice] = useState(p.sponsoredPrice)
   const [reason, setReason] = useState(p.reason)
   const [seats, setSeats] = useState(p.seatsPerMonth === null ? '' : String(p.seatsPerMonth))
+  const [partnerCode, setPartnerCode] = useState(p.partnerCodeSource)
   const [busy, setBusy] = useState(false)
   const [banner, setBanner] = useState<Banner>(null)
   const id = (k: string) => `offer-${p.id}-${k}`
@@ -130,7 +131,7 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
     e.preventDefault()
     setBanner(null); setBusy(true)
     try {
-      const r = await saveProgramOffer({ programId: p.id, fullPrice, sponsoredPrice, reason, seats: seats.trim() })
+      const r = await saveProgramOffer({ programId: p.id, fullPrice, sponsoredPrice, reason, seats: seats.trim(), partnerCode })
       if (!r.ok) { setBanner({ ok: false, text: r.error }); return }
       router.refresh()
       onDone()
@@ -145,7 +146,7 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
         <div className="min-w-0">
           <DialogPrimitive.Title className="text-lg font-bold text-gray-900">{p.name}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="text-sm text-gray-600">
-            {p.ownerName ? `Owner: ${p.ownerName}` : 'No owner'} · {p.usedThisMonth} seat{p.usedThisMonth === 1 ? '' : 's'} offered on calls this month
+            {p.ownerName ? `Owner: ${p.ownerName}` : 'No owner'} · {p.usedThisMonth} sponsorship{p.usedThisMonth === 1 ? '' : 's'} offered on calls this month
           </DialogPrimitive.Description>
         </div>
         <DialogPrimitive.Close className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close"><X className="h-5 w-5" /></DialogPrimitive.Close>
@@ -170,9 +171,9 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
         <fieldset className="space-y-3">
           <legend className="text-sm font-bold text-gray-900">Sponsorship <span className="font-normal text-gray-500">(admins only)</span></legend>
           <div className="max-w-[12rem]">
-            <label className={lbl} htmlFor={id('seats')}>Seats per month</label>
+            <label className={lbl} htmlFor={id('seats')}>Sponsorships per month</label>
             <input id={id('seats')} className={inp} inputMode="numeric" type="number" min={0} max={1000} step={1} value={seats} onChange={(e) => setSeats(e.target.value)} placeholder="0" />
-            <p className={hint}>0 or empty = no sponsorship line shown. A seat is used when the team offers it on the call.</p>
+            <p className={hint}>0 or empty = no sponsorship line shown. A sponsorship counts when the team offers it on the call.</p>
           </div>
           <div>
             <label className={lbl} htmlFor={id('reason')}>Why it&apos;s sponsored (one line shown to people signing up)</label>
@@ -180,25 +181,33 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
               placeholder="NowTransformed pays part of the cost so more people can take part." />
             <p className={hint}>{300 - reason.length} characters left.</p>
           </div>
+          <div>
+            <label className={lbl} htmlFor={id('partner')}>Discount code sent with the offer</label>
+            <select id={id('partner')} className={inp} value={partnerCode} onChange={(e) => setPartnerCode(e.target.value)}>
+              <option value="">None</option>
+              <option value="explorenation">ExploreNation founding-rate code</option>
+            </select>
+            <p className={hint}>With ExploreNation chosen, offering a sponsorship on the call gets a one-time founding-rate code from ExploreNation and emails it to the person. Only admins see the code.</p>
+          </div>
         </fieldset>
 
         <div className="space-y-2">
           <p className="text-sm font-bold text-gray-900">How it shows on the sign-up page</p>
           {showsOffer ? (
             <div className="rounded-xl border-2 border-primary-700 p-4 space-y-1.5">
-              <p className="text-xs font-bold text-sky-800 tracking-wide">SPONSORED SEATS</p>
+              <p className="text-xs font-bold text-sky-800 tracking-wide">SPONSORSHIPS</p>
               {previewLeft > 0 ? (
                 <>
                   <p className="text-sm text-gray-900">{SPONSOR_LINE} We&apos;ll talk about it on your free call.</p>
                   {reason.trim() && <p className="text-sm text-gray-700 break-words">{reason.trim()}</p>}
                 </>
               ) : (
-                <p className="text-sm text-gray-900">Sponsored seats for this month have all been offered. Join the waiting list for next month.</p>
+                <p className="text-sm text-gray-900">Sponsorships for this month have all been offered. Join the waiting list for next month.</p>
               )}
-              <p className="text-sm text-gray-600">No prices or seat counts are shown before the call. The host sees the prices on the call record.</p>
+              <p className="text-sm text-gray-600">No prices or sponsorship counts are shown before the call. The host sees the prices on the call record.</p>
             </div>
           ) : (
-            <p className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">No sponsorship line is shown (seats are 0 or empty).</p>
+            <p className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">No sponsorship line is shown (sponsorships per month is 0 or empty).</p>
           )}
         </div>
         <BannerView banner={banner} />

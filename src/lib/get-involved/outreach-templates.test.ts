@@ -23,7 +23,7 @@ describe('outreach templates', () => {
 
   it('renders the text message with a seat line', () => {
     expect(renderTemplate(DEFAULT_TEMPLATES.TEXT.body, 'TEXT', V)).toBe(
-      "Hi Sarah!\nYou mentioned wanting to give back more, so I thought of you.\nI'm involved with Health & Stress Management, a small group for busy people who want simpler ways to handle stress. NowTransformed is sponsoring a few seats this month. Would you be open to hearing about it?",
+      "Hi Sarah!\nYou mentioned wanting to give back more, so I thought of you.\nI'm involved with Health & Stress Management, a small group for busy people who want simpler ways to handle stress. NowTransformed is sponsoring a few people this month. Would you be open to hearing about it?",
     )
   })
 
@@ -36,7 +36,7 @@ describe('outreach templates', () => {
 
   it('posts use the real number of seats and the link', () => {
     const r = renderTemplate(DEFAULT_TEMPLATES.POST.body, 'POST', { ...V, seatsLeft: 1 })
-    expect(r).toContain('there is 1 sponsored seat this month')
+    expect(r).toContain('there is 1 sponsorship this month')
     expect(r).toContain(V.link)
   })
 

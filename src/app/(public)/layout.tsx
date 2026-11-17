@@ -1,36 +1,5 @@
-import Image from 'next/image'
-import { BackToAppBar } from '@/components/back-to-app-bar'
+import { PublicShell } from '@/components/public-shell'
 
-export default function PublicLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <BackToAppBar />
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-center">
-            <Image src="/brand/nowtransformed-logo.png" alt="NowTransformed" width={800} height={201} priority className="h-14 sm:h-16 w-auto" />
-          </div>
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-auto">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <p className="text-center text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} NowTransformed. All rights reserved.
-          </p>
-        </div>
-      </footer>
-    </div>
-  )
+export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  return <PublicShell>{children}</PublicShell>
 }

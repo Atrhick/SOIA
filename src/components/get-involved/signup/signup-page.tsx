@@ -23,10 +23,12 @@ export interface SignupPageProps {
   inviter: { name: string; first: string; roleLabel: string; photoUrl: string | null; initials: string; why: string | null }
   /** `slug` is set only on a program share link (it is posted with the form). */
   program: { slug: string | null; label: string; headline: string | null; bullets: string[] } | null
-  /** The program has sponsored seats. No prices or counts reach the browser: the team offers seats on the call. */
+  /** The program has sponsorships. No prices or counts reach the browser: the team offers seats on the call. */
   offer: { reason: string | null; seatsOpen: boolean; reopens: string } | null
   smsOn: boolean
   mailingAddress: string
+  /** Inside an offering's landing page: only the form and its next steps (the page shows the rest). */
+  embedded?: boolean
 }
 
 type Age = 'AGE_18_24' | 'AGE_25_55' | 'AGE_56_PLUS' | 'UNDER_18'
@@ -49,7 +51,7 @@ type Stage =
   | { kind: 'check-email'; first: string }
 
 export function SignupPage(props: SignupPageProps) {
-  const { inviter, program, offer, smsOn, mailingAddress } = props
+  const { inviter, program, offer, smsOn, mailingAddress, embedded } = props
   const seatsFull = !!offer && !offer.seatsOpen
   // Seats full (5b A): the person chooses the waiting list or a full-price call before the form shows.
   const [seatChoice, setSeatChoice] = useState<null | 'waitlist' | 'full'>(null)
@@ -65,9 +67,10 @@ export function SignupPage(props: SignupPageProps) {
 
   useEffect(() => {
     if (stage.kind === 'form') return
-    window.scrollTo({ top: 0 })
+    if (embedded) topRef.current?.scrollIntoView({ block: 'start' })
+    else window.scrollTo({ top: 0 })
     topRef.current?.querySelector<HTMLElement>('h1, h2')?.focus()
-  }, [stage])
+  }, [stage, embedded])
 
   const fieldErr = (f: string) => (error?.field === f ? error.text : null)
   const errProps = (f: string, extra?: string) => {
@@ -103,7 +106,7 @@ export function SignupPage(props: SignupPageProps) {
     else await loadBooking(r.token, r.firstName)
   }
 
-  const footer = (
+  const footer = embedded ? null : (
     <footer className="pt-2 pb-4 text-sm leading-relaxed text-gray-600">
       {program ? `${program.label} is run by ${inviter.name} through NowTransformed, a youth leadership development program.` : 'NowTransformed is a youth leadership development program.'}
       {mailingAddress && <> {mailingAddress}</>}
@@ -112,7 +115,7 @@ export function SignupPage(props: SignupPageProps) {
 
   if (stage.kind === 'booking') {
     return (
-      <div ref={topRef} className="max-w-xl mx-auto space-y-4">
+      <div ref={topRef} className={embedded ? 'space-y-4 scroll-mt-4' : 'max-w-xl mx-auto space-y-4'}>
         <Book token={stage.token} v={stage.view} card={cardCls} variant="signup" />
         {footer}
       </div>
@@ -120,7 +123,7 @@ export function SignupPage(props: SignupPageProps) {
   }
   if (stage.kind !== 'form') {
     return (
-      <div ref={topRef} className="max-w-xl mx-auto space-y-4">
+      <div ref={topRef} className={embedded ? 'space-y-4 scroll-mt-4' : 'max-w-xl mx-auto space-y-4'}>
         <div className={cardCls}>
           <MailCheck className="h-10 w-10 text-green-700" aria-hidden />
           {stage.kind === 'parent' && (
@@ -140,7 +143,7 @@ export function SignupPage(props: SignupPageProps) {
           {stage.kind === 'waitlisted' && (
             <>
               <h1 tabIndex={-1} className={`text-2xl font-bold text-gray-900 rounded ${focusRing}`}>You&apos;re on the waiting list, {stage.first}</h1>
-              <p className="text-gray-700">Sponsored seats open again on {offer?.reopens}. You&apos;ll be among the first to hear.</p>
+              <p className="text-gray-700">Sponsorships open again on {offer?.reopens}. You&apos;ll be among the first to hear.</p>
               {stage.token && (
                 <>
                   <p className="text-gray-700">Want to talk sooner? You can book your free call now.</p>
@@ -158,13 +161,14 @@ export function SignupPage(props: SignupPageProps) {
   const formHeading = minor
     ? null
     : seatChoice === 'waitlist' ? 'Join the waiting list'
+    : embedded ? 'Book your free 15-minute call'
     : 'Book your free call'
   const toForm = () => setTimeout(() => document.getElementById('f-ageRange')?.focus(), 0)
 
   return (
-    <div className="max-w-xl mx-auto space-y-5">
+    <div ref={embedded ? topRef : undefined} className={embedded ? 'space-y-4 scroll-mt-4' : 'max-w-xl mx-auto space-y-5'}>
       {/* Who invited you, in their own words */}
-      <section className="space-y-4">
+      {!embedded && <section className="space-y-4">
         <div className="flex items-center gap-3.5">
           {inviter.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -184,10 +188,10 @@ export function SignupPage(props: SignupPageProps) {
             <figcaption className="mt-1.5 text-sm text-gray-600">{inviter.first}&apos;s own words</figcaption>
           </figure>
         )}
-      </section>
+      </section>}
 
       {/* The program */}
-      <section className="space-y-3">
+      {!embedded && <section className="space-y-3">
         {program ? (
           <>
             <p className="text-sm font-bold uppercase tracking-wider text-primary-800">{program.label}</p>
@@ -204,20 +208,20 @@ export function SignupPage(props: SignupPageProps) {
             <p className="text-base text-gray-700">NowTransformed helps young people and adults grow, lead and build community.</p>
           </>
         )}
-      </section>
+      </section>}
 
       {/* Sponsorship (5) or all seats offered (5b A). No seats = no box. Never prices or counts before the call. */}
-      {offer && !minor && !seatsFull && (
+      {offer && !minor && !seatsFull && !embedded && (
         <section className="rounded-2xl border-2 border-primary-700 bg-white p-4 space-y-2.5" aria-labelledby="seat-h">
-          <h2 id="seat-h" className="text-sm font-bold uppercase tracking-wide text-primary-800">Sponsored seats</h2>
+          <h2 id="seat-h" className="text-sm font-bold uppercase tracking-wide text-primary-800">Sponsorships</h2>
           <p className="text-base leading-relaxed text-gray-900">{SPONSOR_LINE} We&apos;ll talk about it on your free call.</p>
           {offer.reason && <p className="text-base leading-relaxed text-gray-700">{offer.reason}</p>}
         </section>
       )}
       {offer && !minor && seatsFull && (
         <section className="rounded-2xl border border-gray-200 bg-white p-4 space-y-2.5" aria-labelledby="full-h">
-          <p className="text-sm font-bold uppercase tracking-wide text-primary-800">Sponsored seats</p>
-          <h2 id="full-h" className="text-lg font-bold text-gray-900">Sponsored seats for this month have all been offered</h2>
+          <p className="text-sm font-bold uppercase tracking-wide text-primary-800">Sponsorships</p>
+          <h2 id="full-h" className="text-lg font-bold text-gray-900">Sponsorships for this month have all been offered</h2>
           <p className="text-base leading-relaxed text-gray-700">
             New ones open on {offer.reopens}. Join the waiting list and you&apos;ll be among the first to hear, or book your free call now.
           </p>
@@ -228,12 +232,12 @@ export function SignupPage(props: SignupPageProps) {
         </section>
       )}
 
-      {!minor && (
+      {!minor && !embedded && (
         <p className="flex items-center gap-2 text-base text-gray-700"><Check className="h-[18px] w-[18px] text-green-700 flex-none" strokeWidth={2.4} aria-hidden />Free 15-minute call first. No obligation.</p>
       )}
 
       {(
-        <form onSubmit={onSubmit} noValidate className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4" aria-labelledby="form-h">
+        <form onSubmit={onSubmit} noValidate className={`bg-white border border-gray-200 rounded-2xl p-5 space-y-4 ${embedded ? 'shadow-lg sm:p-6' : ''}`} aria-labelledby="form-h">
           {/* Honeypot: hidden from people, bots fill it in. */}
           <div aria-hidden="true" className="absolute -left-[9999px] h-0 overflow-hidden">
             <label>Website<input type="text" name="website" tabIndex={-1} autoComplete="off" /></label>
@@ -251,7 +255,7 @@ export function SignupPage(props: SignupPageProps) {
           ) : (
             <div>
               <h2 id="form-h" className="text-xl font-bold text-gray-900">{formHeading}</h2>
-              <p className="mt-1 text-sm text-gray-600">Step 1 of 2 · about 1 minute. Next you pick a call time.</p>
+              <p className="mt-1 text-sm text-gray-600">{embedded ? 'Free, no obligation. Step 1 of 2: about 1 minute, then you pick a time.' : 'Step 1 of 2 · about 1 minute. Next you pick a call time.'}</p>
             </div>
           )}
 

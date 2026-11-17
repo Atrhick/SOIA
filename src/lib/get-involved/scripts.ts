@@ -18,10 +18,10 @@
  *   {program}       the program name ("Vision Development")
  *   {program line}  one line on what it does ("a 4-week online program that helps ...")
  *   {link}          the sign-up link (tracked per channel)
- *   {sponsor line}  "Families who are a good fit may qualify for a NowTransformed sponsored seat."
- *                   Renders EMPTY when the program has no sponsored seats, so no message promises one.
+ *   {sponsor line}  "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer."
+ *                   Renders EMPTY when the program has no sponsorships, so no message promises one.
  *
- * Wording rules: "sponsorship" / "sponsored seat", never "grant". Never promise a seat: the admin team
+ * Wording rules: "sponsorship" / "sponsorship", never "grant". Never promise a seat: the admin team
  * qualifies on the free call and offers it.
  */
 
@@ -135,7 +135,7 @@ export interface ScriptValues {
   program: string
   programLine: string
   link: string
-  /** The program offers sponsored seats this month (seats > 0). */
+  /** The program offers sponsorships this month (seats > 0). */
   sponsorship: boolean
   /** The program's regular price as the owner set it (empty = a [blank] the sender must fill). */
   regularPrice?: string
@@ -220,7 +220,7 @@ export function fillPrice(text: string, price: string | null | undefined): strin
   return text.split('{regular price}').join(price?.trim() || PRICE_BLANK)
 }
 
-export const SPONSOR_LINE = 'Families who are a good fit may qualify for a NowTransformed sponsored seat.'
+export const SPONSOR_LINE = "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer."
 
 const TOKEN_RE = /\{[^{}\n]{1,40}\}/g
 
@@ -243,7 +243,7 @@ function fill(token: string, v: ScriptValues): string {
 /** Fills every fill-in, drops lines that only held an empty fill-in, and tidies spacing. */
 /**
  * [[sponsor: any wording]] lets a writer mention sponsorship in their own words. The block is kept
- * (without the brackets) when the program has sponsored seats this month, and removed when it doesn't.
+ * (without the brackets) when the program has sponsorships this month, and removed when it doesn't.
  */
 export const SPONSOR_BLOCK_RE = /\[\[sponsor:\s*([^\]]*?)\s*\]\]/g
 const ANY_BLOCK_RE = /\[\[[^\]]*\]\]/g
@@ -330,7 +330,7 @@ export function scriptChecks(scenario: ScenarioKey, variant: ScriptVariant, t: {
   const limit = wordLimit(scenario, variant)
   checks.push({ id: 'words', label: `Under ${limit} words`, ok: wordCount(body) < limit })
   checks.push({ id: 'promises', label: 'No promised results or earnings ("guaranteed", "cure", "earn $")', ok: !PROMISE_RE.test(all) })
-  checks.push({ id: 'sponsorship', label: 'Says "sponsored seat", not "grant"', ok: !GRANT_RE.test(all) })
+  checks.push({ id: 'sponsorship', label: 'Says "sponsorship", not "grant"', ok: !GRANT_RE.test(all) })
   const blocks = all.match(ANY_BLOCK_RE) ?? []
   if (blocks.length) {
     const sponsorTexts = Array.from(all.matchAll(SPONSOR_BLOCK_RE)).map((m) => m[1])

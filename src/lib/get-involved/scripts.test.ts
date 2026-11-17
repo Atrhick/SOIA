@@ -24,8 +24,8 @@ describe('introLine / {intro}', () => {
 describe('[[sponsor: ...]] blocks', () => {
   const v = { firstName: 'Maria', personalLine: '', myName: 'Liz', business: 'B', program: 'P', programLine: '', link: '', sponsorship: true }
   it('keeps the words when seats exist and drops them when not', () => {
-    const t = "Free call first. [[sponsor: Some families get a sponsored seat, so ask about it.]] Want me to set it up?"
-    expect(renderScript(t, v)).toBe('Free call first. Some families get a sponsored seat, so ask about it. Want me to set it up?')
+    const t = "Free call first. [[sponsor: Some families get a sponsorship, so ask about it.]] Want me to set it up?"
+    expect(renderScript(t, v)).toBe('Free call first. Some families get a sponsorship, so ask about it. Want me to set it up?')
     expect(renderScript(t, { ...v, sponsorship: false })).toBe('Free call first. Want me to set it up?')
   })
   it('a whole line that is only a block disappears cleanly', () => {
@@ -34,8 +34,8 @@ describe('[[sponsor: ...]] blocks', () => {
   it('checks flag promised seats and unknown blocks', async () => {
     const { scriptChecks } = await import('./scripts')
     const c = (body: string) => scriptChecks('POST', 'POST', { body: body + ' {link}' }).find((x) => x.id === 'blocks')
-    expect(c('[[sponsor: You get a free sponsored seat.]]')?.ok).toBe(false)
-    expect(c('[[sponsor: You might qualify for a sponsored seat.]]')?.ok).toBe(true)
+    expect(c('[[sponsor: You get a free sponsorship.]]')?.ok).toBe(false)
+    expect(c('[[sponsor: You might qualify for a sponsorship.]]')?.ok).toBe(true)
     expect(c('[[other: x]]')?.ok).toBe(false)
   })
 })

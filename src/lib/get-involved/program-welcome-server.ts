@@ -134,3 +134,19 @@ export async function draftWelcomeNoteOnPublish(programId: string): Promise<void
     console.error('[WELCOME-NOTE] draft on publish failed', e)
   }
 }
+
+/**
+ * The landing-page link for an old /p/[slug] program link: /join/[owner's invite slug]/[program],
+ * but only when the program is live, has a landing page and its owner has an invite link. Else null
+ * (the old page keeps showing).
+ */
+export async function offerLinkForProgram(programSlug: string): Promise<string | null> {
+  if (!programSlug || programSlug.length > 120) return null
+  const p = await prisma.coachProgram.findFirst({
+    where: { AND: [{ slug: programSlug }, LIVE, { NOT: { offerPage: { equals: Prisma.DbNull } } }] },
+    select: { slug: true, coach: { select: { user: { select: { inviteSlug: true, status: true } } } }, ambassador: { select: { user: { select: { inviteSlug: true, status: true } } } } },
+  })
+  const owner = p?.coach?.user ?? p?.ambassador?.user ?? null
+  if (!p || !owner?.inviteSlug || owner.status !== 'ACTIVE') return null
+  return `/join/${encodeURIComponent(owner.inviteSlug)}/${encodeURIComponent(p.slug)}`
+}

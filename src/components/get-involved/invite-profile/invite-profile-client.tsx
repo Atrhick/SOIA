@@ -13,7 +13,7 @@ import {
 export interface InviteProfileProgram {
   id: string
   name: string
-  /** e.g. "3 of 5 sponsored seats left this month", or null when the program has no offer. */
+  /** e.g. "3 of 5 sponsorships left this month", or null when the program has no offer. */
   seatsLabel: string | null
 }
 
@@ -246,7 +246,7 @@ export function InviteProfileClient({ role, name, slug, photoUrl, why: initialWh
                 ? "You don't have a live program page yet, so your main link uses the standard sign-up."
                 : <>
                     {chosen ? (chosen.seatsLabel ? `${chosen.name}: ${chosen.seatsLabel}. ` : '') : 'Automatic shares your newest live program. '}
-                    You set your program&apos;s prices on its program page. The NowTransformed team sets how many sponsored seats each program has.
+                    You set your program&apos;s prices on its program page. The NowTransformed team sets how many sponsorships each program has.
                   </>}
             </p>
           </div>

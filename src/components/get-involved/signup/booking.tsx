@@ -29,7 +29,7 @@ export type BookView = {
   /** Text reminders are on and this person asked for them. */
   textReminders: boolean
   programName: string | null
-  /** Show "your sponsored seat" in "What happens next". */
+  /** Show "your sponsorship" in "What happens next". */
   sponsored: boolean
   helpWith: string
 }
@@ -369,7 +369,7 @@ function Booked({ token, v, card, call, moved, headingRef, onChange }: {
         <ol className="list-decimal pl-5 text-sm leading-7 text-gray-700">
           <li>A confirmation email is on its way now{v.minor ? ` to you and ${parentFirst}` : ''}.</li>
           <li>We remind you the day before (and 3 days before, if the call is further off), by email{v.textReminders ? ' and by text' : ''}.</li>
-          <li>On the call: what you&apos;d like help with, how {v.programName ? 'the program' : 'NowTransformed'} works{v.sponsored ? ', and whether a sponsored seat is a fit' : ''}.</li>
+          <li>On the call: what you&apos;d like help with, how {v.programName ? 'the program' : 'NowTransformed'} works{v.sponsored ? ', and whether a sponsorship is a fit' : ''}.</li>
         </ol>
       </div>
 

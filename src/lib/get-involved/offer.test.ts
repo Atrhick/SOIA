@@ -3,7 +3,7 @@ import { canUndoSeatOffer, monthStart, nextMonthStart, seatLockKey, seatsLeftOf,
 
 const now = new Date('2026-11-12T15:00:00Z')
 
-describe('sponsored seats', () => {
+describe('sponsorships', () => {
   it('a seat is used when OFFERED in the current month (not when a call is booked)', () => {
     // Months follow US Central time: Nov 1 starts at 05:00 UTC (CDT), Dec 1 at 06:00 UTC (CST).
     expect(seatsUsedWhere(now)).toEqual({ sponsoredSeatOfferedAt: { gte: new Date('2026-11-01T05:00:00Z'), lt: new Date('2026-12-01T06:00:00Z') } })

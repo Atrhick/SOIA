@@ -6,20 +6,20 @@ import { Armchair, Loader2 } from 'lucide-react'
 import { kit } from '@/components/ui/kit/styles'
 import { useToast } from '@/components/ui/kit/toast'
 import { HelpTip } from '@/components/ui/kit/help-tip'
-import { offerSponsoredSeat, undoSponsoredSeatOffer } from '@/lib/actions/sponsored-seat'
+import { offerSponsoredSeat, resendPartnerCode, undoSponsoredSeatOffer } from '@/lib/actions/sponsored-seat'
 import type { SeatCardData } from './sponsored-seat-data'
 
 const day = (iso: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(iso))
 
 /**
- * "Sponsored seat" on the call record. Prices are for the host only (the person never sees them before
+ * "Sponsorship" on the call record. Prices are for the host only (the person never sees them before
  * the call). Offering uses one of this month's seats; "Undo offer" gives it back within the same month.
  */
 export function SponsoredSeatCard({ d, readOnly = false }: { d: SeatCardData; readOnly?: boolean }) {
   const router = useRouter()
   const toast = useToast()
   const [confirming, setConfirming] = useState(false)
-  const [busy, setBusy] = useState<'offer' | 'undo' | null>(null)
+  const [busy, setBusy] = useState<'offer' | 'undo' | 'resend' | null>(null)
   const first = d.firstName
 
   async function offer() {
@@ -29,6 +29,14 @@ export function SponsoredSeatCard({ d, readOnly = false }: { d: SeatCardData; re
     setConfirming(false)
     if (!r.ok) { toast.error(r.error); return }
     toast.success(r.message, { action: { label: 'Undo', onClick: () => { void undo() } } })
+    router.refresh()
+  }
+  async function resend() {
+    setBusy('resend')
+    const r = await resendPartnerCode(d.prospectId)
+    setBusy(null)
+    if (!r.ok) { toast.error(r.error); return }
+    toast.success(r.message)
     router.refresh()
   }
   async function undo() {
@@ -55,10 +63,10 @@ export function SponsoredSeatCard({ d, readOnly = false }: { d: SeatCardData; re
         <span className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-primary-50 text-primary-700"><Armchair className="h-5 w-5" aria-hidden /></span>
         <div className="min-w-0">
           <h2 id="seat-card-h" className="text-lg font-bold text-gray-900">
-            Sponsored seat
-            <HelpTip label="How sponsored seats work">
-              <p>{d.programName} has {d.seatsPerMonth} NowTransformed sponsored seat{d.seatsPerMonth === 1 ? '' : 's'} a month.</p>
-              <p>A seat is used when you offer it here, not when a call is booked. Undo gives it back (same month only).</p>
+            Sponsorship
+            <HelpTip label="How sponsorships work">
+              <p>{d.programName} has {d.seatsPerMonth} NowTransformed sponsorship{d.seatsPerMonth === 1 ? '' : 's'} a month.</p>
+              <p>A sponsorship counts when you offer it here, not when a call is booked. Undo gives it back (same month only).</p>
               <p>Payment isn&apos;t taken in this app: the program owner collects the fee.</p>
             </HelpTip>
           </h2>
@@ -72,7 +80,23 @@ export function SponsoredSeatCard({ d, readOnly = false }: { d: SeatCardData; re
           <p className="rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-base text-green-900">
             Offered to {first} on {day(d.offered.at)}{d.offered.by ? ` by ${d.offered.by}` : ''}.
           </p>
-          <p className="text-sm text-gray-600">{d.seatsLeft} of {d.seatsPerMonth} sponsored seats left this month.</p>
+          {d.partnerCode && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 space-y-1.5">
+              <p className="text-sm font-semibold text-gray-900">{d.partnerName ?? 'Partner'} founding-rate code</p>
+              {d.partnerCode.code && <p className="font-mono text-lg font-bold tracking-wider text-gray-900 break-all">{d.partnerCode.code}</p>}
+              <p className="text-sm text-gray-700">
+                {d.partnerCode.label}
+                {d.partnerCode.emailedAt ? ` · emailed ${day(d.partnerCode.emailedAt)}` : ' · not emailed yet'}
+                {d.partnerCode.expiresAt && (d.partnerCode.status === 'SENT' || d.partnerCode.status === 'HELD') ? ` · use by ${day(d.partnerCode.expiresAt)}` : ''}
+              </p>
+              {d.partnerCode.canResend && !readOnly && (
+                <button type="button" className={kit.secondary} disabled={busy !== null} onClick={resend}>
+                  {busy === 'resend' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Email the code again
+                </button>
+              )}
+            </div>
+          )}
+          <p className="text-sm text-gray-600">{d.seatsLeft} of {d.seatsPerMonth} sponsorships left this month.</p>
           {d.offered.canUndo && !readOnly && (
             <button type="button" className={kit.secondary} disabled={busy !== null} onClick={undo}>
               {busy === 'undo' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Undo offer
@@ -83,25 +107,26 @@ export function SponsoredSeatCard({ d, readOnly = false }: { d: SeatCardData; re
         <>
           {prices(d.fullPrice, d.sponsoredPrice)}
           <p className={`text-base font-semibold ${d.seatsLeft > 0 ? 'text-amber-800' : 'text-red-700'}`}>
-            {d.seatsLeft} of {d.seatsPerMonth} sponsored seats left this month
+            {d.seatsLeft} of {d.seatsPerMonth} sponsorships left this month
           </p>
-          <p className="text-sm text-gray-700">Qualify first. If {first} is a good fit, offer the seat on the call.</p>
+          <p className="text-sm text-gray-700">Qualify first. If {first} is a good fit, offer the sponsorship on the call.</p>
           {!readOnly && (d.seatsLeft > 0 ? (
             confirming ? (
               <div role="group" aria-label="Confirm the offer" className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-                <p className="text-base text-gray-900">Offer {first} a sponsored seat{d.sponsoredPrice ? ` at ${d.sponsoredPrice}` : ''}? This uses 1 of this month&apos;s seats.</p>
+                <p className="text-base text-gray-900">Offer {first} a sponsorship{d.sponsoredPrice ? ` at ${d.sponsoredPrice}` : ''}? This uses 1 of this month&apos;s sponsorships.</p>
+                {d.partnerName && <p className="text-sm text-gray-700">We&apos;ll get {first}&apos;s founding-rate code from {d.partnerName} and email it to them. If {d.partnerName} doesn&apos;t answer, nothing is offered and the seat isn&apos;t used.</p>}
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className={kit.primary} disabled={busy !== null} onClick={offer}>
-                    {busy === 'offer' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Yes, offer the seat
+                    {busy === 'offer' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Yes, offer the sponsorship
                   </button>
                   <button type="button" className={kit.secondary} disabled={busy !== null} onClick={() => setConfirming(false)}>Cancel</button>
                 </div>
               </div>
             ) : (
-              <button type="button" className={kit.primary} onClick={() => setConfirming(true)}>Offer a sponsored seat</button>
+              <button type="button" className={kit.primary} onClick={() => setConfirming(true)}>Offer a sponsorship</button>
             )
           ) : (
-            <p className="text-sm text-gray-700">All seats for this month have been offered. They reset on the 1st.</p>
+            <p className="text-sm text-gray-700">All sponsorships for this month have been offered. They reset on the 1st.</p>
           ))}
         </>
       )}

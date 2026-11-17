@@ -32,7 +32,8 @@ const offerSchema = z.object({
   reason: text(300, 'Reason'),
   seats: z.union([z.literal(''), z.coerce.number()])
     .transform((v) => (v === '' ? null : v))
-    .refine((v) => v === null || (Number.isInteger(v) && v >= 0 && v <= 1000), 'Seats per month: a whole number from 0 to 1000'),
+    .refine((v) => v === null || (Number.isInteger(v) && v >= 0 && v <= 1000), 'Sponsorships per month: a whole number from 0 to 1000'),
+  partnerCode: z.enum(['', 'explorenation']).optional(),
 })
 
 export type SaveOfferResult =
@@ -44,8 +45,8 @@ export async function saveProgramOffer(input: unknown): Promise<SaveOfferResult>
   if (denied) return { ok: false, error: denied }
   const parsed = offerSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check the form' }
-  const { programId, fullPrice, sponsoredPrice, reason, seats } = parsed.data
-  if (seats && seats > 0 && !sponsoredPrice) return { ok: false, error: 'Enter the sponsored price, or set seats to 0 to show no offer.' }
+  const { programId, fullPrice, sponsoredPrice, reason, seats, partnerCode } = parsed.data
+  if (seats && seats > 0 && !sponsoredPrice) return { ok: false, error: 'Enter the sponsored price, or set sponsorships per month to 0 to show no offer.' }
 
   try {
     const exists = await prisma.coachProgram.findUnique({ where: { id: programId }, select: { id: true, offerFullPrice: true, offerSponsoredPrice: true } })
@@ -59,6 +60,7 @@ export async function saveProgramOffer(input: unknown): Promise<SaveOfferResult>
         offerSponsoredPrice: sponsoredPrice || null,
         offerReason: reason || null,
         sponsoredSeatsPerMonth: seats,
+        ...(partnerCode !== undefined ? { partnerCodeSource: partnerCode || null } : {}),
         ...(pricesChanged ? { offerPricesUpdatedAt: new Date(), offerPricesUpdatedById: session?.user.id ?? null } : {}),
       },
     })
@@ -148,7 +150,7 @@ export async function saveMyProgramPrices(input: unknown): Promise<{ ok: true } 
   const { fullPrice, sponsoredPrice } = parsed.data
   const p = ctx.program
   if ((p.sponsoredSeatsPerMonth ?? 0) > 0 && !sponsoredPrice) {
-    return { ok: false, error: 'Sponsored seats are on for this program, so it needs a sponsored price.' }
+    return { ok: false, error: 'Sponsorships are on for this program, so it needs a sponsored price.' }
   }
   if ((p.offerFullPrice ?? '') === fullPrice && (p.offerSponsoredPrice ?? '') === sponsoredPrice) return { ok: true }
   try {

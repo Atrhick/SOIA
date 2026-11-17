@@ -2238,6 +2238,7 @@ model Prospect {
   joinedAt                  DateTime?
   notAFitAt                 DateTime?
   notes                     ProspectNote[]
+  partnerCodes              PartnerCode[]
 
   @@index([email])
   @@index([status])
@@ -2776,6 +2777,10 @@ model CoachProgram {
   offerSponsoredPrice    String?
   offerReason            String?    @db.Text
   sponsoredSeatsPerMonth Int?
+  /// "explorenation": offering a sponsorship requests a founding-rate code from that partner (src/lib/explorenation). Admin only.
+  partnerCodeSource      String?
+  /// The offering's landing page (OfferPage in src/lib/get-involved/offer-page.ts). Null = the plain sign-up page.
+  offerPage              Json?
   offerPricesUpdatedAt   DateTime?
   /// User id of whoever last changed the prices (owner or admin).
   offerPricesUpdatedById String?
@@ -3212,4 +3217,27 @@ model BroadcastDelivery {
   @@unique([broadcastId, userId])
   @@index([broadcastId, status])
   @@map("broadcast_deliveries")
+}
+
+/// A partner's discount code requested for one sponsorship offer (ExploreNation founding rate).
+/// The code is shown to admins only and emailed to the person. Status follows the partner's webhook.
+model PartnerCode {
+  id          String    @id @default(cuid())
+  partner     String /// "explorenation"
+  requestId   String    @unique /// sent as requestId: retries never create a second code
+  prospectId  String
+  prospect    Prospect  @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  programId   String?
+  code        String?   @unique
+  status      String    @default("REQUESTED") /// REQUESTED, SENT, HELD, USED, EXPIRED, REVOKED
+  package     String?
+  expiresAt   DateTime?
+  emailedAt   DateTime?
+  statusAt    DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([prospectId])
+  @@map("partner_codes")
 }

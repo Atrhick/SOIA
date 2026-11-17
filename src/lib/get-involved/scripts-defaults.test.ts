@@ -33,7 +33,7 @@ describe('GENERAL_SCRIPTS', () => {
     expect(failed).toEqual([])
   })
 
-  it.each(ALL)('$scenario $variant reads cleanly with and without sponsored seats', ({ scenario, variant }) => {
+  it.each(ALL)('$scenario $variant reads cleanly with and without sponsorships', ({ scenario, variant }) => {
     const t = GENERAL_SCRIPTS[`${scenario}:${variant}`]!
     const senders: Partial<ScriptValues>[] = [
       { owns: true },
@@ -48,8 +48,8 @@ describe('GENERAL_SCRIPTS', () => {
       expect(out).not.toMatch(/\{[^{}]+\}/) // no fill-in left behind
       expect(out).not.toMatch(/\[\[|\]\]/) // no sponsor block brackets left behind
       expect(out).not.toMatch(/ {2,}|\s[.,?]/) // no double spaces or stray punctuation
-      if (t.body.includes('{sponsor line}') && sponsorship) expect(out).toContain('sponsored seat')
-      if (!sponsorship) expect(out).not.toMatch(/sponsored seat/)
+      if (t.body.includes('{sponsor line}') && sponsorship) expect(out).toContain('sponsorship')
+      if (!sponsorship) expect(out).not.toMatch(/sponsorship/)
     }
   })
 
@@ -101,10 +101,10 @@ describe('GENERAL_SCRIPTS sound like a person', () => {
     expect(dupes).toEqual([])
   })
 
-  it('sponsorship wording says "sponsored seat" when it shows', () => {
+  it('sponsorship wording says "sponsorship" when it shows', () => {
     for (const t of Object.values(GENERAL_SCRIPTS)) {
       const blocks = Array.from(`${t!.subject ?? ''} ${t!.body}`.matchAll(/\[\[sponsor:([^\]]*)\]\]/g)).map((m) => m[1])
-      for (const b of blocks) expect(b).toMatch(/sponsored seat/)
+      for (const b of blocks) expect(b).toMatch(/sponsorship/)
     }
   })
 

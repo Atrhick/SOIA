@@ -423,14 +423,14 @@ export function ProgramEditorClient({
                 <VideoField
                   label="NowTransformed and sponsorship video"
                   htmlFor="ntVideoUrl"
-                  hint={`Introduces NowTransformed and sponsored seats for this program. An admin may also set this for you. ${VIDEO_LINK_HINT}`}
+                  hint={`Introduces NowTransformed and sponsorships for this program. An admin may also set this for you. ${VIDEO_LINK_HINT}`}
                   value={form.ntVideoUrl}
                   onChange={(v) => set('ntVideoUrl', v)}
                 />
                 <Field
                   label="Text above the NowTransformed video"
                   htmlFor="ntVideoIntro"
-                  hint="Optional. A line or two about NowTransformed sponsored seats. Don't promise a seat or a price: families who are a good fit may qualify."
+                  hint="Optional. A line or two about NowTransformed sponsorships. Don't promise a sponsorship or a price: people who are a good fit may qualify."
                 >
                   <Textarea
                     id="ntVideoIntro"

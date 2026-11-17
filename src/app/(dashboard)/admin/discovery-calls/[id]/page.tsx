@@ -14,7 +14,7 @@ export default async function CallRecordPage({ params }: { params: { id: string 
   const session = await auth()
   if (!session || session.user.role !== 'ADMIN') redirect('/login')
   const tz = await staffTimeZone(session.user.id)
-  const [data, origin, seat] = await Promise.all([loadCallRecord(params.id, { tz, admin: true }), loadCallOrigin(params.id, tz), loadSeatCard(params.id)])
+  const [data, origin, seat] = await Promise.all([loadCallRecord(params.id, { tz, admin: true }), loadCallOrigin(params.id, tz), loadSeatCard(params.id, new Date(), { showCode: true })])
   if (!data) notFound()
 
   return (

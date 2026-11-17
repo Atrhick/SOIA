@@ -3,7 +3,9 @@
  * Everything returned is plain JSON (dates formatted here) for the client component.
  */
 import { userDisplayName } from '@/lib/get-involved/server'
-import { programDisplay, programForSignup } from '@/lib/get-involved/program-welcome-server'
+import { invitePrograms, programDisplay, programForSignup } from '@/lib/get-involved/program-welcome-server'
+import { parseOfferPage, type OfferPage } from '@/lib/get-involved/offer-page'
+import { prisma } from '@/lib/prisma'
 import { getInviteProfile, getOutreachSettings, getSignupOffer, nextMonthStart, smsEnabled } from '@/lib/get-involved/offer'
 import type { SignupPageProps } from '@/components/get-involved/signup/signup-page'
 
@@ -55,5 +57,26 @@ export async function loadSignupPage(inviter: { id: string; role: string }, slug
       : null,
     smsOn: smsEnabled(),
     mailingAddress: settings.mailingAddress.trim(),
+  }
+}
+
+export interface OfferLandingData {
+  page: OfferPage
+  /** Who runs it, for "More from ..." and the footer. */
+  business: string
+  /** The owner's other live offerings, linked on the same inviter link. */
+  more: { label: string; href: string }[]
+}
+
+/** The landing page for an offering, or null when it has none (or the saved page doesn't check out). */
+export async function loadOfferLanding(programId: string, inviterId: string, slug: string, qs: string): Promise<OfferLandingData | null> {
+  const p = await prisma.coachProgram.findUnique({ where: { id: programId }, select: { offerPage: true, organization: true, playbook: { select: { businessName: true } } } })
+  const page = parseOfferPage(p?.offerPage)
+  if (!p || !page) return null
+  const others = (await invitePrograms(inviterId).catch(() => [])).filter((o) => o.id !== programId).slice(0, 6)
+  return {
+    page,
+    business: p.playbook?.businessName?.trim() || p.organization?.trim() || 'NowTRANSFORMED',
+    more: others.map((o) => ({ label: o.name, href: `/join/${encodeURIComponent(slug)}/${encodeURIComponent(o.slug)}${qs ? `?${qs}` : ''}` })),
   }
 }

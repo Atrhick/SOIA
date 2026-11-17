@@ -1,4 +1,5 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { offerLinkForProgram } from '@/lib/get-involved/program-welcome-server'
 import type { Metadata } from 'next'
 import { getProgramPreview, getPublicProgram } from '@/lib/actions/program-pages'
 import { ProgramLandingClient } from './program-landing-client'
@@ -54,6 +55,10 @@ export default async function PublicProgramPage({
       </div>
     )
   }
+
+  // Programs with a landing page send old links there (sign-up then follows the One-A-Day steps).
+  const landing = await offerLinkForProgram(params.slug).catch(() => null)
+  if (landing) redirect(landing)
 
   const result = await getPublicProgram(params.slug)
   if ('error' in result) {

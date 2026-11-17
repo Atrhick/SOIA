@@ -45,7 +45,7 @@ export async function bookViewFor(p: P, now = new Date()): Promise<BookView> {
     replyWithin: settings.replyWithin.trim(),
     textReminders: smsEnabled() && !!p.smsConsentAt,
     programName: program?.label ?? null,
-    // "your sponsored seat" on the booked screen: only with an offer, and not for someone on the waiting list.
+    // "your sponsorship" on the booked screen: only with an offer, and not for someone on the waiting list.
     sponsored: !!offer && !waitlisted,
     helpWith: p.helpWith ?? '',
   }

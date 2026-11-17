@@ -38,7 +38,7 @@ export function inviterHeader(i: WelcomeInviter): string {
 }
 
 /**
- * "Families who are a good fit may qualify for a NowTransformed sponsored seat. We'll talk about it on
+ * "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. We'll talk about it on
  * your free call." Only while the program has seats this month. Never prices or seat counts before the
  * call: the team qualifies on the call and offers the seat there.
  */

@@ -1,0 +1,220 @@
+{
+  "eyebrow": "ExploreNation · Launching soon in Las Vegas & Henderson",
+  "hook": "Be the business your neighbors read about.",
+  "intro": "ExploreNation is a local magazine for Las Vegas and Henderson, launching soon, that focuses on positive, true stories about local people and places. Put your business in front of locals who are looking for places to go and people to support.",
+  "bullets": [
+    {
+      "lead": "Get listed free",
+      "text": "so locals can find you by what you do. Paid upgrades available."
+    },
+    {
+      "lead": "Own your trade.",
+      "text": "One partner spot per trade in each section, shown on every story there and never shared with a competitor."
+    },
+    {
+      "lead": "Get your story told,",
+      "text": "written by our staff and always labeled as sponsored."
+    }
+  ],
+  "hostNote": "runs ExploreNation's weekly intro sessions",
+  "heroImage": {
+    "src": "/offers/explorenation/listing-phone.webp",
+    "alt": "A sample ExploreNation directory listing: Desert Sky Family Law, a family and divorce attorney in Henderson, with a photo of the attorney in her office",
+    "sample": true,
+    "handNote": "This could be your business ↙"
+  },
+  "showcase": {
+    "eyebrow": "A sneak peek",
+    "title": "Here's where your business shows up",
+    "desktop": {
+      "src": "/offers/explorenation/story-desktop.webp",
+      "alt": "An ExploreNation story about where to deliver a baby near Henderson, with sample paid partner cards for a summer camp, a child care center, a party venue and a pediatrician around the story"
+    },
+    "phone": {
+      "src": "/offers/explorenation/story-phone.webp",
+      "alt": "The same story on a phone, with a sample pediatrician's partner card between paragraphs"
+    },
+    "pins": [
+      {
+        "left": 44.5,
+        "top": 89
+      },
+      {
+        "left": 8.7,
+        "top": 59
+      },
+      {
+        "left": 85.8,
+        "top": 25
+      }
+    ],
+    "points": [
+      {
+        "title": "Your card, right in the story",
+        "text": "Readers see it while they read. It's made from your listing, so there's nothing to design."
+      },
+      {
+        "title": "One spot per trade",
+        "text": "One summer camp, one child care center, one pediatrician. No competitor shares your spot."
+      },
+      {
+        "title": "On every story in your section",
+        "text": "Partner cards rotate around each story in that section, on phones and computers."
+      }
+    ],
+    "caption": "Preview of ExploreNation, launching soon in Las Vegas & Henderson. The businesses shown are samples. Photos from Pexels."
+  },
+  "why": {
+    "title": "Locals want to know what's good near them.",
+    "paragraphs": [
+      "People will open ExploreNation to find good things in their own city. That's where your business shows up.",
+      "ExploreNation has five areas, LIVE, WORK, EXPLORE, SERVE and BUILD, each split into topics like neighborhoods, things to do and small business. Your business shows up where it fits."
+    ]
+  },
+  "options": {
+    "title": "Three ways to be part of it",
+    "items": [
+      {
+        "label": "Free listing",
+        "title": "Be easy to find",
+        "text": "Create a free account and add your business, so locals can find you by what you do and how to reach you. Paid upgrades are available.",
+        "image": {
+          "src": "/offers/explorenation/listing-phone.webp",
+          "alt": "A sample free listing for a family law firm, with its name, specialty, town and phone number",
+          "sample": true,
+          "note": "your name, your number",
+          "focus": "50% 30%"
+        }
+      },
+      {
+        "label": "Partner spot",
+        "title": "Own your trade",
+        "text": "Each section has six partner spots, one per trade. Yours shows on every story in that section, and no competitor can take it. Your partner card is made from your listing, so there's nothing to design. You also get our content studio in your dashboard, where you make your own short videos, pictures and flyers.",
+        "image": {
+          "src": "/offers/explorenation/story-phone.webp",
+          "alt": "A sample paid partner card for a pediatrician, shown between paragraphs of a story",
+          "sample": true,
+          "note": "one per trade",
+          "focus": "50% 60%"
+        },
+        "featured": true
+      },
+      {
+        "label": "Sponsored feature",
+        "title": "Get your story told",
+        "text": "Our staff writes a story about your business, always clearly labeled as sponsored, so readers get to know the people behind it.",
+        "image": {
+          "src": "/offers/explorenation/sponsored-phone.webp",
+          "alt": "A sample sponsored feature titled Keeping pets calm through Henderson's noisy holidays, with a yellow Sponsored by label",
+          "sample": true,
+          "note": "always labeled",
+          "focus": "50% 30%"
+        }
+      }
+    ],
+    "soon": {
+      "label": "Also planned: print",
+      "text": "A printed magazine is planned, six times a year, with paid full-page Partner Profiles and cover ads. It's sold on its own, and the founding-rate code doesn't cover it. Ask on your free call.",
+      "images": [
+        {
+          "src": "/offers/explorenation/print-cover.webp",
+          "alt": "Sample cover of the ExploreNation Henderson print magazine: a smiling woman in sunglasses, hand in her hair, in sunny desert hills, under the headline 'There's More to Life Here.'",
+          "note": "the cover"
+        },
+        {
+          "src": "/offers/explorenation/print-partner-profile.webp",
+          "alt": "Sample Partner Profile page: 'The Shortest Distance to a Paycheck', a one-page story on a fictional Henderson staffing agency, with two photos and a Visit box.",
+          "note": "a full page on you"
+        }
+      ]
+    },
+    "footnote": "Run a cause or volunteer group? It can be featured in SERVE.",
+    "cta": "See which spots are open for my trade"
+  },
+  "story": {
+    "title": "Many stories are reported by young people from your city",
+    "paragraphs": [
+      "Many of the magazine's regular stories are reported by local young people, NowTRANSFORMED Ambassadors, learning to interview, write and take photos with coaching. Their name goes on their work, so every story helps them build a real portfolio.",
+      "Sponsored features are different: our staff writes them, and they're always labeled."
+    ]
+  },
+  "sponsorship": {
+    "title": "You may qualify for a NowTRANSFORMED sponsorship",
+    "text": "If you're a good fit, the NowTRANSFORMED team gives you a code for ExploreNation's founding rate, a lower price than the regular rate. The founding rate is only available with a code. We'll go over it on your free call.",
+    "cta": "See if I qualify"
+  },
+  "steps": [
+    {
+      "title": "Tell us who you are",
+      "text": "Your name and email, then pick a time."
+    },
+    {
+      "title": "Free 15-minute call",
+      "text": "The NowTRANSFORMED team walks you through the options and rates, and checks whether you qualify for a sponsorship."
+    },
+    {
+      "title": "Pick what fits",
+      "text": "Qualify, and you get your founding-rate code. Choose a listing, a partner spot or a feature, and you're there from launch day."
+    }
+  ],
+  "gallery": {
+    "title": "Take a look inside",
+    "text": "Real local stories, sorted into five sections, so readers find what's good near them.",
+    "images": [
+      {
+        "src": "/offers/explorenation/home-phone.webp",
+        "alt": "ExploreNation home page: Discover the Heart of Las Vegas–Henderson"
+      },
+      {
+        "src": "/offers/explorenation/live-phone.webp",
+        "alt": "The LIVE section: Love Where You Live, with topic tabs"
+      },
+      {
+        "src": "/offers/explorenation/live-stories-phone.webp",
+        "alt": "A list of LIVE stories"
+      },
+      {
+        "src": "/offers/explorenation/sponsored-phone.webp",
+        "alt": "A sponsored feature with its Sponsored by label"
+      }
+    ],
+    "caption": "Preview of ExploreNation, launching soon in Las Vegas & Henderson. Sample businesses shown. Photos from Pexels."
+  },
+  "testimonials": [],
+  "faqs": [
+    {
+      "q": "How much does it cost?",
+      "a": "A basic listing is free. Partner spots and sponsored features have regular rates. If you qualify for a NowTRANSFORMED sponsorship, you get a code for ExploreNation's lower founding rate. You'll get exact numbers on the free call."
+    },
+    {
+      "q": "What happens on the call?",
+      "a": "The team asks what you're looking for, explains how ExploreNation works and answers your questions. There's no obligation to sign up."
+    },
+    {
+      "q": "Is ExploreNation live yet?",
+      "a": "Not yet. It's launching soon in Las Vegas and Henderson. Businesses that join now are there from day one and get first pick of the partner spots."
+    },
+    {
+      "q": "Will there be a printed magazine?",
+      "a": "One is planned, six times a year. You could buy a Partner Profile: a full page on your business, written and photographed by ExploreNation, one business per trade per issue. It would also run online as a story with a QR code and a short video interview. Cover ads are planned too. Print is sold on its own, not with a partner spot, and the founding-rate code doesn't cover it. Ask on your free call."
+    },
+    {
+      "q": "Is the coverage only positive?",
+      "a": "We focus on positive, true stories about local people and places. Anything paid is always clearly labeled, so readers can trust the rest."
+    },
+    {
+      "q": "Do I need to design an ad?",
+      "a": "No. Your partner card is made from your listing, so there's nothing to design."
+    },
+    {
+      "q": "What's the content studio?",
+      "a": "It's a tool in your dashboard to make your own marketing. Record a short video on your phone, or turn your photos into one. Captions go on automatically and the ums get tidied out. You can also design pictures and flyers. You download it all and post it yourself. It comes with the partner spot and the bigger monthly packages, even at the founding rate. It isn't part of the free listing or a one-off sponsored story. It'll be there when ExploreNation launches."
+    }
+  ],
+  "closing": {
+    "title": "Get your business into the good news.",
+    "text": "A free 15-minute call. Pick a time that works for you.",
+    "cta": "Book my free call"
+  },
+  "partnerLine": "in partnership with ExploreNation"
+}

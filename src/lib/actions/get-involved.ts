@@ -189,21 +189,21 @@ async function createIntake(data: z.infer<typeof intakeSchema>, inviterId: strin
   }
   if (inviterId && source === 'INVITE_LINK') await emailInviterNewLead(inviterId, { name: `${data.firstName} ${data.lastName}`, ageRange: data.ageRange, city: data.city || null })
   await notifyAdmins('New Get Involved form', `${data.firstName} ${data.lastName} (${ageRangeLabel(data.ageRange)})${inviter ? ` was invited by ${inviter.full}` : ''}.`, prospectId).catch(() => {})
-  // "Join the waiting list" (sponsored seats full): only when this program really has an offer.
+  // "Join the waiting list" (sponsorships full): only when this program really has an offer.
   if (source === 'INVITE_LINK' && data.waitlist === 'on' && program) {
     await addToSeatWaitlist(prospectId, `${data.firstName} ${data.lastName}`, program.id, program.name).catch((e) => console.error('[GET-INVOLVED] waitlist failed', e))
   }
   return { kind: 'created', prospectId, journeyToken }
 }
 
-/** Sponsored seats are full: record a SEAT_WAITLIST request (once) and tell the admins. */
+/** Sponsorships are full: record a SEAT_WAITLIST request (once) and tell the admins. */
 async function addToSeatWaitlist(prospectId: string, name: string, programId: string, programName: string) {
   const offer = await getSignupOffer(programId)
   if (!offer) return
   const open = await prisma.discoverySlotRequest.findFirst({ where: { prospectId, kind: 'SEAT_WAITLIST', handledAt: null }, select: { id: true } })
   if (open) return
   await prisma.discoverySlotRequest.create({ data: { prospectId, kind: 'SEAT_WAITLIST' } })
-  await notifyAdmins('Sponsored seat waiting list', `${name} joined the waiting list for a sponsored seat in ${programName}.`, prospectId)
+  await notifyAdmins('Sponsorship waiting list', `${name} joined the waiting list for a sponsorship in ${programName}.`, prospectId)
 }
 
 /**

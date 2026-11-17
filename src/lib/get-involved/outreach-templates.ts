@@ -6,7 +6,7 @@
  *
  * Fill-ins: {first name} {personal line} {program} {one-line description} {link} {seats left} {seat line}
  * - {seat line} is the sponsored-seat sentence. It renders EMPTY when the program has no offer (or no
- *   seats left), so defaults never mention sponsored seats that don't exist.
+ *   seats left), so defaults never mention sponsorships that don't exist.
  * - A line that only held a fill-in which rendered empty is dropped.
  *
  * Checks (templateChecks) by key:
@@ -105,7 +105,7 @@ export interface FillValues {
   program: string
   description: string
   link: string
-  /** Sponsored seats left this month; null = the program has no offer. */
+  /** Sponsorships left this month; null = the program has no offer. */
   seatsLeft: number | null
 }
 
@@ -115,9 +115,9 @@ export const MAIN_LINK_PROGRAM = { program: 'NowTransformed', description: 'a yo
 /** The sponsored-seat sentence. Empty when there's no offer or no seats left. */
 export function seatLine(key: TemplateKey, seatsLeft: number | null): string {
   if (seatsLeft == null || seatsLeft <= 0) return ''
-  if (key === 'POST') return `Thanks to NowTransformed, there ${seatsLeft === 1 ? 'is 1 sponsored seat' : `are ${seatsLeft} sponsored seats`} this month.`
+  if (key === 'POST') return `Thanks to NowTransformed, there ${seatsLeft === 1 ? 'is 1 sponsorship' : `are ${seatsLeft} sponsorships`} this month.`
   // Messages to one person say "a few", so they stay true however many are left.
-  return 'NowTransformed is sponsoring a few seats this month.'
+  return 'NowTransformed is sponsoring a few people this month.'
 }
 
 function fillValue(token: string, key: TemplateKey, v: FillValues): string {

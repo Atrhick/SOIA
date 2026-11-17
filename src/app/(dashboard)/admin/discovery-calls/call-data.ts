@@ -152,7 +152,7 @@ export interface CallOrigin {
   firstName: string
   inviter: { name: string; first: string; role: string } | null
   program: string | null
-  /** e.g. "Sponsored seat: $49 (full $199)"; null when the program has no offer (or there's no program). */
+  /** e.g. "Sponsorship: $49 (full $199)"; null when the program has no offer (or there's no program). */
   offer: string | null
   hasOffer: boolean
   channel: string
@@ -195,7 +195,7 @@ export async function loadCallOrigin(callId: string, viewerTz: string): Promise<
     inviter: inviter ? { name: inviter.full, first: inviter.first, role: roleWord(inviter.role) } : null,
     program: p.program?.name ?? null,
     offer: offer && offer.sponsoredPrice
-      ? `Sponsored seat: ${offer.sponsoredPrice}${offer.fullPrice ? ` (full ${offer.fullPrice})` : ''}`
+      ? `Sponsorship: ${offer.sponsoredPrice}${offer.fullPrice ? ` (full ${offer.fullPrice})` : ''}`
       : null,
     hasOffer: !!offer?.sponsoredPrice,
     channel: p.inviteChannel ? channelLabel(p.inviteChannel) : 'Unknown',

@@ -36,7 +36,7 @@ export interface InviteProgramOption {
   business: string
   program: string
   programLine: string
-  /** Sponsored seats left this month: {sponsor line} renders. */
+  /** Sponsorships left this month: {sponsor line} renders. */
   sponsorship: boolean
   /** The owner's regular price for {regular price} (empty = a blank to fill). */
   regularPrice?: string

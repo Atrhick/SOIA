@@ -4,7 +4,7 @@
  *
  * Owned by the content writer. Every message here must pass scriptChecks() (scripts-defaults.test.ts),
  * which also fails on the banned words and phrases from the copy brief.
- * Wording: "sponsored seat", never "grant"; never promise a seat (the team decides on the call).
+ * Wording: "sponsorship", never "grant"; never promise a seat (the team decides on the call).
  *
  * Voice notes for anyone editing:
  * - Senders range from a 45-year-old coach to a 16-year-old ambassador texting an aunt. Plain, warm,
@@ -74,15 +74,15 @@ export const GENERAL_SCRIPTS: GeneralScripts = {
   },
   'PARENT:EMAIL': {
     subject: "A thought for your family",
-    body: "Hi {first name},\n\n{personal line}\n\n{intro}. I wanted to ask you first.\n\nIt starts with a free 15-minute call with the team. For anyone under 18 a parent is on it, so you'd hear everything before anything is decided, and you can bring whatever questions you have. [[sponsor: If cost is a worry, you can ask them about a sponsored seat.]]\n\nWant me to send you the details so you can look first?\n\nThanks,\n{my name}",
+    body: "Hi {first name},\n\n{personal line}\n\n{intro}. I wanted to ask you first.\n\nIt starts with a free 15-minute call with the team. For anyone under 18 a parent is on it, so you'd hear everything before anything is decided, and you can bring whatever questions you have. [[sponsor: If cost is a worry, you can ask them about a sponsorship.]]\n\nWant me to send you the details so you can look first?\n\nThanks,\n{my name}",
   },
   'ORG:SHORT': {
     subject: null,
-    body: "Hi {first name}, I'm {my name}. {intro}.\n{personal line}\nI think some people you work with could use it. Each person books a free 15-minute call with the NowTransformed team. You'd just pass on a name. [[sponsor: They can ask about a sponsored seat.]]\nCould I send an overview to share?",
+    body: "Hi {first name}, I'm {my name}. {intro}.\n{personal line}\nI think some people you work with could use it. Each person books a free 15-minute call with the NowTransformed team. You'd just pass on a name. [[sponsor: They can ask about a sponsorship.]]\nCould I send an overview to share?",
   },
   'ORG:EMAIL': {
     subject: "For the people you work with",
-    body: "Hi {first name},\n\nI'm {my name}. {intro}.\n\n{personal line}\n\nI think some of the people you work with could use it, and a mention from you means more than anything I could post.\n\nIf you pass along a name, that person books a free 15-minute call with the NowTransformed team, who get to know them and, if it's a fit, talk through next steps. [[sponsor: Where cost is a barrier, they can ask on the call about a sponsored seat.]]\n\nI can send a short overview you could forward, or come talk with your team for 15 minutes. Would either one help?\n\nThanks,\n{my name}",
+    body: "Hi {first name},\n\nI'm {my name}. {intro}.\n\n{personal line}\n\nI think some of the people you work with could use it, and a mention from you means more than anything I could post.\n\nIf you pass along a name, that person books a free 15-minute call with the NowTransformed team, who get to know them and, if it's a fit, talk through next steps. [[sponsor: Where cost is a barrier, they can ask on the call about a sponsorship.]]\n\nI can send a short overview you could forward, or come talk with your team for 15 minutes. Would either one help?\n\nThanks,\n{my name}",
   },
   'POST:POST': {
     subject: null,
@@ -95,7 +95,7 @@ export const GENERAL_SCRIPTS: GeneralScripts = {
   },
   'ASK_PRICE:SHORT': {
     subject: null,
-    body: "{personal line}\nThe call is free. The team goes over cost on the call, so you hear it from them and not my guess. [[sponsor: You can also ask them about a sponsored seat.]]\nWant the link to book it?",
+    body: "{personal line}\nThe call is free. The team goes over cost on the call, so you hear it from them and not my guess. [[sponsor: You can also ask them about a sponsorship.]]\nWant the link to book it?",
   },
   'ASK_TIME:SHORT': {
     subject: null,
@@ -177,7 +177,7 @@ export const GENERAL_TIPS: PlaybookSection[] = [
     points: [
       "Follow up twice at most. Send one check-in after 3 or 4 days with something new, one kind last note around day 10 to 14, and then stop.",
       "Never send \"Did you see my message?\" because it makes people feel guilty. Give them something new instead, like the fact that the call is only 15 minutes.",
-      "Never say someone will get a sponsored seat. Say they may be able to and can ask on the call, because the team decides.",
+      "Never say someone will get a sponsorship. Say they may be able to and can ask on the call, because the team decides.",
       "Don't promise results, health changes or money. Say what happens next (a free call), not what it will do for them.",
       "Never name, tag or post about anyone under 18, and never mention anyone's health, money or foster care situation in public.",
     ],
