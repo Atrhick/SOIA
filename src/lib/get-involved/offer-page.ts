@@ -3,7 +3,7 @@
  *
  * Every section except the hero, steps and closing is optional and is left out when empty. The sign-up
  * form is always the real One-A-Day form (signup-page.tsx), shown in the hero; every button jumps to it.
- * The sponsorship box shows only while the program has sponsorships open this month, and testimonials
+ * The sponsorship box shows unless the program's monthly sponsorships are all offered, and testimonials
  * only when there is at least one real one (name and permission are the owner's responsibility).
  */
 import { z } from 'zod'

@@ -4,7 +4,7 @@
  * and every button on the page jumps to it (#get-started).
  *
  * Rules carried over from the sign-up page: no prices or sponsorship counts before the call, the
- * sponsorship box only while sponsorships are open this month, testimonials only when real ones exist.
+ * sponsorship box unless the program's monthly sponsorships are all offered, testimonials only when real ones exist.
  */
 /* eslint-disable @next/next/no-img-element -- static screenshots; plain <img> keeps them lazy and simple */
 import Image from 'next/image'
@@ -34,7 +34,9 @@ const TILTS = [s.tiltA, s.tiltB, s.tiltC, s.tiltA]
 export function OfferLanding({ signup, page, business, more }: OfferLandingProps) {
   const { inviter, program, offer } = signup
   const label = program?.label ?? business
-  const sponsorshipsOpen = !!offer && offer.seatsOpen && !!page.sponsorship
+  // Shown whenever the page has a sponsorship box (the wording promises nothing). Hidden only when the
+  // program has a monthly number of sponsorships set and this month's are all offered.
+  const sponsorshipsOpen = !!page.sponsorship && (!offer || offer.seatsOpen)
   const hand = `${caveat.className} ${s.hand}`
   const t = page.theme ?? DEFAULT_OFFER_THEME
   // The page's colours, as CSS variables; the embedded sign-up form picks them up too (offer-landing.module.css).
