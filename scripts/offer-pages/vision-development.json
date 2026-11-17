@@ -1,0 +1,143 @@
+{
+  "theme": {
+    "accent": "#6d28d9",
+    "accentDark": "#5b21b6",
+    "tint": "#f6f3ff",
+    "deep": "#3b0764",
+    "deepText": "#ede9fe"
+  },
+  "eyebrow": "DreamIt LiveIt · Vision Development, for young people in foster care",
+  "hook": "So much gets decided for them. Here, someone asks what they want.",
+  "intro": "Vision Development is a four-week program from DreamIt LiveIt for young people in foster care. They look at what they're good at and what matters to them, and they finish with a few practical steps toward what they want.",
+  "bullets": [
+    {
+      "lead": "Half an hour a week.",
+      "text": "Four weeks, Thursdays 10:30 to 11 a.m. Eastern, on Zoom."
+    },
+    {
+      "lead": "The adult who cares for them comes first.",
+      "text": "A foster or kinship parent or other carer books the free call and is on it."
+    }
+  ],
+  "hostNote": "founder of DreamIt LiveIt",
+  "heroImage": {
+    "src": "/offers/vision-development/hero-journal-on-bed.webp",
+    "alt": "A teenager in a blue jumper lies on her bed writing in a notebook, with a teddy bear beside her",
+    "sample": true,
+    "focus": "70% 40%",
+    "handNote": "what do you want? ↙"
+  },
+  "why": {
+    "title": "When every question about the future gets a shrug",
+    "paragraphs": [
+      "\"He just shuts down.\" \"She says I don't know to everything.\" \"I want her to have something to aim at.\" If you care for a teenager in foster care, you may have said one of these. Questions about after high school get a shrug.",
+      "A lot of young people in care have had plenty of adults with plans for them. Vision Development starts with what they're good at, what matters to them and what they want."
+    ]
+  },
+  "options": {
+    "title": "What the four weeks look at",
+    "items": [
+      {
+        "label": "Who they are",
+        "title": "What they're good at",
+        "text": "Self-awareness and identity: who they are and where their strengths lie.",
+        "image": {
+          "src": "/offers/vision-development/teen-notebook-desk.webp",
+          "alt": "A teenage boy in a grey hoodie writes in a notebook at a wooden desk at home",
+          "sample": true,
+          "note": "strengths",
+          "focus": "70% 40%"
+        }
+      },
+      {
+        "label": "What matters",
+        "title": "Their values",
+        "text": "What matters to them, put in their own words.",
+        "image": {
+          "src": "/offers/vision-development/teen-writing-table.webp",
+          "alt": "A teenage girl in glasses and a blue beanie writes in a notebook at a table",
+          "sample": true,
+          "note": "values",
+          "focus": "50% 35%"
+        }
+      },
+      {
+        "label": "Where they're headed",
+        "title": "A vision and a few next steps",
+        "text": "By the end of the four weeks they have a picture of the future they want and practical action steps toward it.",
+        "image": {
+          "src": "/offers/vision-development/teen-laptop-headphones.webp",
+          "alt": "A teenage boy in glasses and headphones smiles at a laptop on his desk",
+          "sample": true,
+          "note": "next steps",
+          "focus": "65% 40%"
+        }
+      }
+    ],
+    "footnote": "We can't promise what will change. Each young person leaves with a few steps they chose themselves.",
+    "cta": "Ask if it's a fit"
+  },
+  "story": {
+    "title": "Why Elizabeth does this",
+    "paragraphs": [
+      "Elizabeth Mgaya started DreamIt LiveIt because she believes a big change in life doesn't have to be the end of your story.",
+      "Her own path through career, family responsibilities, caregiving, unexpected life changes and starting over has shaped how she helps others find purpose in the middle of a transition. Today she brings together coaching, mentoring, life experience and practical tools for young people and caregivers.",
+      "In her words: \"Your current circumstances are part of your story, but they do not have to determine your future.\""
+    ]
+  },
+  "sponsorship": {
+    "title": "For carers and caseworkers who get asked about cost first",
+    "text": "Cost is usually the first thing a caseworker gets asked, so here is the answer up front. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. The carer books the free call and the team looks at it with them, so a caseworker has nothing to set up.",
+    "cta": "Ask on behalf of a young person"
+  },
+  "steps": [
+    {
+      "title": "Fill in the form",
+      "text": "Your first name, email and age, then pick a time in the next three weeks."
+    },
+    {
+      "title": "Free 15-minute call",
+      "text": "The NowTRANSFORMED team asks what you'd like help with, explains how Vision Development works and answers your questions. For anyone under 18, a parent or carer is on the call. The young person can join and just listen."
+    },
+    {
+      "title": "Decide together",
+      "text": "Talk it over with the young person. If it fits, the team explains how sign-up works and which adults need to agree."
+    }
+  ],
+  "testimonials": [],
+  "faqs": [
+    {
+      "q": "Who can sign a young person up?",
+      "a": "The adult who cares for the young person books the free call. If the young person is under 18, a parent or carer must be on it. On that call, ask what's needed to enrol them in the program and whose consent comes first, and keep their caseworker in the loop."
+    },
+    {
+      "q": "What ages is it for?",
+      "a": "It's for young people in foster care. To check it fits their age, ask on your free call."
+    },
+    {
+      "q": "When and where is it?",
+      "a": "Thursdays, 10:30 to 11 a.m. Eastern, for four weeks, on Zoom. Ask about the next start date and how to join on your free call."
+    },
+    {
+      "q": "How much does it cost?",
+      "a": "You'll get the exact price on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer, and the team looks at that with you then."
+    },
+    {
+      "q": "They're done with programs.",
+      "a": "That's fair, and they don't have to decide now. They can join the free call and just listen before anyone decides anything."
+    },
+    {
+      "q": "What happens on the call?",
+      "a": "Fifteen minutes with the NowTRANSFORMED team. They ask what you'd like help with, explain how Vision Development works and answer your questions. There's nothing to prepare, and you can book up to three weeks ahead."
+    },
+    {
+      "q": "How do I know this is legitimate?",
+      "a": "Good to check. DreamIt LiveIt is Elizabeth's business, and the free call is run by NowTRANSFORMED, a youth leadership development program. If a caseworker would like to talk with Elizabeth first, she's glad to. Ask the team on your free call."
+    }
+  ],
+  "closing": {
+    "title": "Start with one question: what do they want?",
+    "text": "A free 15-minute call with the NowTRANSFORMED team. Pick a time in the next three weeks.",
+    "cta": "Book a free call"
+  }
+}

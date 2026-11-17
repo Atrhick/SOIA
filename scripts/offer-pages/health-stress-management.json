@@ -1,0 +1,146 @@
+{
+  "theme": {
+    "accent": "#166534",
+    "accentDark": "#14532d",
+    "tint": "#f0fdf4",
+    "deep": "#14532d",
+    "deepText": "#dcfce7"
+  },
+  "eyebrow": "Usawa Health Coaching · A weekly class on stress and energy",
+  "hook": "Live well. Perform well. A weekly class for busy people who are tired all the time.",
+  "intro": "You keep up at work and at home, and you're running on empty. Usawa Health Coaching is an interactive class with Daniella Munene, every Tuesday at 7pm East Africa Time. You look at what's draining you and work on one small change at a time, the kind you can keep with a full job and a full house.",
+  "bullets": [
+    {
+      "lead": "Handle stress better.",
+      "text": "Practical ways to manage stress that fit the life you already have."
+    },
+    {
+      "lead": "Habits you can keep.",
+      "text": "Small everyday changes, not a diet and not a strict plan."
+    },
+    {
+      "lead": "Energy for long days.",
+      "text": "Practical work on energy and resilience, for people whose days don't stop."
+    }
+  ],
+  "hostNote": "Lead Coach, Usawa Health Coaching",
+  "heroImage": {
+    "src": "/offers/health-stress-management/hero-video-class.webp",
+    "alt": "A smiling woman on a video call at her laptop gives a thumbs up",
+    "sample": true,
+    "focus": "50% 15%",
+    "handNote": "Tuesdays at 7 ↙"
+  },
+  "why": {
+    "title": "Most people don't say \"I'm stressed.\" They say \"I'm just tired.\"",
+    "paragraphs": [
+      "\"I'm fine, just tired. Work is crazy.\" \"I can't switch off at night.\" \"I'll sort myself out after this project.\" If you've said one of these, you know how it goes. Lunch at your desk, short nights, and the rest you promised yourself keeps moving to next month.",
+      "Usawa is for people who want to keep doing well at work and at home without paying for it with their health. You learn how stress and everyday choices affect your energy, and you build habits that fit a real week."
+    ]
+  },
+  "options": {
+    "title": "Who the Tuesday class is for",
+    "items": [
+      {
+        "label": "Working parents",
+        "title": "Doing everything for everyone",
+        "text": "You hold it together at work, then start again at home. The class works on small changes that fit around your family, not on top of it.",
+        "image": {
+          "src": "/offers/health-stress-management/parent-working-home.webp",
+          "alt": "A mother works on a laptop on the sofa while her two small children play around her",
+          "sample": true,
+          "note": "then the second shift",
+          "focus": "60% 50%"
+        }
+      },
+      {
+        "label": "Told to reduce stress",
+        "title": "\"Reduce stress.\" But how?",
+        "text": "Your doctor told you to reduce stress, and you weren't sure how. The class works on what that looks like on an ordinary Tuesday.",
+        "image": {
+          "src": "/offers/health-stress-management/man-on-couch.webp",
+          "alt": "A man sits on a sofa, resting his head on his hand and looking away, deep in thought",
+          "sample": true,
+          "note": "easier said than done",
+          "focus": "50% 45%"
+        }
+      },
+      {
+        "label": "Students and young professionals",
+        "title": "Big goals, short nights",
+        "text": "Study, work and big plans, running on tea and late nights. Build habits you can keep while you go after your goals, instead of leaving rest for later.",
+        "image": {
+          "src": "/offers/health-stress-management/tired-at-desk.webp",
+          "alt": "A young woman at a desk with sticky notes on her screen rests her cheek on her hand and looks tired",
+          "sample": true,
+          "note": "rest is for later?",
+          "focus": "60% 40%"
+        }
+      }
+    ],
+    "footnote": "This page isn't medical advice, and the class is coaching, not medical treatment. If you have a health concern, talk to your doctor.",
+    "cta": "Ask if it fits me"
+  },
+  "story": {
+    "title": "Meet Daniella",
+    "paragraphs": [
+      "Daniella Munene is Lead Coach at Usawa Health Coaching. Her background is in pharmacy and international public health.",
+      "Her work is helping people understand how stress, lifestyle and everyday choices shape their health and their performance. In class she takes the health science and turns it into things you can actually do on a Tuesday when you're exhausted."
+    ]
+  },
+  "sponsorship": {
+    "title": "If cost is one more thing on your mind",
+    "text": "If the cost is one more thing you'd rather think about next month, ask about it on your free call instead. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. You don't need to have anything worked out before you ask.",
+    "cta": "Ask about the Tuesday class"
+  },
+  "steps": [
+    {
+      "title": "Tell us who you are",
+      "text": "Your first name, email and age, then pick any time in the next three weeks."
+    },
+    {
+      "title": "Free 15-minute call",
+      "text": "The NowTRANSFORMED team asks what's been wearing you down, explains how the class works and checks whether you qualify for a sponsorship."
+    },
+    {
+      "title": "Join on a Tuesday",
+      "text": "If it fits, you join the class on Tuesday evenings at 7pm East Africa Time."
+    }
+  ],
+  "testimonials": [],
+  "faqs": [
+    {
+      "q": "How much does it cost?",
+      "a": "The team gives you the exact price on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer, and they look at that with you then."
+    },
+    {
+      "q": "Is this medical? I already see a doctor.",
+      "a": "No. It's coaching, not treatment. Keep seeing your doctor. The class is about the everyday habits around your health, like how you handle stress."
+    },
+    {
+      "q": "When and where is the class?",
+      "a": "Every Tuesday at 7pm East Africa Time, online. Ask on your free call how long each class runs and how many weeks the program lasts. If you live in another time zone, mention that too."
+    },
+    {
+      "q": "I don't have time.",
+      "a": "I know. It's one class a week, and right now it's just a free 15-minute call with the NowTRANSFORMED team."
+    },
+    {
+      "q": "I've tried apps and diets.",
+      "a": "This isn't a diet. You look at why you're tired and work on small habits you can keep."
+    },
+    {
+      "q": "I'm under 18. Can I join?",
+      "a": "Usawa is open to young people juggling their own goals too. Ask on your free call whether the class suits your age. If you're 17 or younger, a parent or guardian joins the call with you."
+    },
+    {
+      "q": "Do you run anything for teenagers?",
+      "a": "Yes. Daniella also coordinates the Explorer Leadership Clubs for high school students: leadership, teamwork and service with other teens, on Friday mornings, online and in person. Parents, ask about the clubs on your free call."
+    }
+  ],
+  "closing": {
+    "title": "You don't have to wait until things calm down.",
+    "text": "A free 15-minute call with the NowTRANSFORMED team. Pick any time in the next three weeks.",
+    "cta": "Book my free call"
+  }
+}

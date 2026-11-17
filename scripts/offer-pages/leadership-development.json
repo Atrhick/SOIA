@@ -1,0 +1,154 @@
+{
+  "theme": {
+    "accent": "#b42318",
+    "accentDark": "#912018",
+    "tint": "#fdf3f1",
+    "deep": "#5c1610",
+    "deepText": "#fde4df"
+  },
+  "eyebrow": "Leading The Way · A leadership class for young people",
+  "hook": "Getting the role is the easy part. Keeping it is the work.",
+  "intro": "Leadership Development is for young people and young professionals who have been handed responsibility, or want it, and nobody has shown them how. With Chris Moore they find out where they're strong, where they're not, and how to make a decision when it counts.",
+  "bullets": [
+    {
+      "lead": "Twice a month.",
+      "text": "Every other Wednesday at 9 a.m., on Zoom. Ask on your free call which time zone that is."
+    },
+    {
+      "lead": "Real situations, not a textbook.",
+      "text": "Making a call under pressure, and talking through what you'd do."
+    },
+    {
+      "lead": "Calm, not a boot camp.",
+      "text": "Nobody's yelling. Chris pushes them, and he's on their side."
+    }
+  ],
+  "hostNote": "30 years in the American fire service · Leading The Way",
+  "heroImage": {
+    "src": "/offers/leadership-development/hero-young-adults-laptop.webp",
+    "alt": "Five young adults in an office gather around a laptop, smiling",
+    "sample": true,
+    "focus": "50% 40%",
+    "handNote": "for the ones who want it ↙"
+  },
+  "why": {
+    "title": "They got the role. Nobody showed them how.",
+    "paragraphs": [
+      "\"She got thrown into it.\" \"They don't listen to me.\" \"I don't know how to be the boss of my friends.\" If you've heard one of these at home or at work, you know the moment. A teen is named captain. A young adult is promoted to shift lead and now supervises friends. They have the title, and they won't say they're struggling.",
+      "In Chris's class they learn what makes them who they are, and they practice the harder part: keeping the role, and the respect of the people they lead."
+    ]
+  },
+  "options": {
+    "title": "Who the class is for",
+    "items": [
+      {
+        "label": "New at work",
+        "title": "Promoted over their friends",
+        "text": "A new shift lead just wants to keep the crew's respect in the first month. Leading people you used to work beside is the kind of thing the class works on.",
+        "image": {
+          "src": "/offers/leadership-development/leading-at-work.webp",
+          "alt": "A young woman stands by a board of sticky notes and talks to a small group of young colleagues",
+          "sample": true,
+          "note": "first month in charge",
+          "focus": "62% 45%"
+        }
+      },
+      {
+        "label": "Teens",
+        "title": "Just made captain",
+        "text": "Captain is harder than it looks. Your teen has the role, and the class is a place to practice leading teammates. It meets at 9 a.m. on a Wednesday, a school morning for most teens, so check it fits their week before you book.",
+        "image": {
+          "src": "/offers/leadership-development/team-captain.webp",
+          "alt": "A young woman holding a basketball talks to two teammates sitting on a locker room bench",
+          "sample": true,
+          "note": "captain this season",
+          "focus": "50% 40%"
+        }
+      },
+      {
+        "label": "After a setback",
+        "title": "Cut, passed over, or ready to quit",
+        "text": "A hard season or a bad review is often when people are ready to learn. A lot of the class is about getting back up and not quitting until you reach the goal.",
+        "image": {
+          "src": "/offers/leadership-development/after-a-loss.webp",
+          "alt": "Young women basketball players sit on benches in a locker room with their heads down",
+          "sample": true,
+          "note": "getting back up",
+          "focus": "60% 50%"
+        }
+      },
+      {
+        "label": "Managers and owners",
+        "title": "Young staff stepping up",
+        "text": "If your young staff are moving into lead roles, each of them can book their own free call to see whether the class fits.",
+        "image": {
+          "src": "/offers/leadership-development/team-high-five.webp",
+          "alt": "Young adults in casual clothes high-five together in a bright room",
+          "sample": true,
+          "note": "for your team",
+          "focus": "50% 35%"
+        }
+      }
+    ],
+    "footnote": "The class doesn't promise a promotion, a scholarship or a captaincy. You practice making decisions and leading people. What you do with it is up to you.",
+    "cta": "See if it fits"
+  },
+  "story": {
+    "title": "Thirty years in the fire service",
+    "paragraphs": [
+      "Chris Moore spent 30 years in the American fire service. He led with a title and without one, and he learned how through years of formal education and countless hours on calls most people never have to see.",
+      "Now he runs Leading The Way and teaches what he learned to young people and young professionals."
+    ]
+  },
+  "sponsorship": {
+    "title": "Ready to step up, but unsure about the cost?",
+    "text": "If cost is what's in the way, say so on your free call. That goes for a young professional booking for yourself and for a parent whose teen wants in. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "cta": "Ask about the Wednesday class"
+  },
+  "steps": [
+    {
+      "title": "Tell us who you are",
+      "text": "Your first name, email and age, then pick a time for the call, up to three weeks ahead."
+    },
+    {
+      "title": "Free 15-minute call",
+      "text": "With the NowTRANSFORMED team, not with Chris. Ask anything, then decide."
+    },
+    {
+      "title": "Join on a Wednesday",
+      "text": "If it fits, Chris sends you the joining details himself."
+    }
+  ],
+  "testimonials": [],
+  "faqs": [
+    {
+      "q": "How much does it cost?",
+      "a": "You'll get the exact price on your free call, along with whether a sponsorship could apply."
+    },
+    {
+      "q": "When does it meet?",
+      "a": "Every other Wednesday at 9 a.m., so twice a month, on Zoom. Ask on your free call which time zone that is. If 9 a.m. on a Wednesday never works, this class may not be the right one."
+    },
+    {
+      "q": "Who can join?",
+      "a": "Young people and young professionals who are starting out. If you're not sure you're old enough, ask on your free call. Anyone under 18 needs a parent on that call."
+    },
+    {
+      "q": "My son isn't really a leader type.",
+      "a": "Most people aren't, until somebody shows them. He can sit in on the free call with you and hear it for himself. The class is for young people who want it, and Chris won't drag anyone."
+    },
+    {
+      "q": "What happens on the call?",
+      "a": "It's 15 minutes with the NowTRANSFORMED team, not with Chris. They ask what you'd like help with, explain how the class runs and answer your questions. You decide after."
+    },
+    {
+      "q": "How do I know this is legitimate?",
+      "a": "Fair question. Chris Moore spent 30 years in the fire service, and Leading The Way is his business. The free call is run by NowTRANSFORMED, a youth leadership development program."
+    }
+  ],
+  "closing": {
+    "title": "For the ones who want it.",
+    "text": "A free 15-minute call with the NowTRANSFORMED team. You can book it up to three weeks ahead.",
+    "cta": "Book my free call"
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "theme": {
+    "accent": "#4338ca",
+    "accentDark": "#3730a3",
+    "tint": "#f3f3fe",
+    "deep": "#312e81",
+    "deepText": "#e0e7ff"
+  },
+  "eyebrow": "Verily Academy · For people who know something useful",
+  "hook": "People already ask you about it. Teach it as one free class.",
+  "intro": "Verily Academy, part of NowTRANSFORMED, is where people who know something useful teach one practical intro class on it, live or recorded, and anyone in the community can join. Learners leave with something they can use, and they get to know you.",
+  "bullets": [
+    {
+      "lead": "One real problem.",
+      "text": "Pick a question people already bring to you, like getting a small business loan or switching careers."
+    },
+    {
+      "lead": "Live, recorded or both,",
+      "text": "so it fits around your work."
+    },
+    {
+      "lead": "No teaching background needed.",
+      "text": "If you can explain it to a friend over coffee, you can teach the intro class."
+    },
+    {
+      "lead": "Room to go further.",
+      "text": "If learners want more, you can build a fuller course later."
+    }
+  ],
+  "hostNote": "runs Verily Academy, part of NowTRANSFORMED",
+  "heroImage": {
+    "src": "/offers/verilyacademy/hero-community-class.webp",
+    "alt": "A man stands at the front of a brick-walled room talking to a small group of adults on wooden chairs, and one woman raises her hand",
+    "sample": true,
+    "focus": "50% 40%",
+    "handNote": "what do people ask you? ↙"
+  },
+  "why": {
+    "title": "You already teach it. Just not as a class yet.",
+    "paragraphs": [
+      "\"People keep asking me about this.\" \"I don't want all that experience to just sit there.\" \"I know my stuff. I just don't know how to get in front of people.\" If you've said one of these, you're probably explaining the same thing again and again: over coffee, after church, in a group chat.",
+      "A Verily Academy intro class puts that explanation in one place, for anyone in the community who needs it."
+    ]
+  },
+  "options": {
+    "title": "Who Verily Academy is for",
+    "items": [
+      {
+        "label": "The go-to person",
+        "title": "Everyone asks you the same question",
+        "text": "How to fix your credit. How to get a small business loan. What to do before you register a company. If friends keep bringing you the same question, that question is a good first class.",
+        "image": {
+          "src": "/offers/verilyacademy/go-to-person.webp",
+          "alt": "A woman with curly hair, seen from behind, speaks to a group of men listening at their desks",
+          "sample": true,
+          "note": "the one they ask",
+          "focus": "60% 40%"
+        }
+      },
+      {
+        "label": "Recently retired",
+        "title": "Years of know-how, and some free time",
+        "text": "A career in teaching, nursing, accounting or engineering leaves you with a lot worth passing on. One short class is a way to keep that experience working for other people.",
+        "image": {
+          "src": "/offers/verilyacademy/retired-expert.webp",
+          "alt": "An older man with grey hair and glasses stands at the head of a table and explains a point to the people seated around it",
+          "sample": true,
+          "note": "too good to sit unused",
+          "focus": "50% 30%"
+        }
+      },
+      {
+        "label": "Coaches and consultants",
+        "title": "You know your stuff, but few people know you",
+        "text": "A free intro class lets people meet you and see how you teach, so they can decide whether they want more help from you.",
+        "image": {
+          "src": "/offers/verilyacademy/recording-a-class.webp",
+          "alt": "A smiling woman at a desk with notes and a laptop films herself on a phone held in a ring light",
+          "sample": true,
+          "note": "live or recorded",
+          "focus": "50% 40%"
+        }
+      }
+    ],
+    "footnote": "Classes can cover business, careers, money, technology, leadership, health and wellness education, parenting, personal development, or a practical or creative skill.",
+    "cta": "Talk through my class idea"
+  },
+  "story": {
+    "title": "About Verily Academy",
+    "paragraphs": [
+      "Verily Academy connects people who have useful knowledge and experience with people who can benefit from it. Educators, professionals, coaches, entrepreneurs, subject-matter experts and community leaders teach practical classes on real questions and challenges.",
+      "The aim is to make useful education easier to reach, and to give instructors a way to build relationships and show what they know. Verily Academy is part of NowTRANSFORMED, a youth leadership development program, and is run by Pervis Taylor."
+    ]
+  },
+  "sponsorship": {
+    "title": "Cost, for instructors and for learners",
+    "text": "Thinking of teaching? Ask on your free call whether instructors pay anything, and you'll get a straight answer. Here to learn? Intro classes are free, and if an instructor offers a fuller course afterward, that course is paid. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "cta": "Ask about cost on my call"
+  },
+  "steps": [
+    {
+      "title": "Tell us who you are",
+      "text": "Your first name, email and age, then pick any time in the next three weeks."
+    },
+    {
+      "title": "Free 15-minute call",
+      "text": "The NowTRANSFORMED team asks what you might teach, explains how Verily Academy works and what's expected of instructors, and answers your questions."
+    },
+    {
+      "title": "Decide if it fits",
+      "text": "Take your time. If it fits, the team talks you through the next steps for your first class."
+    }
+  ],
+  "testimonials": [],
+  "faqs": [
+    {
+      "q": "What do I get out of it?",
+      "a": "People get to know you and what you know, and Verily Academy helps instructors get seen and build relationships in the community. Nobody can promise you students or income. It depends on you and your subject."
+    },
+    {
+      "q": "How much time does it take?",
+      "a": "Right now, just the free 15-minute call. Ask the team then how much time a class usually takes."
+    },
+    {
+      "q": "What's expected of instructors?",
+      "a": "The team goes through it with you on your free call, before you commit to anything."
+    },
+    {
+      "q": "Isn't this just a way to sell a course?",
+      "a": "Each class has to be about a real problem, not about selling a course. Learners decide for themselves whether they want more."
+    },
+    {
+      "q": "Who's behind this?",
+      "a": "Pervis Taylor runs the academy. The NowTRANSFORMED team runs the free call."
+    },
+    {
+      "q": "Can I join a class instead of teaching one?",
+      "a": "Yes. The intro classes are free and open to anyone in the community. Which ones are running changes month to month, so ask the team on the free call what's on. If you're under 18, a parent joins the call."
+    }
+  ],
+  "closing": {
+    "title": "What would your first class be?",
+    "text": "Bring the question people ask you most to a free 15-minute call with the NowTRANSFORMED team.",
+    "cta": "Book my free call"
+  }
+}
