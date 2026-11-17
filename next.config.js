@@ -38,6 +38,9 @@ const nextConfig = {
         destination: 'https://www.nowtransformedleadership.com/:path',
         permanent: false,
       },
+      // The ExploreNation program's address was "talent-acquisition" until 2026-11-16; links already shared keep working.
+      { source: '/join/:owner/talent-acquisition', destination: '/join/:owner/explorenation', permanent: true },
+      { source: '/p/talent-acquisition/:rest*', destination: '/p/explorenation/:rest*', permanent: true },
     ]
   },
   async headers() {
