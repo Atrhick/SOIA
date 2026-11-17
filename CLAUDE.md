@@ -332,6 +332,7 @@ Admins can view the app as any coach or ambassador:
 4. An amber banner appears in the header showing "Viewing as: [email] ([role])"
 5. To switch back, click "Switch Back" button in banner or profile dropdown → "Switch Back to Admin"
 6. **Auto-expiry**: impersonation sessions are automatically reverted after 30 minutes; `impersonatingAt` timestamp in JWT is checked on every JWT callback
+7. **Who can be picked**: anyone holding COACH or AMBASSADOR, as main role or in `extraRoles` (an admin who is also a coach is listed as "also an admin" and opens their coach view). The picker sends the view role; `getImpersonationData` and the `jwt` callback both re-check it with `loadRoleView`. The ADMIN view of another person is never opened, and you can't pick yourself (use the view switcher)
 
 **Header Profile Name Display:**
 The header displays the user's profile name (firstName + lastName) for coaches and ambassadors, fetched from `CoachProfile` or `Ambassador` model respectively. Falls back to email if name is not available. The dashboard layout (`src/app/(dashboard)/layout.tsx`) fetches the profile name and passes it to the Header component.

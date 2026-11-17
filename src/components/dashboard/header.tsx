@@ -38,6 +38,7 @@ interface ImpersonationUser {
   id: string
   email: string
   role: string
+  alsoAdmin?: boolean
   name: string
   coachId?: string
   ambassadorId?: string
@@ -75,7 +76,7 @@ export function Header({ user }: HeaderProps) {
   }
 
   const handleImpersonate = async (targetUser: ImpersonationUser) => {
-    const result = await getImpersonationData(targetUser.id)
+    const result = await getImpersonationData(targetUser.id, targetUser.role)
     if (result.impersonateData) {
       const s = await updateSession({ impersonate: result.impersonateData })
       if (!s?.user?.isImpersonating) { toast.error('We couldn’t open that account. Please try again.'); return }
@@ -286,14 +287,14 @@ export function Header({ user }: HeaderProps) {
                     <h3 className="sticky top-0 bg-white py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{g.label} ({g.list.length})</h3>
                     <ul className="space-y-1">
                       {g.list.map((u) => (
-                        <li key={u.id}>
+                        <li key={u.id + u.role}>
                           <button
                             type="button"
                             onClick={() => { setPickerOpen(false); void handleImpersonate(u) }}
                             className="flex min-h-[48px] w-full flex-col items-start justify-center rounded-lg px-3 py-2 text-left hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
                           >
                             <span className="w-full truncate font-medium text-gray-900">{u.name}</span>
-                            <span className="w-full truncate text-sm text-gray-500">{u.email}</span>
+                            <span className="w-full truncate text-sm text-gray-500">{u.email}{u.alsoAdmin ? ` · also an admin, opens their ${u.role === 'COACH' ? 'coach' : 'ambassador'} view` : ''}</span>
                           </button>
                         </li>
                       ))}

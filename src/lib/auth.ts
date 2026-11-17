@@ -187,11 +187,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (trigger === 'update' && session) {
         if (session.impersonate) {
           // Only an admin (in the admin view, not already viewing as someone) may view as a coach or ambassador.
+          // The target may hold that role as an extra one (an admin who is also a coach); loadRoleView checks
+          // they really hold it. The admin view of someone else is never opened.
           const targetId = typeof session.impersonate.id === 'string' ? session.impersonate.id : ''
-          const target = token.role === 'ADMIN' && !token.isImpersonating && targetId
+          const target = token.role === 'ADMIN' && !token.isImpersonating && targetId && targetId !== token.id
             ? await prisma.user.findUnique({ where: { id: targetId }, select: { role: true } })
             : null
-          const view = target && (target.role === 'COACH' || target.role === 'AMBASSADOR') ? await loadRoleView(targetId, target.role) : null
+          const asked = session.impersonate.role
+          const viewRole = asked === 'COACH' || asked === 'AMBASSADOR' ? asked : target?.role
+          const view = target && (viewRole === 'COACH' || viewRole === 'AMBASSADOR') ? await loadRoleView(targetId, viewRole) : null
           if (view) {
             token.originalAdminId = token.id
             token.id = view.id
