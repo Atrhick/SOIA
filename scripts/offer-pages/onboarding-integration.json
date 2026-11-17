@@ -1,4 +1,11 @@
 {
+  "theme": {
+    "accent": "#0369a1",
+    "accentDark": "#075985",
+    "tint": "#f0f7fb",
+    "deep": "#0c4a6e",
+    "deepText": "#e0f2fe"
+  },
   "eyebrow": "K.A.P.I.T Global · Onboarding & Integration · Mentoring and business growth",
   "hook": "Have a business idea you keep putting off? Start here.",
   "intro": "K.A.P.I.T Global is a mentoring platform for people with a business idea, new entrepreneurs, emerging leaders and anyone working on their own growth. Onboarding & Integration is how you get started: a short screening to check it's a good fit, then your paperwork and setup, then orientation and training. An internship is part of it too.",

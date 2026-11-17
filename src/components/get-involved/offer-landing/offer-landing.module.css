@@ -1,6 +1,19 @@
 /* The pieces Tailwind can't say neatly: device frames, pins, the tilted cards and the fan of phones. */
 .root { container-type: inline-size; container-name: lp; }
 
+/* The embedded sign-up form uses the app's primary blue; on a landing page it follows the page's colours. */
+.root :global(.bg-primary-700) { background-color: var(--lp-accent); }
+.root :global(.bg-primary-800), .root :global(.hover\:bg-primary-800:hover) { background-color: var(--lp-accent-dark); }
+.root :global(.bg-primary-50), .root :global(.hover\:bg-primary-50:hover) { background-color: var(--lp-tint); }
+.root :global(.text-primary-700) { color: var(--lp-accent); }
+.root :global(.text-primary-800), .root :global(.hover\:text-primary-800:hover) { color: var(--lp-accent-dark); }
+.root :global(.border-primary-700), .root :global(.border-primary-600) { border-color: var(--lp-accent); }
+.root :global(.ring-primary-500), .root :global(.ring-primary-600), .root :global(.focus\:ring-primary-500:focus), .root :global(.focus-visible\:ring-primary-500:focus-visible) { --tw-ring-color: var(--lp-accent); }
+.root :global(.focus\:border-primary-500:focus), .root :global(.focus\:border-primary-600:focus) { border-color: var(--lp-accent); }
+.root :global(.accent-primary-700) { accent-color: var(--lp-accent); }
+.root :global(.text-primary-600) { color: var(--lp-accent); }
+.root :global(.focus-visible\:ring-primary-600:focus-visible) { --tw-ring-color: var(--lp-accent); }
+
 .sample { position: absolute; top: 10px; left: 10px; z-index: 3; background: rgba(15, 23, 42, .82); color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .04em; padding: 4px 8px; border-radius: 999px; }
 .sampleBottom { top: auto; bottom: 10px; }
 

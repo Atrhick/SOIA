@@ -49,6 +49,14 @@ describe('offer pages', () => {
     }
   })
 
+  it('a page may set its own colours; bad colours fail the check', () => {
+    const theme = { accent: '#9d174d', accentDark: '#831843', tint: '#fdf2f8', deep: '#500724', deepText: '#fce7f3' }
+    expect(parseOfferPage({ ...minimal, theme })?.theme).toEqual(theme)
+    expect(parseOfferPage({ ...minimal, theme: { ...theme, accent: 'red' } })).toBeNull()
+    expect(parseOfferPage({ ...minimal, theme: { ...theme, accent: '#fff;}' } })).toBeNull()
+    expect(parseOfferPage(minimal)?.theme).toBeUndefined()
+  })
+
   it('images only from our own /offers files or https links', () => {
     const withImg = (src: string) => parseOfferPage({ ...minimal, heroImage: { src, alt: 'x' } })
     expect(withImg('/offers/explorenation/listing-phone.webp')).not.toBeNull()

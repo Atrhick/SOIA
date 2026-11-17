@@ -12,7 +12,7 @@ import { Caveat } from 'next/font/google'
 import { ArrowRight, Check } from 'lucide-react'
 import { BackToAppBar } from '@/components/back-to-app-bar'
 import { SignupPage, type SignupPageProps } from '@/components/get-involved/signup/signup-page'
-import type { OfferPage } from '@/lib/get-involved/offer-page'
+import { DEFAULT_OFFER_THEME, type OfferPage } from '@/lib/get-involved/offer-page'
 import s from './offer-landing.module.css'
 
 const caveat = Caveat({ subsets: ['latin'], weight: '700', display: 'swap' })
@@ -24,11 +24,11 @@ export interface OfferLandingProps {
   more: { label: string; href: string }[]
 }
 
-const btn = 'inline-flex items-center justify-center gap-2 min-h-[52px] rounded-xl bg-sky-700 px-7 text-[17px] font-bold text-white no-underline hover:bg-sky-800 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-amber-500'
-const btnLight = 'inline-flex items-center justify-center gap-2 min-h-[52px] rounded-xl bg-white px-7 text-[17px] font-bold text-sky-900 no-underline hover:bg-sky-50 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-amber-500'
+const btn = 'inline-flex items-center justify-center gap-2 min-h-[52px] rounded-xl bg-[var(--lp-accent)] px-7 text-[17px] font-bold text-white no-underline hover:bg-[var(--lp-accent-dark)] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-amber-500'
+const btnLight = 'inline-flex items-center justify-center gap-2 min-h-[52px] rounded-xl bg-white px-7 text-[17px] font-bold text-[var(--lp-deep)] no-underline hover:bg-[var(--lp-tint)] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-amber-500'
 const h2 = 'text-[30px] leading-tight font-extrabold text-slate-900'
 const body = 'text-lg leading-relaxed text-slate-700'
-const eyebrowCls = 'text-sm font-bold uppercase tracking-[.08em] text-sky-700'
+const eyebrowCls = 'text-sm font-bold uppercase tracking-[.08em] text-[var(--lp-accent)]'
 const TILTS = [s.tiltA, s.tiltB, s.tiltC, s.tiltA]
 
 export function OfferLanding({ signup, page, business, more }: OfferLandingProps) {
@@ -36,20 +36,23 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
   const label = program?.label ?? business
   const sponsorshipsOpen = !!offer && offer.seatsOpen && !!page.sponsorship
   const hand = `${caveat.className} ${s.hand}`
+  const t = page.theme ?? DEFAULT_OFFER_THEME
+  // The page's colours, as CSS variables; the embedded sign-up form picks them up too (offer-landing.module.css).
+  const themeVars = { '--lp-accent': t.accent, '--lp-accent-dark': t.accentDark, '--lp-tint': t.tint, '--lp-deep': t.deep, '--lp-deep-text': t.deepText } as React.CSSProperties
 
   return (
-    <div className={`${s.root} min-h-screen bg-white text-slate-900`}>
+    <div className={`${s.root} min-h-screen bg-white text-slate-900`} style={themeVars}>
       <BackToAppBar />
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-4 px-5 py-3">
           <Image src="/brand/nowtransformed-logo.png" alt="NowTRANSFORMED" width={800} height={201} priority className="h-10 w-auto sm:h-12" />
-          <a href="#get-started" className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-sky-700 hover:text-sky-800">Book a free call</a>
+          <a href="#get-started" className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-[var(--lp-accent)] hover:text-[var(--lp-accent-dark)]">Book a free call</a>
         </div>
       </header>
 
       <main>
         {/* Hero: the hook on the left, the real sign-up form on the right */}
-        <section aria-labelledby="hero-h" className="bg-[#f0f7fb]">
+        <section aria-labelledby="hero-h" className="bg-[var(--lp-tint)]">
           <div className="mx-auto flex max-w-[1120px] flex-wrap items-start gap-10 px-5 pb-14 pt-12">
             <div className="flex min-w-0 flex-[1_1_440px] flex-col gap-[18px]">
               {page.eyebrow && <p className={`m-0 ${eyebrowCls}`}>{page.eyebrow}</p>}
@@ -59,7 +62,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
                 <ul className="m-0 flex list-none flex-col gap-3 p-0 text-[17px] leading-normal">
                   {page.bullets.map((b) => (
                     <li key={b.lead} className="flex gap-3">
-                      <Check className="mt-0.5 h-[22px] w-[22px] flex-none text-sky-700" strokeWidth={2.5} aria-hidden />
+                      <Check className="mt-0.5 h-[22px] w-[22px] flex-none text-[var(--lp-accent)]" strokeWidth={2.5} aria-hidden />
                       <span><strong>{b.lead}</strong>{b.text ? ` ${b.text}` : ''}</span>
                     </li>
                   ))}
@@ -69,7 +72,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
                 {inviter.photoUrl ? (
                   <img src={inviter.photoUrl} alt={`Photo of ${inviter.name}`} className="h-[52px] w-[52px] flex-none rounded-full object-cover" />
                 ) : (
-                  <div aria-hidden className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-full bg-sky-700 text-xl font-extrabold text-white">{inviter.initials}</div>
+                  <div aria-hidden className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-full bg-[var(--lp-accent)] text-xl font-extrabold text-white">{inviter.initials}</div>
                 )}
                 <p className="m-0 text-[15px] leading-snug text-slate-700">
                   <strong className="text-slate-900">Hosted by {inviter.first}</strong>
@@ -151,7 +154,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
               <h2 id="get-h" className={`mb-[70px] text-center ${h2}`}>{page.options.title}</h2>
               <div className="flex flex-wrap gap-x-5 gap-y-16">
                 {page.options.items.map((o, i) => (
-                  <div key={o.title} className={`min-w-0 rounded-2xl bg-white p-[22px] ${page.options!.items.length === 4 ? s.optHalf : 'flex-[1_1_280px]'} ${o.featured ? 'border-2 border-sky-700' : 'border border-slate-200'}`}>
+                  <div key={o.title} className={`min-w-0 rounded-2xl bg-white p-[22px] ${page.options!.items.length === 4 ? s.optHalf : 'flex-[1_1_280px]'} ${o.featured ? 'border-2 border-[var(--lp-accent)]' : 'border border-slate-200'}`}>
                     {o.image && (
                       <div className={`${s.polaroid} ${TILTS[i % TILTS.length]}`}>
                         {o.image.sample && <span className={s.sample}>SAMPLE</span>}
@@ -159,7 +162,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
                         {o.image.note && <span className={hand}>{o.image.note}</span>}
                       </div>
                     )}
-                    <p className="mb-1.5 text-sm font-bold uppercase tracking-[.06em] text-sky-700">{o.label}</p>
+                    <p className="mb-1.5 text-sm font-bold uppercase tracking-[.06em] text-[var(--lp-accent)]">{o.label}</p>
                     <h3 className="mb-2 text-xl font-bold">{o.title}</h3>
                     <p className="m-0 text-base leading-relaxed text-slate-700">{o.text}</p>
                   </div>
@@ -217,7 +220,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
             <ol className="m-0 flex list-none flex-wrap gap-5 p-0">
               {page.steps.map((st, i) => (
                 <li key={st.title} className="flex min-w-0 flex-[1_1_260px] gap-3.5">
-                  <span aria-hidden className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-sky-700 font-extrabold text-white">{i + 1}</span>
+                  <span aria-hidden className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[var(--lp-accent)] font-extrabold text-white">{i + 1}</span>
                   <div>
                     <h3 className="m-0 mb-1 text-lg font-bold">{st.title}</h3>
                     <p className="m-0 text-base leading-relaxed text-slate-700">{st.text}</p>
@@ -229,18 +232,18 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
         </section>
 
         {page.gallery && (
-          <section aria-labelledby="inside-h" className="overflow-hidden bg-sky-900 text-white">
+          <section aria-labelledby="inside-h" className="overflow-hidden bg-[var(--lp-deep)] text-white">
             <div className="mx-auto max-w-[1120px] pb-10 pt-14">
               <div className="px-5 text-center">
                 <h2 id="inside-h" className="mb-2.5 text-[30px] font-extrabold leading-tight">{page.gallery.title}</h2>
-                {page.gallery.text && <p className="mx-auto max-w-[52ch] text-lg leading-normal text-sky-100">{page.gallery.text}</p>}
+                {page.gallery.text && <p className="mx-auto max-w-[52ch] text-lg leading-normal text-[var(--lp-deep-text)]">{page.gallery.text}</p>}
               </div>
               <div className={s.fan}>
                 {page.gallery.images.slice(0, 4).map((im) => (
                   <div key={im.src} className={s.phone}><img src={im.src} alt={im.alt} loading="lazy" /></div>
                 ))}
               </div>
-              {page.gallery.caption && <p className="mt-8 px-5 text-center text-sm text-sky-200">{page.gallery.caption}</p>}
+              {page.gallery.caption && <p className="mt-8 px-5 text-center text-sm text-[var(--lp-deep-text)]">{page.gallery.caption}</p>}
               <div className="mt-5 flex justify-center px-5"><a href="#get-started" className={btnLight}>Book my free call</a></div>
             </div>
           </section>
@@ -277,10 +280,10 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
           </section>
         )}
 
-        <section aria-labelledby="end-h" className="bg-sky-900 text-white">
+        <section aria-labelledby="end-h" className="bg-[var(--lp-deep)] text-white">
           <div className="mx-auto flex max-w-[760px] flex-col items-center gap-4 px-5 py-14 text-center">
             <h2 id="end-h" className="m-0 text-[32px] font-extrabold leading-tight">{page.closing.title}</h2>
-            {page.closing.text && <p className="m-0 text-lg text-sky-100">{page.closing.text}</p>}
+            {page.closing.text && <p className="m-0 text-lg text-[var(--lp-deep-text)]">{page.closing.text}</p>}
             <a href="#get-started" className={btnLight}>{page.closing.cta}</a>
           </div>
         </section>
@@ -290,7 +293,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
             <h2 id="more-h" className="mb-3 text-lg font-extrabold">More from {business}</h2>
             <ul className="m-0 flex list-none flex-col p-0">
               {more.map((m) => (
-                <li key={m.href}><a href={m.href} className="inline-flex min-h-[44px] items-center gap-1.5 text-base font-semibold text-sky-700 hover:text-sky-800">{m.label}<ArrowRight className="h-4 w-4" aria-hidden /></a></li>
+                <li key={m.href}><a href={m.href} className="inline-flex min-h-[44px] items-center gap-1.5 text-base font-semibold text-[var(--lp-accent)] hover:text-[var(--lp-accent-dark)]">{m.label}<ArrowRight className="h-4 w-4" aria-hidden /></a></li>
               ))}
             </ul>
           </section>
@@ -303,7 +306,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
             {label} is offered through NowTRANSFORMED, a youth leadership development program{page.partnerLine ? `, ${page.partnerLine}` : ''}.
             {signup.mailingAddress && <> {signup.mailingAddress}</>}
           </span>
-          <span><a href="/privacy" className="text-sky-700 underline">Privacy</a> · <a href="/terms" className="text-sky-700 underline">Terms</a></span>
+          <span><a href="/privacy" className="text-[var(--lp-accent)] underline">Privacy</a> · <a href="/terms" className="text-[var(--lp-accent)] underline">Terms</a></span>
         </div>
       </footer>
 

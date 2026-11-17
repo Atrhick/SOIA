@@ -1,4 +1,11 @@
 {
+  "theme": {
+    "accent": "#c2410c",
+    "accentDark": "#9a3412",
+    "tint": "#fff3e8",
+    "deep": "#431407",
+    "deepText": "#ffedd5"
+  },
   "eyebrow": "Padayon Connect · A youth hub in Catarman, Northern Samar",
   "hook": "Thinking about working abroad one day? Take your first step here in Catarman.",
   "intro": "Padayon Connect is a youth hub in Catarman, Northern Samar, for young people who want more from their future. If you have thought about working in another country one day, this is a place to start. You meet other young people with the same hope, and you take a first step close to home. Book a free 15-minute call to hear how it works and ask your questions.",

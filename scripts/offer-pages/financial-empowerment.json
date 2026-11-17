@@ -1,4 +1,11 @@
 {
+  "theme": {
+    "accent": "#0f766e",
+    "accentDark": "#115e59",
+    "tint": "#f0faf8",
+    "deep": "#134e4a",
+    "deepText": "#ccfbf1"
+  },
   "eyebrow": "Life Changing Solutions · Legal and identity protection for families",
   "hook": "Worry less. Live more. Have legal and identity protection in place before you need it.",
   "intro": "Most families only look at this after a scare: a fake call to Mom, a data breach letter, a lease nobody explained. Justin Nguyen helps families set up LegalShield and IDShield, from PPLSI, so they aren't figuring it out alone when a legal question or an identity problem comes up.",

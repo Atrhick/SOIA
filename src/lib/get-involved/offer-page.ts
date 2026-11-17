@@ -20,7 +20,27 @@ const shot = image.extend({
   focus: z.string().regex(/^\d{1,3}% \d{1,3}%$/).optional(),
 })
 
+const hex = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #0f766e')
+
+/** The page's own colours. Left out = the standard NowTRANSFORMED blue. Pick an accent that passes AA on white. */
+export const OfferThemeSchema = z.object({
+  /** Buttons, links, labels, numbers. */
+  accent: hex,
+  /** Button hover. */
+  accentDark: hex,
+  /** Hero background. */
+  tint: hex,
+  /** Closing band and photo band background. */
+  deep: hex,
+  /** Light text on the deep colour. */
+  deepText: hex,
+})
+export type OfferTheme = z.infer<typeof OfferThemeSchema>
+
+export const DEFAULT_OFFER_THEME: OfferTheme = { accent: '#0369a1', accentDark: '#075985', tint: '#f0f7fb', deep: '#0c4a6e', deepText: '#e0f2fe' }
+
 export const OfferPageSchema = z.object({
+  theme: OfferThemeSchema.optional(),
   eyebrow: z.string().trim().max(120).optional(),
   hook: text(120),
   intro: text(600),
