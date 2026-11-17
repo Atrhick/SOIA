@@ -49,6 +49,26 @@ describe('offer pages', () => {
     }
   })
 
+  it('every saved page leads with the sponsorship: a hero bullet and a full section with the exact line', () => {
+    const LINE = "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer."
+    const dir = join(process.cwd(), 'scripts/offer-pages')
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+      const page = parseOfferPage(JSON.parse(readFileSync(join(dir, f), 'utf8')))!
+      expect(page.sponsorship?.text, f).toContain(LINE)
+      expect(page.sponsorship?.points, f).toHaveLength(3)
+      expect(page.bullets.some((b) => /sponsorship/i.test(`${b.lead} ${b.text}`)), `${f}: hero bullet`).toBe(true)
+      const words = JSON.stringify(page.sponsorship) + JSON.stringify(page.bullets)
+      expect(words, f).not.toMatch(/\$\d|\bgrant\b|\bseats?\b|nonprofit/i)
+    }
+  })
+
+  it('sponsorship points are optional and capped at three', () => {
+    const spon = { title: 'T', text: 'X.', cta: 'Go' }
+    expect(parseOfferPage({ ...minimal, sponsorship: spon })?.sponsorship?.points).toEqual([])
+    const pt = { lead: 'L', text: 'T' }
+    expect(parseOfferPage({ ...minimal, sponsorship: { ...spon, points: [pt, pt, pt, pt] } })).toBeNull()
+  })
+
   it('a page may set its own colours; bad colours fail the check', () => {
     const theme = { accent: '#9d174d', accentDark: '#831843', tint: '#fdf2f8', deep: '#500724', deepText: '#fce7f3' }
     expect(parseOfferPage({ ...minimal, theme })?.theme).toEqual(theme)

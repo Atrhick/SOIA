@@ -15,6 +15,10 @@
       "text": "Practical ways to manage stress that fit the life you already have."
     },
     {
+      "lead": "Help paying for Tuesdays.",
+      "text": "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward the Tuesday class. You don't need anything worked out before you ask."
+    },
+    {
       "lead": "Habits you can keep.",
       "text": "Small everyday changes, not a diet and not a strict plan."
     },
@@ -27,7 +31,6 @@
   "heroImage": {
     "src": "/offers/health-stress-management/hero-video-class.webp",
     "alt": "A smiling woman on a video call at her laptop gives a thumbs up",
-    "sample": true,
     "focus": "50% 15%",
     "handNote": "Tuesdays at 7 ↙"
   },
@@ -48,7 +51,6 @@
         "image": {
           "src": "/offers/health-stress-management/parent-working-home.webp",
           "alt": "A mother works on a laptop on the sofa while her two small children play around her",
-          "sample": true,
           "note": "then the second shift",
           "focus": "60% 50%"
         }
@@ -60,7 +62,6 @@
         "image": {
           "src": "/offers/health-stress-management/man-on-couch.webp",
           "alt": "A man sits on a sofa, resting his head on his hand and looking away, deep in thought",
-          "sample": true,
           "note": "easier said than done",
           "focus": "50% 45%"
         }
@@ -72,7 +73,6 @@
         "image": {
           "src": "/offers/health-stress-management/tired-at-desk.webp",
           "alt": "A young woman at a desk with sticky notes on her screen rests her cheek on her hand and looks tired",
-          "sample": true,
           "note": "rest is for later?",
           "focus": "60% 40%"
         }
@@ -89,8 +89,22 @@
     ]
   },
   "sponsorship": {
-    "title": "If cost is one more thing on your mind",
-    "text": "If the cost is one more thing you'd rather think about next month, ask about it on your free call instead. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. You don't need to have anything worked out before you ask.",
+    "title": "Help toward the cost of the Tuesday class",
+    "text": "If the cost is one more thing you'd rather think about next month, ask about it on your free call instead. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "points": [
+      {
+        "lead": "Help paying for the class",
+        "text": "NowTRANSFORMED helps pay toward the cost of Usawa Health Coaching's weekly class with Daniella."
+      },
+      {
+        "lead": "For people running on empty",
+        "text": "Busy people who keep up at work and at home, feel tired all the time, and want small habits they can actually keep."
+      },
+      {
+        "lead": "Ask on your free call",
+        "text": "Tell the NowTRANSFORMED team what's been wearing you down, and they look at cost with you in the same 15 minutes. If you're 17 or younger, a parent or guardian joins."
+      }
+    ],
     "cta": "Ask about the Tuesday class"
   },
   "steps": [

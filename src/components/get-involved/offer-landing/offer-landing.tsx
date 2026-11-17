@@ -32,11 +32,8 @@ const eyebrowCls = 'text-sm font-bold uppercase tracking-[.08em] text-[var(--lp-
 const TILTS = [s.tiltA, s.tiltB, s.tiltC, s.tiltA]
 
 export function OfferLanding({ signup, page, business, more }: OfferLandingProps) {
-  const { inviter, program, offer } = signup
+  const { inviter, program } = signup
   const label = program?.label ?? business
-  // Shown whenever the page has a sponsorship box (the wording promises nothing). Hidden only when the
-  // program has a monthly number of sponsorships set and this month's are all offered.
-  const sponsorshipsOpen = !!page.sponsorship && (!offer || offer.seatsOpen)
   const hand = `${caveat.className} ${s.hand}`
   const t = page.theme ?? DEFAULT_OFFER_THEME
   // The page's colours, as CSS variables; the embedded sign-up form picks them up too (offer-landing.module.css).
@@ -88,7 +85,6 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
               {page.heroImage && (
                 <div className="relative">
                   <div className={s.peek}>
-                    {page.heroImage.sample && <span className={s.sample}>SAMPLE</span>}
                     <img src={page.heroImage.src} alt={page.heroImage.alt} style={page.heroImage.focus ? { objectPosition: page.heroImage.focus } : undefined} />
                   </div>
                   {page.heroImage.handNote && <p className={`${hand} ${s.peekNote}`}>{page.heroImage.handNote}</p>}
@@ -112,7 +108,6 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
                   <div className={s.browser}>
                     <div className={s.browserBar} aria-hidden><i /><i /><i /></div>
                     <div className="relative">
-                      <span className={`${s.sample} ${s.sampleBottom}`}>SAMPLE BUSINESSES</span>
                       <img src={page.showcase.desktop.src} alt={page.showcase.desktop.alt} className="block h-auto w-full" loading="lazy" />
                       {page.showcase.pins.map((p, i) => (
                         <span key={i} className={s.pin} style={{ left: `${p.left}%`, top: `${p.top}%` }} aria-hidden>{i + 1}</span>
@@ -149,6 +144,29 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
           </section>
         )}
 
+        {/* The headline gift. Always shown when the page has one: the wording promises nothing, and a call is
+            worth booking even when this month's sponsorships are all offered. */}
+        {page.sponsorship && (
+          <section aria-labelledby="spon-h" className="mx-auto max-w-[1120px] px-5 pb-14">
+            <div className="rounded-[24px] border-2 border-amber-300 bg-[#fff7e6] p-6 sm:p-9">
+              <p className="mb-1.5 text-sm font-bold uppercase tracking-[.08em] text-amber-800">From NowTRANSFORMED</p>
+              <h2 id="spon-h" className="mb-3 text-[28px] leading-tight font-extrabold text-slate-900 sm:text-[32px]">{page.sponsorship.title}</h2>
+              <p className="mb-0 max-w-[760px] text-lg leading-relaxed text-amber-950">{page.sponsorship.text}</p>
+              {page.sponsorship.points.length > 0 && (
+                <ol className="m-0 mt-6 flex list-none flex-wrap gap-4 p-0">
+                  {page.sponsorship.points.map((pt, i) => (
+                    <li key={pt.lead} className="flex min-w-0 flex-[1_1_240px] gap-3 rounded-2xl bg-white/80 p-4">
+                      <span aria-hidden className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-amber-400 font-extrabold text-amber-950">{i + 1}</span>
+                      <span className="text-base leading-relaxed text-slate-800"><strong className="text-slate-900">{pt.lead}</strong> {pt.text}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <div className="mt-6"><a href="#get-started" className={btn}>{page.sponsorship.cta}</a></div>
+            </div>
+          </section>
+        )}
+
         {/* The options, each with a tilted screenshot */}
         {page.options && (
           <section aria-labelledby="get-h" className="border-y border-slate-200 bg-slate-50">
@@ -159,7 +177,6 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
                   <div key={o.title} className={`min-w-0 rounded-2xl bg-white p-[22px] ${page.options!.items.length === 4 ? s.optHalf : 'flex-[1_1_280px]'} ${o.featured ? 'border-2 border-[var(--lp-accent)]' : 'border border-slate-200'}`}>
                     {o.image && (
                       <div className={`${s.polaroid} ${TILTS[i % TILTS.length]}`}>
-                        {o.image.sample && <span className={s.sample}>SAMPLE</span>}
                         <img src={o.image.src} alt={o.image.alt} loading="lazy" style={o.image.focus ? { objectPosition: o.image.focus } : undefined} />
                         {o.image.note && <span className={hand}>{o.image.note}</span>}
                       </div>
@@ -178,7 +195,6 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
                     <div className={s.spread}>
                       {page.options.soon.images.map((im) => (
                         <div key={im.src} className={`${s.polaroid} ${s.printPage}`}>
-                          {im.sample && <span className={s.sample}>SAMPLE</span>}
                           {/* Opens the full page so the small print is readable. */}
                           <a href={im.src} target="_blank" rel="noopener noreferrer"><img src={im.src} alt={im.alt} loading="lazy" /></a>
                           {im.note && <span className={hand}>{im.note}</span>}
@@ -200,18 +216,6 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
             <div className="min-w-0 flex-[1_1_420px]">
               <h2 id="story-h" className={`mb-3.5 ${h2}`}>{page.story.title}</h2>
               {page.story.paragraphs.map((p) => <p key={p} className={`mb-3 ${body}`}>{p}</p>)}
-            </div>
-          </section>
-        )}
-
-        {sponsorshipsOpen && (
-          <section aria-labelledby="spon-h" className="mx-auto max-w-[1120px] px-5 pb-14">
-            <div className="flex flex-wrap items-center gap-5 rounded-[20px] border border-amber-300 bg-[#fff7e6] p-7">
-              <div className="min-w-0 flex-[1_1_420px]">
-                <h2 id="spon-h" className="mb-2 text-2xl font-extrabold">{page.sponsorship!.title}</h2>
-                <p className="m-0 text-[17px] leading-relaxed text-amber-950">{page.sponsorship!.text}</p>
-              </div>
-              <a href="#get-started" className={`${btn} flex-none`}>{page.sponsorship!.cta}</a>
             </div>
           </section>
         )}

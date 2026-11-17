@@ -8,6 +8,10 @@
       "text": "so locals can find you by what you do. Paid upgrades available."
     },
     {
+      "lead": "A founding-rate code,",
+      "text": "if you're a good fit, through a NowTRANSFORMED sponsorship. The team checks on the free call."
+    },
+    {
       "lead": "Own your trade.",
       "text": "One partner spot per trade in each section, shown on every story there and never shared with a competitor."
     },
@@ -20,7 +24,6 @@
   "heroImage": {
     "src": "/offers/explorenation/listing-phone.webp",
     "alt": "A sample ExploreNation directory listing: Desert Sky Family Law, a family and divorce attorney in Henderson, with a photo of the attorney in her office",
-    "sample": true,
     "handNote": "This could be your business ↙"
   },
   "showcase": {
@@ -81,7 +84,6 @@
         "image": {
           "src": "/offers/explorenation/listing-phone.webp",
           "alt": "A sample free listing for a family law firm, with its name, specialty, town and phone number",
-          "sample": true,
           "note": "your name, your number",
           "focus": "50% 30%"
         }
@@ -93,7 +95,6 @@
         "image": {
           "src": "/offers/explorenation/story-phone.webp",
           "alt": "A sample paid partner card for a pediatrician, shown between paragraphs of a story",
-          "sample": true,
           "note": "one per trade",
           "focus": "50% 60%"
         },
@@ -106,7 +107,6 @@
         "image": {
           "src": "/offers/explorenation/sponsored-phone.webp",
           "alt": "A sample sponsored feature titled Keeping pets calm through Henderson's noisy holidays, with a yellow Sponsored by label",
-          "sample": true,
           "note": "always labeled",
           "focus": "50% 30%"
         }
@@ -139,8 +139,22 @@
     ]
   },
   "sponsorship": {
-    "title": "You may qualify for a NowTRANSFORMED sponsorship",
-    "text": "If you're a good fit, the NowTRANSFORMED team gives you a code for ExploreNation's founding rate, a lower price than the regular rate. The founding rate is only available with a code. We'll go over it on your free call.",
+    "title": "A founding-rate code from NowTRANSFORMED",
+    "text": "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. For ExploreNation, that sponsorship is a code.",
+    "points": [
+      {
+        "lead": "A lower rate, by code only",
+        "text": "The code gets you ExploreNation's founding rate, a lower price than the regular rate. The founding rate is only available with a code. It doesn't cover print."
+      },
+      {
+        "lead": "For businesses that serve their area",
+        "text": "Local businesses that want the people in their own area's edition to find them, through a listing, a partner spot or a sponsored feature."
+      },
+      {
+        "lead": "Find out on your free call",
+        "text": "In 15 minutes the NowTRANSFORMED team goes over the options and rates and tells you whether you qualify, before you sign up for anything."
+      }
+    ],
     "cta": "See if I qualify"
   },
   "steps": [

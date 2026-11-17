@@ -15,6 +15,10 @@
       "text": "even if right now you couldn't say. You work out your goals and which direction you want to go next."
     },
     {
+      "lead": "Help toward the three months,",
+      "text": "if you're a good fit. You may qualify for a NowTRANSFORMED sponsorship, so mention cost early on your free call."
+    },
+    {
       "lead": "Changes that last past Monday,",
       "text": "because you work on the thinking and choices underneath your habits."
     },
@@ -27,7 +31,6 @@
   "heroImage": {
     "src": "/offers/total-transformation/hero-two-generations.webp",
     "alt": "An older woman with white hair smiles as a younger woman leans in to talk with her outdoors",
-    "sample": true,
     "handNote": "never too late ↙"
   },
   "why": {
@@ -48,7 +51,6 @@
         "image": {
           "src": "/offers/total-transformation/option-coaching-group.webp",
           "alt": "Four women sit together in a bright living room, talking in a small circle",
-          "sample": true,
           "note": "three months, together"
         }
       }
@@ -64,8 +66,22 @@
     ]
   },
   "sponsorship": {
-    "title": "If cost would put you last on your own list again",
-    "text": "If cost is the reason you'd put yourself last again, say so on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. Mention it early, and the team can look at that with you before you decide anything about the three months.",
+    "title": "A sponsorship toward your three months with Sheila",
+    "text": "If cost is the reason you'd put yourself last again, say so on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "points": [
+      {
+        "lead": "Help paying for the group",
+        "text": "NowTRANSFORMED helps pay toward the cost of Total Transformation, Sheila Sherman's three months of group coaching."
+      },
+      {
+        "lead": "For anyone at a turning point",
+        "text": "People who know they're capable of more and are tired of starting over every Monday."
+      },
+      {
+        "lead": "Find out before you decide",
+        "text": "The NowTRANSFORMED team looks at it with you on the 15-minute call, before you decide anything about the three months."
+      }
+    ],
     "cta": "Book my call and mention cost"
   },
   "steps": [

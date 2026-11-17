@@ -15,6 +15,10 @@
       "text": "The hub is in Catarman, so you can start without leaving Northern Samar."
     },
     {
+      "lead": "Help toward Padayon Connect.",
+      "text": "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward the hub itself. It is not a job or visa sponsorship."
+    },
+    {
       "lead": "Honest from the start.",
       "text": "We won't promise you a job, a visa or travel. We'll tell you what the first step is."
     },
@@ -27,7 +31,6 @@
   "heroImage": {
     "src": "/offers/padayon-connect/laughing-at-table.webp",
     "alt": "Stock photo: four young people laughing around a table with laptops and papers",
-    "sample": true,
     "handNote": "Start where you are ↙"
   },
   "why": {
@@ -47,7 +50,6 @@
         "image": {
           "src": "/offers/padayon-connect/three-students-talking.webp",
           "alt": "Stock photo: three students talking at a table in a classroom",
-          "sample": true,
           "note": "people with the same hope",
           "focus": "50% 50%"
         }
@@ -59,7 +61,6 @@
         "image": {
           "src": "/offers/padayon-connect/team-laptops.webp",
           "alt": "Stock photo: four young adults working together on laptops at a long table",
-          "sample": true,
           "note": "one step at a time",
           "focus": "50% 40%"
         },
@@ -76,8 +77,22 @@
     ]
   },
   "sponsorship": {
-    "title": "Not a job or visa sponsorship",
-    "text": "Here, a sponsorship has nothing to do with an employer or a visa abroad. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. That means help toward Padayon Connect itself. Ask on your call what it would cover.",
+    "title": "A sponsorship toward Padayon Connect",
+    "text": "Here, a sponsorship has nothing to do with an employer or a visa abroad. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "points": [
+      {
+        "lead": "Help toward the hub itself",
+        "text": "If Padayon Connect has a cost for you, NowTRANSFORMED helps pay toward it. Ask on your call what it would cover."
+      },
+      {
+        "lead": "For young people ready to keep going",
+        "text": "Young people in Northern Samar who want more from their future and are ready to put in the work, including those thinking about working abroad one day."
+      },
+      {
+        "lead": "Find out on your free call",
+        "text": "The NowTRANSFORMED team tells you on the 15-minute call, before you agree to anything. If you're 17 or younger, a parent or guardian joins."
+      }
+    ],
     "cta": "Ask what it would cover"
   },
   "steps": [

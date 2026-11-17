@@ -3,6 +3,7 @@
  * Everything returned is plain JSON (dates formatted here) for the client component.
  */
 import { userDisplayName } from '@/lib/get-involved/server'
+import { inviterRoleOf } from '@/lib/get-involved/core'
 import { invitePrograms, programDisplay, programForSignup } from '@/lib/get-involved/program-welcome-server'
 import { parseOfferPage, type OfferPage } from '@/lib/get-involved/offer-page'
 import { prisma } from '@/lib/prisma'
@@ -23,7 +24,7 @@ export function invParam(v: string | string[] | undefined): string | null {
   return /^[A-Za-z0-9_-]{8,100}$/.test(s) ? s : null
 }
 
-export async function loadSignupPage(inviter: { id: string; role: string }, slug: string, programSlug: string | null, via: string | null, inv: string | null = null): Promise<SignupPageProps> {
+export async function loadSignupPage(inviter: { id: string; role: string; extraRoles?: readonly string[] | null }, slug: string, programSlug: string | null, via: string | null, inv: string | null = null): Promise<SignupPageProps> {
   const [name, profile, settings] = await Promise.all([userDisplayName(inviter.id), getInviteProfile(inviter.id), getOutreachSettings()])
   // With a program link that program; otherwise the inviter's chosen program, then their latest with an approved note.
   const program = await programForSignup(inviter.id, programSlug).catch(() => null)
@@ -39,7 +40,7 @@ export async function loadSignupPage(inviter: { id: string; role: string }, slug
     inviter: {
       name: full,
       first: name?.first ?? full,
-      roleLabel: inviter.role === 'COACH' ? 'NowTransformed coach' : 'NowTransformed ambassador',
+      roleLabel: inviterRoleOf(inviter) === 'COACH' ? 'NowTransformed coach' : 'NowTransformed ambassador',
       photoUrl: profile?.photoUrl ?? null,
       initials,
       why: profile?.why?.trim() || null,

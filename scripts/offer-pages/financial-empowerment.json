@@ -11,6 +11,10 @@
   "intro": "Most families only look at this after a scare: a fake call to Mom, a data breach letter, a lease nobody explained. Justin Nguyen helps families set up LegalShield and IDShield, from PPLSI, so they aren't figuring it out alone when a legal question or an identity problem comes up.",
   "bullets": [
     {
+      "lead": "Help with the cost,",
+      "text": "if a membership is right for your family. You may qualify for a NowTRANSFORMED sponsorship toward it."
+    },
+    {
       "lead": "LegalShield,",
       "text": "legal protection for the household, for the question that's too small for a lawyer and too big to guess at."
     },
@@ -27,7 +31,6 @@
   "heroImage": {
     "src": "/offers/financial-empowerment/hero-couple-planning.webp",
     "alt": "A couple sit side by side at a desk going through papers, with a calculator and a laptop in front of them",
-    "sample": true,
     "handNote": "still on your list? ↙"
   },
   "why": {
@@ -47,7 +50,6 @@
         "image": {
           "src": "/offers/financial-empowerment/family-kitchen.webp",
           "alt": "A mother, father and two young children make breakfast together at a kitchen counter",
-          "sample": true,
           "note": "for the kids"
         }
       },
@@ -58,7 +60,6 @@
         "image": {
           "src": "/offers/financial-empowerment/parent-and-daughter.webp",
           "alt": "An older woman and a younger woman talk across a kitchen table while baking together",
-          "sample": true,
           "note": "for Mom and Dad",
           "focus": "40% 40%"
         }
@@ -70,7 +71,6 @@
         "image": {
           "src": "/offers/financial-empowerment/new-home-keys.webp",
           "alt": "Two people shake hands as one passes a house key to the other",
-          "sample": true,
           "note": "before you sign"
         }
       },
@@ -81,7 +81,6 @@
         "image": {
           "src": "/offers/financial-empowerment/working-from-home.webp",
           "alt": "A mother works on a laptop at home while her two young children play behind her",
-          "sample": true,
           "note": "for your own work",
           "focus": "60% 50%"
         }
@@ -99,8 +98,22 @@
     ]
   },
   "sponsorship": {
-    "title": "Worried about one more bill?",
-    "text": "It's a fair worry, and you can say it out loud on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. And if the numbers still don't work for your family, that's fine.",
+    "title": "Help toward your family's membership",
+    "text": "One more bill is a fair worry, and you can say it out loud on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. If the numbers still don't work for your family, that's fine.",
+    "points": [
+      {
+        "lead": "Help paying for the membership",
+        "text": "NowTRANSFORMED helps pay toward the cost of your family's LegalShield and IDShield membership."
+      },
+      {
+        "lead": "For families who'd rather be ready",
+        "text": "Families who want legal and identity protection in place before they need it, whether that's for the kids, for Mom and Dad or for their own work."
+      },
+      {
+        "lead": "Ask on the free call",
+        "text": "On the 15-minute call, the NowTRANSFORMED team gives you the price and tells you whether a sponsorship applies, before you set up anything."
+      }
+    ],
     "cta": "Ask about my family's options"
   },
   "steps": [

@@ -11,6 +11,10 @@
   "intro": "Vision Development is a four-week program from DreamIt LiveIt for young people in foster care. They look at what they're good at and what matters to them, and they finish with a few practical steps toward what they want.",
   "bullets": [
     {
+      "lead": "Help with the cost of the four weeks,",
+      "text": "if the young person in your care is a good fit, through a NowTRANSFORMED sponsorship."
+    },
+    {
       "lead": "Half an hour a week.",
       "text": "Four weeks, Thursdays 10:30 to 11 a.m. Eastern, on Zoom."
     },
@@ -23,7 +27,6 @@
   "heroImage": {
     "src": "/offers/vision-development/hero-journal-on-bed.webp",
     "alt": "A teenager in a blue jumper lies on her bed writing in a notebook, with a teddy bear beside her",
-    "sample": true,
     "focus": "70% 40%",
     "handNote": "what do you want? ↙"
   },
@@ -44,7 +47,6 @@
         "image": {
           "src": "/offers/vision-development/teen-notebook-desk.webp",
           "alt": "A teenage boy in a grey hoodie writes in a notebook at a wooden desk at home",
-          "sample": true,
           "note": "strengths",
           "focus": "70% 40%"
         }
@@ -56,7 +58,6 @@
         "image": {
           "src": "/offers/vision-development/teen-writing-table.webp",
           "alt": "A teenage girl in glasses and a blue beanie writes in a notebook at a table",
-          "sample": true,
           "note": "values",
           "focus": "50% 35%"
         }
@@ -68,7 +69,6 @@
         "image": {
           "src": "/offers/vision-development/teen-laptop-headphones.webp",
           "alt": "A teenage boy in glasses and headphones smiles at a laptop on his desk",
-          "sample": true,
           "note": "next steps",
           "focus": "65% 40%"
         }
@@ -86,8 +86,22 @@
     ]
   },
   "sponsorship": {
-    "title": "For carers and caseworkers who get asked about cost first",
-    "text": "Cost is usually the first thing a caseworker gets asked, so here is the answer up front. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. The carer books the free call and the team looks at it with them, so a caseworker has nothing to set up.",
+    "title": "Help toward the four weeks, for carers and caseworkers",
+    "text": "Cost is usually the first thing a caseworker gets asked, so here is the answer up front. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "points": [
+      {
+        "lead": "Help paying for the four weeks",
+        "text": "NowTRANSFORMED helps pay toward the cost of Vision Development, DreamIt LiveIt's four-week program with Elizabeth Mgaya."
+      },
+      {
+        "lead": "For young people in foster care",
+        "text": "Young people in care who could use an adult asking what they want, booked by the foster, kinship or other carer who looks after them."
+      },
+      {
+        "lead": "The carer finds out on the call",
+        "text": "The carer books the free 15-minute call and the NowTRANSFORMED team looks at it with them, before anyone commits. A caseworker has nothing to set up."
+      }
+    ],
     "cta": "Ask on behalf of a young person"
   },
   "steps": [

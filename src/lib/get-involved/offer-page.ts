@@ -3,7 +3,8 @@
  *
  * Every section except the hero, steps and closing is optional and is left out when empty. The sign-up
  * form is always the real One-A-Day form (signup-page.tsx), shown in the hero; every button jumps to it.
- * The sponsorship box shows unless the program's monthly sponsorships are all offered, and testimonials
+ * The sponsorship section always shows when the page has one (placed right after "why"; it promises nothing,
+ * and a call is worth booking even when this month's sponsorships are all offered), and testimonials
  * only when there is at least one real one (name and permission are the owner's responsibility).
  */
 import { z } from 'zod'
@@ -12,9 +13,8 @@ const text = (max: number) => z.string().trim().min(1).max(max)
 /** Our own files (/offers/...) or https only. */
 const url = z.string().trim().max(500).refine((u) => /^\/[A-Za-z0-9/_.-]+$/.test(u) || /^https:\/\/[^\s"'<>]+$/.test(u), 'Use a /offers/ path or an https link')
 const image = z.object({ src: url, alt: text(300) })
-/** A screenshot of a sample: shows a SAMPLE tag. */
+/** An image with an optional handwritten note. */
 const shot = image.extend({
-  sample: z.boolean().optional(),
   note: z.string().trim().max(60).optional(),
   /** Which part of a tall screenshot shows in a small frame, as "x% y%" (CSS object-position). */
   focus: z.string().regex(/^\d{1,3}% \d{1,3}%$/).optional(),
@@ -68,7 +68,8 @@ export const OfferPageSchema = z.object({
     cta: z.string().trim().max(60).optional(),
   }).optional(),
   story: z.object({ title: text(120), paragraphs: z.array(text(600)).min(1).max(3), image: image.optional() }).optional(),
-  sponsorship: z.object({ title: text(120), text: text(500), cta: text(40) }).optional(),
+  /** The headline gift: what the NowTRANSFORMED sponsorship is, who it is for, how to find out (up to 3 points). */
+  sponsorship: z.object({ title: text(120), text: text(500), points: z.array(z.object({ lead: text(60), text: text(200) })).max(3).default([]), cta: text(40) }).optional(),
   steps: z.array(z.object({ title: text(60), text: text(300) })).min(1).max(4),
   gallery: z.object({ title: text(120), text: z.string().trim().max(300).optional(), images: z.array(image).min(1).max(5), caption: z.string().trim().max(200).optional() }).optional(),
   testimonials: z.array(z.object({ quote: text(500), name: text(80), role: z.string().trim().max(120).optional(), photo: url.optional() })).max(3).default([]),

@@ -15,6 +15,10 @@
       "text": "The four parts of PATH, the frame Benny teaches around, for school and for life after it."
     },
     {
+      "lead": "Help with the cost of PATH 101,",
+      "text": "if PATH 101 suits your teen, you or both of you. You may qualify for a NowTRANSFORMED sponsorship, and you can ask on the free call."
+    },
+    {
       "lead": "Half an hour, Tuesdays at 7 a.m.",
       "text": "Pacific time, and done by 7:30."
     },
@@ -27,7 +31,6 @@
   "heroImage": {
     "src": "/offers/communication-goals/hero-teen-writing.webp",
     "alt": "A teenage girl sits at a desk writing in a notebook",
-    "sample": true,
     "handNote": "her own goal ↙",
     "focus": "80% 50%"
   },
@@ -48,7 +51,6 @@
         "image": {
           "src": "/offers/communication-goals/students-writing.webp",
           "alt": "Two young students sit on a bench in a school hallway writing in their notebooks",
-          "sample": true,
           "note": "their goal",
           "focus": "60% 40%"
         }
@@ -60,7 +62,6 @@
         "image": {
           "src": "/offers/communication-goals/young-adults-library.webp",
           "alt": "Young adults and an older man read and take notes at a long library table",
-          "sample": true,
           "note": "one step at a time",
           "focus": "55% 50%"
         }
@@ -72,7 +73,6 @@
         "image": {
           "src": "/offers/communication-goals/father-and-son.webp",
           "alt": "A father sits beside his teenage son on a bed and talks with him",
-          "sample": true,
           "note": "someone else to talk to",
           "focus": "45% 40%"
         }
@@ -90,8 +90,22 @@
     ]
   },
   "sponsorship": {
-    "title": "Ask whether a sponsorship could fit your family",
-    "text": "Ask on your free call, once you've talked about the goal itself. That goes for parents of a teen, for young adults booking their own call, and for parents with a goal of their own. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "title": "A NowTRANSFORMED sponsorship toward PATH 101",
+    "text": "Ask about this before your family weighs up the cost. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer. That goes for parents of a teen, for young adults booking their own call, and for parents with a goal of their own.",
+    "points": [
+      {
+        "lead": "Help paying for PATH 101",
+        "text": "NowTRANSFORMED helps pay toward the cost of PATH 101, Benny's half-hour workshop on Tuesday mornings."
+      },
+      {
+        "lead": "For anyone ready to name a goal",
+        "text": "Students from middle school through college, and adults who want a plan too, who are ready to put one goal in their own words and work out the steps."
+      },
+      {
+        "lead": "Ask on the free call",
+        "text": "The NowTRANSFORMED team looks at it with you in 15 minutes, before you commit to anything. A parent joins for anyone under 18."
+      }
+    ],
     "cta": "Ask about PATH 101"
   },
   "steps": [

@@ -6,134 +6,137 @@
     "deep": "#0c4a6e",
     "deepText": "#e0f2fe"
   },
-  "eyebrow": "K.A.P.I.T Global · Onboarding & Integration · Mentoring and business growth",
-  "hook": "Have a business idea you keep putting off? Start here.",
-  "intro": "K.A.P.I.T Global is a mentoring platform for people with a business idea, new entrepreneurs, emerging leaders and anyone working on their own growth. Onboarding & Integration is how you get started: a short screening to check it's a good fit, then your paperwork and setup, then orientation and training. An internship is part of it too.",
+  "eyebrow": "K.A.P.I.T Global · Onboarding & Integration · For businesses and organizations",
+  "hook": "New members and hires, screened and set up your way, without it all landing on your desk.",
+  "intro": "K.A.P.I.T Global is an independent onboarding company. It works with businesses and organizations on screening, processing and onboarding the people who want to join them, as members or as employees, and it follows each client's own guidelines rather than a one-size template.",
   "bullets": [
     {
-      "lead": "A short screening first,",
-      "text": "so you and K.A.P.I.T Global both know it's a good fit before anything else."
+      "lead": "Screened to your standard,",
+      "text": "because candidates are pre-qualified against the criteria you hand over."
     },
     {
-      "lead": "Paperwork and setup",
-      "text": "sorted at the start, so they don't hold you up later."
+      "lead": "Help toward K.A.P.I.T Global's fees,",
+      "text": "if your organization is a good fit. You may qualify for a NowTRANSFORMED sponsorship, and the team checks on the free call."
     },
     {
-      "lead": "Orientation and training,",
-      "text": "plus two weekly intro sessions: one on onboarding, one on the internship."
+      "lead": "Paperwork and setup handled with your team,",
+      "text": "so forms don't stall in someone's inbox."
+    },
+    {
+      "lead": "Applicants guided through your steps,",
+      "text": "so they know what comes next and you aren't fielding every question."
     }
   ],
-  "hostNote": "brings K.A.P.I.T Global's Onboarding & Integration to NowTRANSFORMED",
+  "hostNote": "brings K.A.P.I.T Global's onboarding service to NowTRANSFORMED",
   "heroImage": {
     "src": "/offers/onboarding-integration/hero-welcome.webp",
-    "alt": "A woman stands to shake hands with a man across a table while four colleagues smile, in a bright office meeting",
-    "sample": true,
-    "handNote": "This could be you ↙"
+    "alt": "A woman leans across a meeting table to shake hands with a man while four colleagues look on and smile, in a bright office",
+    "handNote": "your next new member ↙"
   },
   "why": {
-    "title": "Most ideas stall at the first step.",
+    "title": "Onboarding is usually somebody's second job.",
     "paragraphs": [
-      "You know what you want to build, or who you want to become. What's usually missing is the next concrete step, and someone to check your thinking with.",
-      "K.A.P.I.T Global helps people turn what they know, their ideas and their potential into action and results, through mentorship, personal development and business growth opportunities. In its own words, the mission is to transform potential into progress. Onboarding & Integration is where that starts."
+      "In a small business or organization, screening applicants, collecting paperwork and getting people set up tends to fall to whoever has a spare hour. Some weeks that works. Other weeks applications sit, forms go missing, and a good person loses interest while they wait to hear back.",
+      "It also means each new person gets a different start depending on who happened to handle them. Working with a partner that follows one structured process gives everyone the same start."
     ]
   },
   "options": {
-    "title": "What you get",
+    "title": "What's on offer",
     "items": [
       {
         "label": "Weekly session",
         "title": "Intro to Onboarding",
-        "text": "A weekly session that explains how onboarding works and what you'll need for it. A good place to start if you're still deciding.",
+        "text": "A weekly session that walks through how K.A.P.I.T Global's onboarding works.",
         "image": {
           "src": "/offers/onboarding-integration/intro-onboarding.webp",
-          "alt": "A man in glasses points at a whiteboard while a small group listens from their chairs",
-          "sample": true,
-          "note": "start here"
+          "alt": "A man in glasses stands at the front of a room and points to one side while a small group listens from their chairs",
+          "note": "see how it works"
         }
       },
       {
-        "label": "The offer",
+        "label": "The service",
         "title": "Onboarding & Integration",
-        "text": "The full start with K.A.P.I.T Global: screening, paperwork, setup, then orientation and training.",
+        "text": "K.A.P.I.T Global works with you on candidate pre-qualification and screening, paperwork and setup for your prospective members and employees, following your own guidelines.",
         "image": {
           "src": "/offers/onboarding-integration/onboarding-paperwork.webp",
-          "alt": "Hands with pens working through printed charts on a wooden table, next to a tablet and a cup of coffee",
-          "sample": true,
-          "note": "the full start"
+          "alt": "Several people's hands, some holding pens, go over printed charts on a wooden table next to a tablet and a cup of coffee",
+          "note": "the full service"
         },
         "featured": true
-      },
-      {
-        "label": "Weekly session",
-        "title": "Intro to Internship",
-        "text": "A weekly session about K.A.P.I.T Global's internship, with time for your questions.",
-        "image": {
-          "src": "/offers/onboarding-integration/intro-internship.webp",
-          "alt": "A man leans over to help a young woman at her laptop in a shared office with other people working",
-          "sample": true,
-          "note": "then the internship"
-        }
       }
     ],
-    "footnote": "Not sure where to begin? Ask on your free call.",
-    "cta": "Ask which one fits me"
+    "cta": "Ask what fits my organization"
   },
   "steps": [
     {
       "title": "Tell us who you are",
-      "text": "Your first name, email and age, then pick a time."
+      "text": "Your first name and email (the form also asks your age), then pick a time that suits you."
     },
     {
       "title": "Free 15-minute call",
-      "text": "The NowTRANSFORMED team asks about your goals, explains Onboarding & Integration and checks whether you qualify for a sponsorship."
+      "text": "The NowTRANSFORMED team asks how your organization brings new people in today, explains how K.A.P.I.T Global works and checks whether you qualify for a sponsorship."
     },
     {
-      "title": "Start your onboarding",
-      "text": "If it fits, you begin with screening, paperwork and setup, then orientation and training."
+      "title": "Hear what comes next",
+      "text": "If it's a fit, the team explains the next steps before you agree to anything."
     }
   ],
   "sponsorship": {
-    "title": "Is cost why your idea is still waiting?",
-    "text": "If cost is why your idea keeps waiting, say so on your free call before you rule yourself out. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
-    "cta": "Ask about starting onboarding"
+    "title": "A sponsorship toward K.A.P.I.T Global's fees",
+    "text": "Paying an outside company can feel like a cost a small team can't take on yet. Say so on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "points": [
+      {
+        "lead": "Help with the fees",
+        "text": "NowTRANSFORMED helps pay toward K.A.P.I.T Global's fees for screening, paperwork and setup for your new members or employees."
+      },
+      {
+        "lead": "For organizations bringing people in",
+        "text": "Businesses and organizations that take on new members or employees and want onboarding done to their own guidelines, without it all landing on one desk."
+      },
+      {
+        "lead": "Checked on your call",
+        "text": "The NowTRANSFORMED team checks whether you qualify in 15 minutes and explains the next steps before you agree to anything."
+      }
+    ],
+    "cta": "Ask about a sponsorship"
   },
   "story": {
-    "title": "Who you'll be working with",
+    "title": "About K.A.P.I.T Global",
     "paragraphs": [
-      "K.A.P.I.T Global (also written KAPIT Global) is a transformation and mentoring platform. It works with aspiring entrepreneurs, people with business ideas, emerging leaders, and anyone who wants to grow personally and professionally.",
-      "Your free call is with the NowTRANSFORMED team. Criztal, a NowTRANSFORMED Coach, brings this offer to NowTRANSFORMED."
-    ],
-    "image": {
-      "src": "/offers/onboarding-integration/about-kapit.webp",
-      "alt": "A smiling woman in glasses stands with her arms folded in front of a team working at a long table"
-    }
+      "K.A.P.I.T Global works through its own K.A.P.I.T Framework: Knowledge, Action, Passion, Implementation and Transformation. The aim is a structured, consistent onboarding process for every client.",
+      "Criztal, a NowTRANSFORMED Coach, brings this offer to NowTRANSFORMED, a youth leadership development program."
+    ]
   },
   "testimonials": [],
   "faqs": [
     {
       "q": "Who is this for?",
-      "a": "Aspiring entrepreneurs, people with a business idea, emerging leaders, and anyone working on their personal and professional growth."
+      "a": "Businesses and organizations that bring in new members or employees and want help with screening, paperwork and setup. If you're not sure your organization fits, ask on your free call."
+    },
+    {
+      "q": "Will you follow our own process?",
+      "a": "Yes. Bring your current steps to the call, even if they're only a rough list for now."
     },
     {
       "q": "What happens on the call?",
-      "a": "The team asks what you're hoping to do, explains how Onboarding & Integration works and answers your questions. There's no obligation to sign up."
+      "a": "The team asks how you bring new people in today and answers your questions. There's no obligation."
     },
     {
       "q": "How much does it cost?",
-      "a": "Ask on your free call whether there's a cost, and what it is. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer, and we'll explain that on the call too."
+      "a": "The team goes through K.A.P.I.T Global's fees with you on the call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer."
     },
     {
-      "q": "What does the internship involve?",
-      "a": "The weekly Intro to Internship session covers it, and you can ask on your free call too."
+      "q": "How long does onboarding take?",
+      "a": "It depends on your own steps. Ask on your free call."
     },
     {
-      "q": "When are the weekly sessions?",
-      "a": "Intro to Onboarding and Intro to Internship each run once a week. Ask on your free call for the day, time and how to join."
+      "q": "When is Intro to Onboarding?",
+      "a": "It runs once a week. Ask on your free call for the day, time and how to join."
     }
   ],
   "closing": {
-    "title": "Ready to act on your idea?",
-    "text": "A free 15-minute call. Pick a time that works for you.",
+    "title": "See if K.A.P.I.T Global fits your organization.",
+    "text": "A free 15-minute call with the NowTRANSFORMED team. Pick a time that works for you.",
     "cta": "Book my free call"
   }
 }

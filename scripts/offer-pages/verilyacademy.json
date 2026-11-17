@@ -12,11 +12,11 @@
   "bullets": [
     {
       "lead": "One real problem.",
-      "text": "Pick a question people already bring to you, like getting a small business loan or switching careers."
+      "text": "Pick a question people already bring to you, like getting a small business loan, and teach it live, recorded or both, around your work."
     },
     {
-      "lead": "Live, recorded or both,",
-      "text": "so it fits around your work."
+      "lead": "Help with the cost, if there is one.",
+      "text": "Intro classes are free to join. If teaching or a fuller course costs you something, you may qualify for a NowTRANSFORMED sponsorship toward it."
     },
     {
       "lead": "No teaching background needed.",
@@ -31,7 +31,6 @@
   "heroImage": {
     "src": "/offers/verilyacademy/hero-community-class.webp",
     "alt": "A man stands at the front of a brick-walled room talking to a small group of adults on wooden chairs, and one woman raises her hand",
-    "sample": true,
     "focus": "50% 40%",
     "handNote": "what do people ask you? ↙"
   },
@@ -52,7 +51,6 @@
         "image": {
           "src": "/offers/verilyacademy/go-to-person.webp",
           "alt": "A woman with curly hair, seen from behind, speaks to a group of men listening at their desks",
-          "sample": true,
           "note": "the one they ask",
           "focus": "60% 40%"
         }
@@ -64,7 +62,6 @@
         "image": {
           "src": "/offers/verilyacademy/retired-expert.webp",
           "alt": "An older man with grey hair and glasses stands at the head of a table and explains a point to the people seated around it",
-          "sample": true,
           "note": "too good to sit unused",
           "focus": "50% 30%"
         }
@@ -76,7 +73,6 @@
         "image": {
           "src": "/offers/verilyacademy/recording-a-class.webp",
           "alt": "A smiling woman at a desk with notes and a laptop films herself on a phone held in a ring light",
-          "sample": true,
           "note": "live or recorded",
           "focus": "50% 40%"
         }
@@ -93,8 +89,22 @@
     ]
   },
   "sponsorship": {
-    "title": "Cost, for instructors and for learners",
-    "text": "Thinking of teaching? Ask on your free call whether instructors pay anything, and you'll get a straight answer. Here to learn? Intro classes are free, and if an instructor offers a fuller course afterward, that course is paid. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "title": "A sponsorship, for instructors and for learners",
+    "text": "Whether you'd teach or take a fuller course later, ask about cost on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "points": [
+      {
+        "lead": "Help with what it costs you",
+        "text": "NowTRANSFORMED helps pay toward the cost of Verily Academy for you, whether that's as an instructor or for a paid course after an intro class."
+      },
+      {
+        "lead": "For instructors and learners",
+        "text": "Instructors who can teach a real question people already bring them, and learners in the community who want practical help with it."
+      },
+      {
+        "lead": "A straight answer on your call",
+        "text": "The NowTRANSFORMED team tells you in 15 minutes, before you commit to anything. If you're under 18, a parent joins the call."
+      }
+    ],
     "cta": "Ask about cost on my call"
   },
   "steps": [

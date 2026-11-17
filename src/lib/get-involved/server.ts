@@ -24,12 +24,13 @@ export const newToken = () => crypto.randomBytes(24).toString('base64url')
 /** Where a host manages their calls: coaches have their own page, admins use the admin one. */
 export const callsPathFor = (role?: string | null) => (role === 'COACH' ? '/coach/discovery-calls' : '/admin/discovery-calls')
 
-export async function userDisplayName(userId: string): Promise<{ first: string; full: string; email: string; role: string; tz: string | null } | null> {
+export async function userDisplayName(userId: string): Promise<{ first: string; full: string; email: string; role: string; inviterRole: 'COACH' | 'AMBASSADOR' | null; tz: string | null } | null> {
   const u = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       email: true,
       role: true,
+      extraRoles: true,
       coachProfile: { select: { firstName: true, lastName: true } },
       ambassadorProfile: { select: { firstName: true, lastName: true } },
       associateProfile: { select: { firstName: true, lastName: true } },
@@ -38,11 +39,14 @@ export async function userDisplayName(userId: string): Promise<{ first: string; 
   })
   if (!u) return null
   const tz = u.discoveryHost?.timezone ?? null
+  // The role to show beside their name: coach or ambassador, held as the main role or an extra one
+  // (an admin who is also a coach is shown as a coach).
+  const inviterRole = inviterRoleOf(u)
   const p = u.coachProfile ?? u.ambassadorProfile ?? u.associateProfile
-  if (p) return { first: p.firstName, full: `${p.firstName} ${p.lastName}`.trim(), email: u.email, role: u.role, tz }
-  if (u.discoveryHost) return { first: u.discoveryHost.displayName.split(' ')[0], full: u.discoveryHost.displayName, email: u.email, role: u.role, tz }
+  if (p) return { first: p.firstName, full: `${p.firstName} ${p.lastName}`.trim(), email: u.email, role: u.role, inviterRole, tz }
+  if (u.discoveryHost) return { first: u.discoveryHost.displayName.split(' ')[0], full: u.discoveryHost.displayName, email: u.email, role: u.role, inviterRole, tz }
   const local = u.email.split('@')[0]
-  return { first: local, full: local, email: u.email, role: u.role, tz }
+  return { first: local, full: local, email: u.email, role: u.role, inviterRole, tz }
 }
 
 /** The user's invite slug, created on first use. */

@@ -15,6 +15,10 @@
       "text": "Every other Wednesday at 9 a.m., on Zoom. Ask on your free call which time zone that is."
     },
     {
+      "lead": "Help with the cost of Chris's class.",
+      "text": "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward it, whether you're booking for yourself or for a teen who wants in."
+    },
+    {
       "lead": "Real situations, not a textbook.",
       "text": "Making a call under pressure, and talking through what you'd do."
     },
@@ -27,7 +31,6 @@
   "heroImage": {
     "src": "/offers/leadership-development/hero-young-adults-laptop.webp",
     "alt": "Five young adults in an office gather around a laptop, smiling",
-    "sample": true,
     "focus": "50% 40%",
     "handNote": "for the ones who want it ↙"
   },
@@ -48,7 +51,6 @@
         "image": {
           "src": "/offers/leadership-development/leading-at-work.webp",
           "alt": "A young woman stands by a board of sticky notes and talks to a small group of young colleagues",
-          "sample": true,
           "note": "first month in charge",
           "focus": "62% 45%"
         }
@@ -60,7 +62,6 @@
         "image": {
           "src": "/offers/leadership-development/team-captain.webp",
           "alt": "A young woman holding a basketball talks to two teammates sitting on a locker room bench",
-          "sample": true,
           "note": "captain this season",
           "focus": "50% 40%"
         }
@@ -72,7 +73,6 @@
         "image": {
           "src": "/offers/leadership-development/after-a-loss.webp",
           "alt": "Young women basketball players sit on benches in a locker room with their heads down",
-          "sample": true,
           "note": "getting back up",
           "focus": "60% 50%"
         }
@@ -84,7 +84,6 @@
         "image": {
           "src": "/offers/leadership-development/team-high-five.webp",
           "alt": "Young adults in casual clothes high-five together in a bright room",
-          "sample": true,
           "note": "for your team",
           "focus": "50% 35%"
         }
@@ -101,8 +100,22 @@
     ]
   },
   "sponsorship": {
-    "title": "Ready to step up, but unsure about the cost?",
-    "text": "If cost is what's in the way, say so on your free call. That goes for a young professional booking for yourself and for a parent whose teen wants in. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "title": "A sponsorship toward Chris's class",
+    "text": "If cost is what's in the way, say so on your free call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "points": [
+      {
+        "lead": "Help paying for the class",
+        "text": "NowTRANSFORMED helps pay toward the cost of Leadership Development, Chris Moore's twice-a-month class with Leading The Way."
+      },
+      {
+        "lead": "For anyone stepping up",
+        "text": "Young people and young professionals in a new role, or hoping for one, who want to practice leading people."
+      },
+      {
+        "lead": "Ask on the free call",
+        "text": "It's with the NowTRANSFORMED team, not with Chris, and you find out before you commit to anything. Anyone under 18 needs a parent on the call."
+      }
+    ],
     "cta": "Ask about the Wednesday class"
   },
   "steps": [

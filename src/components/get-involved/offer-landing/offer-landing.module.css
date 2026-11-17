@@ -14,8 +14,6 @@
 .root :global(.text-primary-600) { color: var(--lp-accent); }
 .root :global(.focus-visible\:ring-primary-600:focus-visible) { --tw-ring-color: var(--lp-accent); }
 
-.sample { position: absolute; top: 10px; left: 10px; z-index: 3; background: rgba(15, 23, 42, .82); color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .04em; padding: 4px 8px; border-radius: 999px; }
-.sampleBottom { top: auto; bottom: 10px; }
 
 .phone { position: relative; border-radius: 30px; border: 9px solid #0f172a; background: #0f172a; box-shadow: 0 22px 44px rgba(15, 23, 42, .28); overflow: hidden; aspect-ratio: 600 / 1298; }
 .phone img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }

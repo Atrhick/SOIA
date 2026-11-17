@@ -119,7 +119,7 @@ async function inviterFor(userId: string | null) {
   if (!userId) return null
   const [name, profile] = await Promise.all([userDisplayName(userId), getInviteProfile(userId).catch(() => null)])
   if (!name) return null
-  const roleLabel = name.role === 'COACH' ? 'NowTransformed coach' : name.role === 'AMBASSADOR' ? 'NowTransformed ambassador' : 'NowTransformed'
+  const roleLabel = name.inviterRole === 'COACH' ? 'NowTransformed coach' : name.inviterRole === 'AMBASSADOR' ? 'NowTransformed ambassador' : 'NowTransformed'
   return { name: name.full, roleLabel, photoUrl: profile?.photoUrl ? appUrl(profile.photoUrl) : null }
 }
 

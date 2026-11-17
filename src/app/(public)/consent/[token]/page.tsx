@@ -31,7 +31,7 @@ export default async function ConsentPage({ params }: { params: { token: string 
     p.invitedById && p.programId ? userOwnsProgram(p.invitedById, p.programId).catch(() => false) : false,
   ])
   const inviterName = inviter?.full ?? null
-  const role = inviter?.role === 'COACH' ? 'coach' : inviter?.role === 'AMBASSADOR' ? 'ambassador' : 'member'
+  const role = inviter?.inviterRole === 'COACH' ? 'coach' : inviter?.inviterRole === 'AMBASSADOR' ? 'ambassador' : 'member'
   return (
     <ConsentClient
       token={params.token}
