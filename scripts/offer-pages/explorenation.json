@@ -1,7 +1,7 @@
 {
-  "eyebrow": "ExploreNation · Launching soon in Las Vegas & Henderson",
+  "eyebrow": "ExploreNation · Local city magazines in the US and abroad · Launching soon",
   "hook": "Be the business your neighbors read about.",
-  "intro": "ExploreNation is a local magazine for Las Vegas and Henderson, launching soon, that focuses on positive, true stories about local people and places. Put your business in front of locals who are looking for places to go and people to support.",
+  "intro": "ExploreNation is a network of local city magazines, with editions being built in the US and abroad. Each edition tells positive, true stories about the people and places in its own area, with a guide to the local businesses that serve it. Your business takes part in your own area's edition, in front of locals looking for places to go and people to support.",
   "bullets": [
     {
       "lead": "Get listed free",
@@ -62,7 +62,7 @@
         "text": "Partner cards rotate around each story in that section, on phones and computers."
       }
     ],
-    "caption": "Preview of ExploreNation, launching soon in Las Vegas & Henderson. The businesses shown are samples. Photos from Pexels."
+    "caption": "Preview of an ExploreNation edition, launching soon. The businesses shown are samples. Photos from Pexels."
   },
   "why": {
     "title": "Locals want to know what's good near them.",
@@ -89,7 +89,7 @@
       {
         "label": "Partner spot",
         "title": "Own your trade",
-        "text": "Each section has six partner spots, one per trade. Yours shows on every story in that section, and no competitor can take it. Your partner card is made from your listing, so there's nothing to design. You also get our content studio in your dashboard, where you make your own short videos, pictures and flyers.",
+        "text": "Each section of your area's edition has six partner spots, one per trade. Yours shows on every story in that section, and no competitor can take it. Your partner card is made from your listing, so there's nothing to design. You also get our content studio in your dashboard, where you make your own short videos, pictures and flyers.",
         "image": {
           "src": "/offers/explorenation/story-phone.webp",
           "alt": "A sample paid partner card for a pediatrician, shown between paragraphs of a story",
@@ -178,7 +178,7 @@
         "alt": "A sponsored feature with its Sponsored by label"
       }
     ],
-    "caption": "Preview of ExploreNation, launching soon in Las Vegas & Henderson. Sample businesses shown. Photos from Pexels."
+    "caption": "Preview of an ExploreNation edition, launching soon. Sample businesses shown. Photos from Pexels."
   },
   "testimonials": [],
   "faqs": [
@@ -192,7 +192,7 @@
     },
     {
       "q": "Is ExploreNation live yet?",
-      "a": "Not yet. It's launching soon in Las Vegas and Henderson. Businesses that join now are there from day one and get first pick of the partner spots."
+      "a": "Not yet. Editions are being built in several cities in the US and abroad, and they'll open in turn. On your free call we'll tell you when your area's edition is planned to open."
     },
     {
       "q": "Will there be a printed magazine?",
