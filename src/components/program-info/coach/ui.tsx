@@ -80,7 +80,7 @@ export function Crumbs({ items }: { items: { label: string; href?: string }[] })
 export function ViewingAsBanner() {
   return (
     <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-[15px] leading-relaxed text-amber-900">
-      <b>You're viewing as this person.</b> You can help them: answers, names and groups, and team questions all save, and the history shows your name. Only they can press "Looks good, put it live" or take their page offline. To put a page live for them, use the team page.
+      <b>You're viewing as this person.</b> You can help them: answers, names and groups, and team questions all save, and the history shows your name. Only they can press &ldquo;Looks good, put it live&rdquo; or take their page offline. To put a page live for them, use the team page.
     </div>
   )
 }
