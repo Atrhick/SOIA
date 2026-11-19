@@ -203,7 +203,14 @@ export default function AmbassadorLoginPage() {
               </div>
             </div>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <Link
+                href="/forgot-password"
+                className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors group"
+              >
+                <span>Forgot your password?</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
               <Link
                 href="/login"
                 className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors group"

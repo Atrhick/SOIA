@@ -12,16 +12,26 @@ const BASE_URL = process.env.NEXTAUTH_URL || 'http://localhost:3001'
 // ─── Request password reset ───────────────────────────────────────────────────
 
 export async function requestPasswordReset(email: string): Promise<{ success: true } | { error: string }> {
-  const parsed = z.string().email().safeParse(email)
+  const parsed = z.string().trim().email().safeParse(email)
   if (!parsed.success) {
     return { error: 'Invalid email address' }
   }
 
   // Always return success to prevent user enumeration
-  const user = await prisma.user.findUnique({
-    where: { email: parsed.data },
+  // Same lookup as sign-in: exact match first, else ignore letter case when exactly one account matches.
+  const typed = parsed.data.trim()
+  let user = await prisma.user.findUnique({
+    where: { email: typed },
     select: { id: true, email: true, status: true },
   })
+  if (!user) {
+    const matches = await prisma.user.findMany({
+      where: { email: { equals: typed, mode: 'insensitive' } },
+      select: { id: true, email: true, status: true },
+      take: 2,
+    })
+    user = matches.length === 1 ? matches[0] : null
+  }
 
   if (!user || user.status !== 'ACTIVE') {
     return { success: true }

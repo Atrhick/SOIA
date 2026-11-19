@@ -177,6 +177,8 @@ export interface OfferProgramRow {
   name: string
   slug: string
   organization: string
+  /** The group this page is for (one program can have a page per group), or null. */
+  group: string | null
   ownerName: string | null
   ownerRole: 'COACH' | 'AMBASSADOR' | null
   /** The owner's main invite slug, for a "Preview sign-up page" link (/join/[ownerSlug]/[programSlug]). */
@@ -213,6 +215,7 @@ export async function listOfferPrograms(opts: { q?: string; filter?: OfferFilter
   const search: Prisma.CoachProgramWhereInput[] = q.split(/\s+/).filter(Boolean).slice(0, 4).map((w) => ({ OR: [
     { name: { contains: w, mode: 'insensitive' } },
     { organization: { contains: w, mode: 'insensitive' } },
+    { audienceLabel: { contains: w, mode: 'insensitive' } },
     { coach: { OR: [{ firstName: { contains: w, mode: 'insensitive' } }, { lastName: { contains: w, mode: 'insensitive' } }] } },
     { ambassador: { OR: [{ firstName: { contains: w, mode: 'insensitive' } }, { lastName: { contains: w, mode: 'insensitive' } }] } },
   ] }))
@@ -227,7 +230,8 @@ export async function listOfferPrograms(opts: { q?: string; filter?: OfferFilter
       skip: (page - 1) * pageSize,
       take: pageSize,
       select: {
-        id: true, name: true, slug: true, organization: true, coachId: true, ambassadorId: true,
+        id: true, name: true, slug: true, organization: true, coachId: true, ambassadorId: true, audienceLabel: true, parentProgramId: true,
+        _count: { select: { groupPages: true } },
         offerFullPrice: true, offerSponsoredPrice: true, offerReason: true, sponsoredSeatsPerMonth: true, partnerCodeSource: true,
         offerPricesUpdatedAt: true, offerPricesUpdatedById: true,
         coach: { select: { firstName: true, lastName: true, userId: true, user: { select: { inviteSlug: true } } } },
@@ -256,6 +260,8 @@ export async function listOfferPrograms(opts: { q?: string; filter?: OfferFilter
       name: p.name,
       slug: p.slug,
       organization: p.organization,
+      // Only when the program has more than one page; a one-group program just shows its name.
+      group: (p.parentProgramId || p._count.groupPages > 0) && p.audienceLabel?.trim() ? p.audienceLabel.trim() : null,
       ownerName: owner ? `${owner.firstName} ${owner.lastName}`.trim() : null,
       ownerRole: p.coach ? 'COACH' as const : p.ambassador ? 'AMBASSADOR' as const : null,
       ownerInviteSlug: owner?.user?.inviteSlug ?? null,

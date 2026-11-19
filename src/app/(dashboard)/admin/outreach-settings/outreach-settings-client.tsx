@@ -59,7 +59,7 @@ export function ProgramOfferTable({ programs, emptyText }: { programs: OfferProg
               return (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 min-w-[14rem]">
-                    <p className="font-semibold text-gray-900">{p.name}</p>
+                    <p className="font-semibold text-gray-900">{p.name}{p.group && <span className="font-normal text-gray-600"> · for {p.group}</span>}</p>
                     <p className="text-gray-500">{p.ownerName ? `${p.ownerName} (${p.ownerRole === 'COACH' ? 'coach' : 'ambassador'})` : 'No owner'}{p.organization ? ` · ${p.organization}` : ''}</p>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -85,7 +85,7 @@ export function ProgramOfferTable({ programs, emptyText }: { programs: OfferProg
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button type="button" onClick={() => setEditing(p)} className={`${btnSecondary} h-9`}>
-                      <Pencil className="h-3.5 w-3.5" aria-hidden />Edit<span className="sr-only"> offer for {p.name}</span>
+                      <Pencil className="h-3.5 w-3.5" aria-hidden />Edit<span className="sr-only"> offer for {p.name}{p.group ? ` for ${p.group}` : ''}</span>
                     </button>
                   </td>
                 </tr>
@@ -144,7 +144,7 @@ function OfferForm({ p, onDone }: { p: OfferProgramRow; onDone: () => void }) {
     <form onSubmit={save} className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-5 py-4">
         <div className="min-w-0">
-          <DialogPrimitive.Title className="text-lg font-bold text-gray-900">{p.name}</DialogPrimitive.Title>
+          <DialogPrimitive.Title className="text-lg font-bold text-gray-900">{p.name}{p.group && <span className="font-normal text-gray-600"> · for {p.group}</span>}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="text-sm text-gray-600">
             {p.ownerName ? `Owner: ${p.ownerName}` : 'No owner'} · {p.usedThisMonth} sponsorship{p.usedThisMonth === 1 ? '' : 's'} offered on calls this month
           </DialogPrimitive.Description>

@@ -268,7 +268,15 @@ export async function notifyProgramPage(event: ProgramPageNotifyEvent, input: No
     const found = await notifyContext(event, input)
     if (!found) return 0
     const entry = NOTIFY_CATALOG[event]
-    const c = entry.to === 'TEAM' ? await enrich(found, input.actorId) : found
+    let c = entry.to === 'TEAM' ? await enrich(found, input.actorId) : found
+    // An admin helping while viewing as the owner: the team sees who actually did it ("Lina Lopez for Ben Carson").
+    if (entry.to === 'TEAM' && !entry.noProgram && input.actorId && input.programId) {
+      const owner = (await loadPageWithRoot(input.programId))?.owner
+      if (owner && owner.userId !== input.actorId) {
+        const helper = await actorAsOwner(input.actorId)
+        if (helper) c = { ...c, ownerName: `${helper.fullName} for ${c.ownerName}` }
+      }
+    }
 
     let people: { id: string; email: string; first: string }[]
     if (entry.to === 'OWNER') {

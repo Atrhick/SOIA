@@ -81,6 +81,7 @@ export default async function OutreachSettingsPage({ searchParams }: { searchPar
             <li>Before the call, people only read: &quot;{SPONSOR_LINE}&quot; No prices, no sponsorship counts, no promises.</li>
             <li>The team qualifies them on the free call. If they&apos;re a good fit, the host presses &quot;Offer a sponsorship&quot; on the call record.</li>
             <li>A sponsorship counts when the team offers it, not when a call is booked. &quot;Undo offer&quot; gives it back in the same month.</li>
+            <li>A program with a page for each group (for example Families and Business owners) has a separate number for each page. They don&apos;t share a count.</li>
             <li>Sponsorships reset on the 1st of each month. 0 or empty = no sponsorship line anywhere for that program.</li>
             <li>When every sponsorship has been offered, the sign-up page offers the waiting list for next month. Never a fake countdown.</li>
             <li>Program owners can change the two prices on their program page; each change shows here with who made it.</li>
