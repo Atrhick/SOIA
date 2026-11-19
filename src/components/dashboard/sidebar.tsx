@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -60,6 +60,14 @@ interface SidebarProps {
   role: 'ADMIN' | 'SUB_ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
   /** Small count beside a link, by href (e.g. new support messages). */
   badges?: Record<string, number>
+  /** Non-admins granted the RUNNING_COSTS feature get an extra "Organization" section. */
+  showRunningCosts?: boolean
+}
+
+const runningCostsSection: NavSection = {
+  title: 'Organization',
+  icon: Wallet,
+  items: [{ href: '/running-costs', label: 'Running costs', icon: Wallet }],
 }
 
 interface NavItem {
@@ -296,6 +304,7 @@ const adminNavSections: NavSection[] = [
       { href: '/admin/features', label: 'Feature Config', icon: Settings2 },
       { href: '/admin/time', label: 'Timesheets', icon: Clock },
       { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
+      { href: '/admin/running-costs', label: 'Running costs', icon: Wallet },
       { href: '/admin/audit-logs', label: 'Audit Logs', icon: FileText },
       { href: '/admin/settings', label: 'Settings', icon: Settings },
     ],
@@ -405,7 +414,7 @@ function findActiveSectionIndex(sections: NavSection[], pathname: string, basePa
   return index >= 0 ? index : null
 }
 
-export function Sidebar({ role, badges }: SidebarProps) {
+export function Sidebar({ role, badges, showRunningCosts = false }: SidebarProps) {
   const pathname = usePathname()
   const mobileNav = useMobileNav()
 
@@ -449,7 +458,12 @@ export function Sidebar({ role, badges }: SidebarProps) {
     }
   }
 
-  const sections = getSections()
+  const baseSections = getSections()
+  // Memoised: the effect below depends on this list, so a new array each render must not retrigger it.
+  const sections = useMemo(
+    () => (showRunningCosts && role !== 'ADMIN' ? [...baseSections, runningCostsSection] : baseSections),
+    [baseSections, showRunningCosts, role],
+  )
 
   // Accordion state: track which section index is open (null = none)
   const [openSectionIndex, setOpenSectionIndex] = useState<number | null>(() =>
@@ -510,7 +524,7 @@ export function Sidebar({ role, badges }: SidebarProps) {
       </Link>
 
       {/* Collapsible sections */}
-      {ambassadorNavSections.map((section, index) => (
+      {sections.map((section, index) => (
         <NavSectionComponent
           key={section.title}
           section={section}
@@ -647,13 +661,9 @@ export function Sidebar({ role, badges }: SidebarProps) {
         <nav className="flex-1 overflow-y-auto p-4">
           {role === 'SUB_ADMIN'
             ? renderSubAdminNav()
-            : role === 'ADMIN'
-            ? renderSectionedNav(adminNavSections)
-            : role === 'COACH'
-              ? renderSectionedNav(coachNavSections)
-              : isAssociateRole(role)
-                ? renderSectionedNav(associateNavSections)
-                : renderAmbassadorNav()}
+            : role === 'AMBASSADOR'
+              ? renderAmbassadorNav()
+              : renderSectionedNav(sections)}
         </nav>
 
         {/* Footer */}

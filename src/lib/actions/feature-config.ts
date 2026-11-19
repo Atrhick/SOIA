@@ -22,6 +22,8 @@ const DEFAULT_FEATURES: {
   // Opt-in per user: globally on, but off by role default so an admin grants it
   // to specific coaches or ambassadors from /admin/users.
   { feature: 'PROGRAM_PAGES', isEnabled: true, enabledForCoaches: false, enabledForAmbassadors: false },
+  // Running costs page: admins always; anyone else only when granted per person in /admin/users.
+  { feature: 'RUNNING_COSTS', isEnabled: true, enabledForCoaches: false, enabledForAmbassadors: false },
 ]
 
 export async function getAllFeatureConfigs() {

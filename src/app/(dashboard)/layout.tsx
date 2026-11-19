@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { CALLBACK_PATH_HEADER, loginPath } from '@/lib/safe-callback'
 import { isAssociateRole, isSwitchableRole, rolesOf, type AssociateRole } from '@/lib/roles'
 import { newSupportCount } from '@/lib/support/server'
+import { canViewRunningCosts } from '@/lib/running-costs/server'
 
 export default async function DashboardLayout({
   children,
@@ -71,11 +72,13 @@ export default async function DashboardLayout({
 
   // Sidebar badge: support messages nobody has picked up yet (admins and sub-admins).
   const supportNew = role === 'ADMIN' || role === 'SUB_ADMIN' ? await newSupportCount({ id: session.user.id, role }) : 0
+  // Admins have Running costs under System; anyone else sees it only when granted the feature.
+  const showRunningCosts = role !== 'ADMIN' && (await canViewRunningCosts({ id: session.user.id, role }))
 
   return (
     <MobileNavProvider>
     <div className="min-h-screen bg-gray-50">
-      <Sidebar role={role} badges={supportNew ? { '/admin/support': supportNew, '/team/support': supportNew } : undefined} />
+      <Sidebar role={role} showRunningCosts={showRunningCosts} badges={supportNew ? { '/admin/support': supportNew, '/team/support': supportNew } : undefined} />
       <Header user={{
         email: viewingEmail ?? session.user.email,
         role: session.user.role,
