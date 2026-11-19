@@ -12,6 +12,7 @@ import { auth } from '@/lib/auth'
 import { aiDraftingAvailable, draftWelcomeNoteWithAI } from '@/lib/ai/welcome-note-ai'
 import { checkWelcomeNote, cleanWelcomeNote } from '@/lib/get-involved/program-welcome'
 import { rateLimited, userDisplayName } from '@/lib/get-involved/server'
+import { IN_FLOW_TEXT_ADMIN_MESSAGE, IN_FLOW_TEXT_MESSAGE, isInProgramInfoFlow } from '@/lib/program-pages-core'
 
 export interface WelcomePanelData {
   programId: string
@@ -27,7 +28,7 @@ export interface WelcomePanelData {
   readOnly: boolean
 }
 
-type Access = { ok: false; error: string } | { ok: true; userId: string; readOnly: boolean; program: NonNullable<Awaited<ReturnType<typeof loadProgram>>> }
+type Access = { ok: false; error: string } | { ok: true; userId: string; isAdmin: boolean; readOnly: boolean; program: NonNullable<Awaited<ReturnType<typeof loadProgram>>> }
 
 const loadProgram = (id: string) =>
   prisma.coachProgram.findUnique({
@@ -50,7 +51,7 @@ async function access(programId: string, write: boolean): Promise<Access> {
   if (role !== 'ADMIN' && !isOwner) return { ok: false, error: 'Program not found' }
   const impersonating = Boolean(session.user.isImpersonating)
   if (write && impersonating) return { ok: false, error: 'Not available while impersonating another user' }
-  return { ok: true, userId: session.user.id, readOnly: impersonating, program }
+  return { ok: true, userId: session.user.id, isAdmin: role === 'ADMIN', readOnly: impersonating, program }
 }
 
 function refresh(programId: string) {
@@ -89,6 +90,8 @@ const saveSchema = z.object({ note: z.string().max(5000), approve: z.boolean(), 
 export async function saveWelcomeNote(programId: string, input: z.input<typeof saveSchema>): Promise<{ success: true; message: string } | { error: string }> {
   const a = await access(programId, true)
   if (!a.ok) return { error: a.error }
+  // In the program info workflow the note goes live with an approved page version, never directly.
+  if (await isInProgramInfoFlow(a.program.id)) return { error: a.isAdmin ? IN_FLOW_TEXT_ADMIN_MESSAGE : IN_FLOW_TEXT_MESSAGE }
   const parsed = saveSchema.safeParse(input)
   if (!parsed.success) return { error: 'Please check the text.' }
   const note = cleanWelcomeNote(parsed.data.note)

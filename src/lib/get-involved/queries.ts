@@ -84,7 +84,7 @@ export async function inviterDashboard(userId: string, role: 'COACH' | 'AMBASSAD
   return {
     shareUrl: appUrl(`/join/${slug}`),
     // One link per live program page; its welcome email is about that program once the note is approved.
-    programLinks: programs.map((pr) => ({ name: pr.name, url: appUrl(`/join/${slug}/${pr.slug}`), emailReady: !!pr.note })),
+    programLinks: programs.map((pr) => ({ name: pr.label, url: appUrl(`/join/${slug}/${pr.slug}`), emailReady: !!pr.note })),
     streak,
     doneToday,
     formsThisMonth: me?.forms ?? recent.filter((r) => r.createdAt >= since).length,

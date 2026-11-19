@@ -22,6 +22,9 @@ export interface OfferLandingProps {
   page: OfferPage
   business: string
   more: { label: string; href: string }[]
+  /** Shown inside a back-office screen (the program info preview): no "Back to my dashboard" bar, and no
+   *  <main> of its own because the screen around it already has one. The public page leaves this off. */
+  preview?: boolean
 }
 
 const btn = 'inline-flex items-center justify-center gap-2 min-h-[52px] rounded-xl bg-[var(--lp-accent)] px-7 text-[17px] font-bold text-white no-underline hover:bg-[var(--lp-accent-dark)] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-amber-500'
@@ -31,17 +34,18 @@ const body = 'text-lg leading-relaxed text-slate-700'
 const eyebrowCls = 'text-sm font-bold uppercase tracking-[.08em] text-[var(--lp-accent)]'
 const TILTS = [s.tiltA, s.tiltB, s.tiltC, s.tiltA]
 
-export function OfferLanding({ signup, page, business, more }: OfferLandingProps) {
+export function OfferLanding({ signup, page, business, more, preview = false }: OfferLandingProps) {
   const { inviter, program } = signup
   const label = program?.label ?? business
   const hand = `${caveat.className} ${s.hand}`
   const t = page.theme ?? DEFAULT_OFFER_THEME
   // The page's colours, as CSS variables; the embedded sign-up form picks them up too (offer-landing.module.css).
+  const Main = preview ? 'div' : 'main'
   const themeVars = { '--lp-accent': t.accent, '--lp-accent-dark': t.accentDark, '--lp-tint': t.tint, '--lp-deep': t.deep, '--lp-deep-text': t.deepText } as React.CSSProperties
 
   return (
-    <div className={`${s.root} min-h-screen bg-white text-slate-900`} style={themeVars}>
-      <BackToAppBar />
+    <div className={`${s.root} ${preview ? '' : 'min-h-screen'} bg-white text-slate-900`} style={themeVars}>
+      {!preview && <BackToAppBar />}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-4 px-5 py-3">
           <Image src="/brand/nowtransformed-logo.png" alt="NowTRANSFORMED" width={800} height={201} priority className="h-10 w-auto sm:h-12" />
@@ -49,7 +53,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
         </div>
       </header>
 
-      <main>
+      <Main>
         {/* Hero: the hook on the left, the real sign-up form on the right */}
         <section aria-labelledby="hero-h" className="bg-[var(--lp-tint)]">
           <div className="mx-auto flex max-w-[1120px] flex-wrap items-start gap-10 px-5 pb-14 pt-12">
@@ -304,7 +308,7 @@ export function OfferLanding({ signup, page, business, more }: OfferLandingProps
             </ul>
           </section>
         )}
-      </main>
+      </Main>
 
       <footer className="border-t border-slate-200 pb-24 sm:pb-0">
         <div className="mx-auto flex max-w-[1120px] flex-wrap justify-between gap-3 px-5 py-6 text-sm text-slate-600">

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Bell, Check, CheckCheck, Trash2, ExternalLink } from 'lucide-react'
+import { Bell, Check, CheckCheck, Trash2, ExternalLink, ClipboardCheck, ArrowRightLeft, CreditCard, UserPlus, FileText, type LucideIcon } from 'lucide-react'
+import type { NotificationType } from '@prisma/client'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -32,14 +33,26 @@ interface Notification {
   createdAt: string
 }
 
-const NOTIFICATION_ICONS: Record<string, string> = {
-  PROSPECT_ASSESSMENT_COMPLETED: 'bg-blue-100 text-blue-600',
-  PROSPECT_STATUS_CHANGED: 'bg-amber-100 text-amber-600',
-  PAYMENT_RECEIVED: 'bg-green-100 text-green-600',
-  ACCOUNT_CREATED: 'bg-purple-100 text-purple-600',
+// Every NotificationType needs an entry (the Record type makes a new enum value a type error here).
+const NOTIFICATION_STYLES: Record<NotificationType, { icon: LucideIcon; className: string; label: string }> = {
+  PROSPECT_ASSESSMENT_COMPLETED: { icon: ClipboardCheck, className: 'bg-blue-100 text-blue-600', label: 'Assessment' },
+  PROSPECT_STATUS_CHANGED: { icon: ArrowRightLeft, className: 'bg-amber-100 text-amber-600', label: 'Prospect update' },
+  PAYMENT_RECEIVED: { icon: CreditCard, className: 'bg-green-100 text-green-600', label: 'Payment' },
+  ACCOUNT_CREATED: { icon: UserPlus, className: 'bg-purple-100 text-purple-600', label: 'New account' },
+  PROGRAM_PAGE: { icon: FileText, className: 'bg-primary-100 text-primary-700', label: 'Program page' },
+}
+const FALLBACK_STYLE = { icon: Bell, className: 'bg-gray-100 text-gray-600', label: 'Notification' }
+export function notificationStyle(type: string) {
+  return NOTIFICATION_STYLES[type as NotificationType] ?? FALLBACK_STYLE
 }
 
-export function NotificationBell() {
+/** Only same-site paths are followed ("/coach/programs/..."), never another site or "//host". */
+export function safeActionPath(url: string | null): string | null {
+  if (!url || !url.startsWith('/') || url.startsWith('//') || url.startsWith('/\\')) return null
+  return url
+}
+
+export function NotificationBell({ viewAllHref = null }: { viewAllHref?: string | null } = {}) {
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -103,17 +116,17 @@ export function NotificationBell() {
   }
 
   const handleClick = (notification: Notification) => {
-    handleMarkAsRead(notification.id)
-    if (notification.actionUrl) {
-      router.push(notification.actionUrl)
-    }
     setIsOpen(false)
+    // Mark read and open the link at the same time; a failed mark never blocks the link.
+    void handleMarkAsRead(notification.id).catch(() => {})
+    const path = safeActionPath(notification.actionUrl)
+    if (path) router.push(path)
   }
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative h-11 w-11" aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
           <Bell className="h-5 w-5 text-gray-600" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
@@ -158,18 +171,22 @@ export function NotificationBell() {
                 key={notification.id}
                 className="group relative px-2 py-2 hover:bg-gray-50 border-b last:border-b-0"
               >
-                <div
-                  className="cursor-pointer"
+                <button
+                  type="button"
+                  className="block w-full cursor-pointer rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
                   onClick={() => handleClick(notification)}
                 >
                   <div className="flex gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        NOTIFICATION_ICONS[notification.type] || 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      <Bell className="h-4 w-4" />
-                    </div>
+                    {(() => {
+                      const st = notificationStyle(notification.type)
+                      const Icon = st.icon
+                      return (
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${st.className}`} title={st.label}>
+                          <Icon className="h-4 w-4" aria-hidden />
+                          <span className="sr-only">{st.label}: </span>
+                        </div>
+                      )
+                    })()}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {notification.title}
@@ -182,13 +199,13 @@ export function NotificationBell() {
                       </p>
                     </div>
                     {notification.actionUrl && (
-                      <ExternalLink className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <ExternalLink className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden />
                     )}
                   </div>
-                </div>
+                </button>
 
                 {/* Actions */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 flex gap-1 transition-opacity">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
@@ -196,6 +213,7 @@ export function NotificationBell() {
                     }}
                     className="p-1 hover:bg-gray-200 rounded"
                     title="Mark as read"
+                    aria-label="Mark as read"
                   >
                     <Check className="h-3 w-3 text-gray-500" />
                   </button>
@@ -206,6 +224,7 @@ export function NotificationBell() {
                     }}
                     className="p-1 hover:bg-gray-200 rounded"
                     title="Delete"
+                    aria-label="Delete"
                   >
                     <Trash2 className="h-3 w-3 text-gray-500" />
                   </button>
@@ -215,13 +234,13 @@ export function NotificationBell() {
           </div>
         )}
 
-        {notifications.length > 0 && (
+        {notifications.length > 0 && viewAllHref && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="justify-center text-primary-600 cursor-pointer"
               onClick={() => {
-                router.push('/admin/notifications')
+                router.push(viewAllHref)
                 setIsOpen(false)
               }}
             >

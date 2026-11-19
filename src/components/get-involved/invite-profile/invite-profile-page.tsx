@@ -30,7 +30,7 @@ export async function InviteProfilePage({ role }: { role: 'COACH' | 'AMBASSADOR'
   ])
   const programs: InviteProfileProgram[] = await Promise.all(live.map(async (p) => {
     const offer = await getSignupOffer(p.id)
-    return { id: p.id, name: p.name, seatsLabel: offer ? `${offer.seatsLeft} of ${offer.seatsPerMonth} sponsorships left this month` : null }
+    return { id: p.id, name: p.label, seatsLabel: offer ? `${offer.seatsLeft} of ${offer.seatsPerMonth} sponsorships left this month` : null }
   }))
 
   // The photo URL is cached for 5 minutes publicly; a version param shows a fresh one here.

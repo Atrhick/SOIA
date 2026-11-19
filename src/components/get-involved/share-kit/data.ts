@@ -117,7 +117,7 @@ export async function loadInvitePage(userId: string, role: 'COACH' | 'AMBASSADOR
     const offer = await getSignupOffer(p.id, now).catch(() => null)
     return {
       id: p.id,
-      label: p.name,
+      label: p.label,
       owns: true, // invitePrograms only returns the user's own live programs
       url: appUrl(`/join/${slug}/${p.slug}`),
       business: pitch?.business ?? p.company ?? p.name,
@@ -203,7 +203,7 @@ export async function loadShareKit(userId: string, role: 'COACH' | 'AMBASSADOR',
     const [offer, display] = await Promise.all([getSignupOffer(p.id, now), programDisplay(p.id)])
     return {
       id: p.id,
-      label: p.name,
+      label: p.label,
       name: p.name,
       description: descriptionFromHeadline(display?.headline) ?? 'a NowTransformed program',
       url: appUrl(`/join/${slug}/${p.slug}`),

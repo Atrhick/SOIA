@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
-import { offerLinkForProgram } from '@/lib/get-involved/program-welcome-server'
+import { offerLinkForProgram, offlineFallbackForProgram } from '@/lib/get-involved/program-welcome-server'
 import type { Metadata } from 'next'
 import { getProgramPreview, getPublicProgram } from '@/lib/actions/program-pages'
 import { ProgramLandingClient } from './program-landing-client'
@@ -24,12 +24,22 @@ const STATUS_LABELS: Record<string, string> = {
   REJECTED: 'Sent back for changes',
 }
 
+/** "?a=1&b=2" from the page's search params (repeated keys kept), or "" when there are none. */
+function queryString(searchParams: Record<string, string | string[] | undefined>): string {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(searchParams ?? {})) {
+    for (const one of Array.isArray(v) ? v : v === undefined ? [] : [v]) q.append(k, one)
+  }
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
+
 export default async function PublicProgramPage({
   params,
   searchParams,
 }: {
   params: { slug: string }
-  searchParams: { preview?: string }
+  searchParams: Record<string, string | string[] | undefined>
 }) {
   // ?preview=1 renders the current draft for the owning coach or an admin.
   // It is authenticated inside getProgramPreview - the public never sees it.
@@ -57,11 +67,15 @@ export default async function PublicProgramPage({
   }
 
   // Programs with a landing page send old links there (sign-up then follows the One-A-Day steps).
+  // The query string (?via=..., ?utm_...) goes along; redirect() from a page render is a 307.
   const landing = await offerLinkForProgram(params.slug).catch(() => null)
-  if (landing) redirect(landing)
+  if (landing) redirect(landing + queryString(searchParams))
 
   const result = await getPublicProgram(params.slug)
   if ('error' in result) {
+    // An offline page sends people to the owner's main sign-up link, as its /join link does.
+    const fallback = await offlineFallbackForProgram(params.slug).catch(() => null)
+    if (fallback) redirect(fallback + queryString(searchParams))
     notFound()
   }
 

@@ -2078,6 +2078,7 @@ enum NotificationType {
   PROSPECT_STATUS_CHANGED
   PAYMENT_RECEIVED
   ACCOUNT_CREATED
+  PROGRAM_PAGE
 }
 
 model Prospect {
@@ -2795,10 +2796,121 @@ model CoachProgram {
   playbook    ProgramPlaybook?
   messageLine String? // one-line description used in messages ("helping teens in foster care ..."); falls back to the headline
 
+  // Program info workflow (src/lib/program-info). One row = one page. The ROOT row (parentProgramId null)
+  // is the first group's page; extra groups are child rows. Grant goals stay on the root.
+  parentProgramId     String?
+  parent              CoachProgram?         @relation("ProgramGroups", fields: [parentProgramId], references: [id], onDelete: SetNull)
+  groupPages          CoachProgram[]        @relation("ProgramGroups")
+  /// "Families", "Business owners". Null on a single-group program.
+  audienceLabel       String?
+  /// ROOT only: when the owner first saved "Names and groups". Null = the program still needs setting up.
+  groupsConfirmedAt   DateTime?
+  /// This page's answers (keys = question ids in src/lib/program-info/questions.ts).
+  infoAnswers         Json?
+  /// ROOT only: answers shared by every page of the program (aboutYou, mustNotSay, photosLink, programName, companyName).
+  sharedAnswers       Json?
+  infoStage           ProgramInfoStage      @default(ANSWERING)
+  infoStageAt         DateTime?
+  infoRemindersSent   Int                   @default(0)
+  infoLastReminderAt  DateTime?
+  infoStalledAt       DateTime?
+  infoAnswersSentAt   DateTime?
+  infoAnswersEditedAt DateTime?
+  /// Offline = status DRAFT with offlineAt set (the owner or the team took a live page down).
+  offlineAt           DateTime?
+  offlineById         String?
+  offlineReason       String?               @db.Text
+  pageVersions        ProgramPageVersion[]
+  infoQuestions       ProgramInfoQuestion[]
+  pageEvents          ProgramPageEvent[]
+
   @@index([ambassadorId])
   @@index([coachId])
   @@index([status])
+  @@index([parentProgramId])
+  @@index([infoStage])
   @@map("coach_programs")
+}
+
+enum ProgramInfoStage {
+  ANSWERING // owner filling in
+  WITH_TEAM // answers sent, the team is writing
+  QUESTION_OPEN // a team question awaits the owner
+  READY_TO_CHECK // a draft version was sent to the owner
+  CHANGES_ASKED // the owner asked for changes
+  DONE // approved; nothing pending
+}
+
+enum ProgramVersionStatus {
+  DRAFT
+  SENT
+  APPROVED
+  CHANGES_ASKED
+  SUPERSEDED
+}
+
+/// A written version of one page: landing page + welcome email paragraph + invitation line.
+model ProgramPageVersion {
+  id               String               @id @default(cuid())
+  programId        String
+  program          CoachProgram         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  number           Int
+  /// Snapshot of infoAnswers + sharedAnswers when this version was written.
+  answers          Json
+  offerPage        Json?
+  welcomeNote      String?              @db.Text
+  messageLine      String?
+  status           ProgramVersionStatus @default(DRAFT)
+  createdById      String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @default(now()) @updatedAt
+  sentAt           DateTime?
+  sentById         String?
+  approvedAt       DateTime?
+  approvedById     String?
+  approvedOnBehalf Boolean              @default(false)
+  changeRequest    String?              @db.Text
+  changeRequestAt  DateTime?
+
+  @@unique([programId, number])
+  @@index([programId, status])
+  @@map("program_page_versions")
+}
+
+/// A question from the team to the page owner.
+model ProgramInfoQuestion {
+  id             String       @id @default(cuid())
+  programId      String
+  program        CoachProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  askedById      String
+  question       String       @db.Text
+  /// Which answer it fills, e.g. "cost". Null = a free question.
+  answerKey      String?
+  answer         Json?
+  answeredAt     DateTime?
+  answeredById   String?
+  createdAt      DateTime     @default(now())
+  remindersSent  Int          @default(0)
+  lastReminderAt DateTime?
+
+  @@index([programId, answeredAt])
+  @@map("program_info_questions")
+}
+
+/// History of one page (the team screen). kind: ANSWERS_SENT, QUESTION_ASKED, QUESTION_ANSWERED, DRAFT_SAVED,
+/// SENT_TO_CHECK, CHANGES_ASKED, APPROVED, PUBLISHED_ON_BEHALF, TAKEN_OFFLINE, BACK_ONLINE, GROUP_ADDED,
+/// NAMES_CHANGED, REMINDER_SENT, STALLED, MIGRATED.
+model ProgramPageEvent {
+  id        String       @id @default(cuid())
+  programId String
+  program   CoachProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  actorId   String?
+  kind      String
+  detail    Json?
+  createdAt DateTime     @default(now())
+
+  @@index([programId, createdAt])
+  @@map("program_page_events")
 }
 
 model ProgramLead {

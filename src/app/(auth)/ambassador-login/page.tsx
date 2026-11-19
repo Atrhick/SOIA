@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { callbackFromLocation } from '@/lib/safe-callback'
 import Link from 'next/link'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react'
 
@@ -31,7 +32,8 @@ export default function AmbassadorLoginPage() {
       if (result?.error) {
         setError('Invalid email or password')
       } else {
-        router.push('/ambassador')
+        // Back to the link that sent them here (email/push deep links), same-site paths only.
+        router.push(callbackFromLocation('/ambassador'))
         router.refresh()
       }
     } catch {

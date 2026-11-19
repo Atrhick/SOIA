@@ -151,8 +151,10 @@ export function Header({ user }: HeaderProps) {
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-            {/* Notifications - Only for Admin */}
-            {user.role === 'ADMIN' && <NotificationBell />}
+            {/* Notifications: admins, coaches and ambassadors (each sees only their own). */}
+            {(user.role === 'ADMIN' || user.role === 'COACH' || user.role === 'AMBASSADOR') && (
+              <NotificationBell viewAllHref={user.role === 'ADMIN' ? '/admin/notifications' : null} />
+            )}
 
             {/* User Menu */}
             <DropdownMenu>

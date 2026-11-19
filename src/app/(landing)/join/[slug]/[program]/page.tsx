@@ -14,7 +14,7 @@ type Props = { params: { slug: string; program: string }; searchParams: { via?: 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const inviter = await inviterBySlug(params.slug)
   const program = inviter ? await inviterProgramBySlug(inviter.id, params.program) : null
-  return { title: program ? `${program.name} | NowTRANSFORMED` : 'Get Involved | NowTRANSFORMED', robots: { index: false } }
+  return { title: program ? `${program.label} | NowTRANSFORMED` : 'Get Involved | NowTRANSFORMED', robots: { index: false } }
 }
 
 /**

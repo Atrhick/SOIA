@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/lib/prisma', () => ({ default: {} }))
 vi.mock('@/lib/email', () => ({ sendEmail: vi.fn() }))
 vi.mock('./server', () => ({ userDisplayName: vi.fn() }))
+vi.mock('@/lib/program-info/server', () => ({ teamQueue: vi.fn() }))
 import { adminDigestEmail, centralDayAndHour, type DigestData } from './admin-digest'
 
 const empty: DigestData = { newSignups: [], waiting: [], waitingTotal: 0, reachOut: 0, callsNext24h: 0 }
@@ -32,5 +33,20 @@ describe('admin daily summary', () => {
     expect(centralDayAndHour(new Date('2026-11-15T13:30:00Z'))).toEqual({ day: '2026-11-15', hour: 7 })
     // 03:00 UTC on 16 Nov = 21:00 on 15 Nov in Central
     expect(centralDayAndHour(new Date('2026-11-16T03:00:00Z'))).toEqual({ day: '2026-11-15', hour: 21 })
+  })
+
+  it('adds a Program pages block with counts and a link, and leaves it out when all are zero', () => {
+    const pages = { ourMove: 3, stalled: 1, oldestWaitingDays: 5 }
+    const m = adminDigestEmail({ ...empty, programPages: pages }, 'Ana')!
+    expect(m.subject).toBe('NowTransformed daily summary: 3 program pages need us')
+    expect(m.html).toContain('Program pages')
+    expect(m.html).toContain('Our move (pages to write, fix or send): <strong>3</strong>')
+    expect(m.html).toContain('Stalled (10+ days waiting on the owner): <strong>1</strong>')
+    expect(m.html).toContain('Oldest one waiting on us: <strong>5 days</strong>')
+    expect(m.html).toContain('/admin/program-pages')
+    expect(adminDigestEmail({ ...empty, programPages: { ourMove: 0, stalled: 0, oldestWaitingDays: 0 } }, 'Ana')).toBeNull()
+    const both = adminDigestEmail({ ...empty, waitingTotal: 2, programPages: { ourMove: 0, stalled: 0, oldestWaitingDays: 0 } }, 'Ana')!
+    expect(both.html).not.toContain('Program pages')
+    expect(both.subject).toBe('NowTransformed daily summary: 0 new, 2 waiting for a call')
   })
 })

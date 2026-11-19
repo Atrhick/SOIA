@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +50,7 @@ import {
   setProgramNtVideo,
 } from '@/lib/actions/program-pages'
 import { toVideoEmbedUrl, VIDEO_LINK_HINT } from '@/lib/video-embed'
+import { TEAM_QUEUE_PATH, teamPagePath } from '@/lib/program-info/paths'
 import {
   UNASSIGNED_OWNER,
   encodeOwnerChoice,
@@ -121,14 +123,32 @@ const STATUS_META: Record<string, { label: string; variant: 'default' | 'success
   REJECTED: { label: 'Sent back', variant: 'destructive' },
 }
 
+/** A13: a program in the new flow goes live only from the page queue. */
+function QueueLink({ id, name }: { id: string; name: string }) {
+  return (
+    <Link
+      href={teamPagePath(id)}
+      className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-primary-200 bg-primary-50 px-3 text-sm font-semibold text-primary-700 hover:bg-primary-100"
+    >
+      Open in the page queue<span className="sr-only">: {name}</span>
+    </Link>
+  )
+}
+
 export function ProgramsAdminClient({
   programs,
+  groupPageCounts = {},
+  inFlowIds = [],
   coaches,
   ambassadors,
   coreQuestions,
   standardQuestionsEnabled,
 }: {
   programs: ProgramRow[]
+  /** Programs in the new program-info flow (A13): no approve/publish here, link to the queue. */
+  inFlowIds?: string[]
+  /** Root program id -> number of extra group pages (child rows, listed only in the page queue). */
+  groupPageCounts?: Record<string, number>
   coaches: OwnerOption[]
   ambassadors: OwnerOption[]
   coreQuestions: CoreQuestionRow[]
@@ -158,7 +178,11 @@ export function ProgramsAdminClient({
     setNtVideoIntro(p.ntVideoIntro ?? '')
   }
 
-  const pending = useMemo(() => programs.filter((p) => p.status === 'PENDING_REVIEW'), [programs])
+  const inFlow = useMemo(() => new Set(inFlowIds), [inFlowIds])
+  const pending = useMemo(
+    () => programs.filter((p) => p.status === 'PENDING_REVIEW' && !inFlow.has(p.id)),
+    [programs, inFlow]
+  )
 
   const run = (fn: () => Promise<{ error?: string; success?: boolean }>, okMessage: string) => {
     setError(null)
@@ -191,8 +215,12 @@ export function ProgramsAdminClient({
           Program Pages
         </h1>
         <p className="text-gray-500 mt-1">
-          Assign each program to its owning coach or ambassador, then review and publish their
-          public page.
+          Assign each program to its owning coach or ambassador. Pages are written, checked and put
+          live in the{' '}
+          <Link href={TEAM_QUEUE_PATH} className="font-semibold text-primary-700 underline">
+            program page queue
+          </Link>
+          .
         </p>
       </div>
 
@@ -287,6 +315,11 @@ export function ProgramsAdminClient({
                       <td className="block md:table-cell md:px-4 md:py-3">
                         <p className="text-base font-semibold text-gray-900 md:text-sm md:font-medium">{p.name}</p>
                         <p className="text-gray-500">{p.organization}</p>
+                        {(groupPageCounts[p.id] ?? 0) > 0 && (
+                          <Link href={teamPagePath(p.id)} className="text-sm font-medium text-primary-700 hover:underline">
+                            +{groupPageCounts[p.id]} group page{groupPageCounts[p.id] === 1 ? '' : 's'}
+                          </Link>
+                        )}
                       </td>
                       <td className="block md:table-cell md:px-4 md:py-3">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 md:hidden">Owner</span>
@@ -373,10 +406,14 @@ export function ProgramsAdminClient({
                         )}
                       </td>
                       <td className="-mx-2 flex flex-wrap items-center gap-1 md:mx-0 md:table-cell md:whitespace-nowrap md:px-4 md:py-3 md:text-right">
-                        {p.status === 'PENDING_REVIEW' && (
-                          <Button size="sm" variant="outline" onClick={() => setReviewTarget(p)}>
-                            Review
-                          </Button>
+                        {inFlow.has(p.id) ? (
+                          <QueueLink id={p.id} name={p.name} />
+                        ) : (
+                          p.status === 'PENDING_REVIEW' && (
+                            <Button size="sm" variant="outline" onClick={() => setReviewTarget(p)}>
+                              Review
+                            </Button>
+                          )
                         )}
                         <Button
                           size="sm"
@@ -388,7 +425,7 @@ export function ProgramsAdminClient({
                           NT video
                           {p.ntVideoUrl && <Check className="h-3.5 w-3.5 ml-1 text-green-600" />}
                         </Button>
-                        {p.status === 'PUBLISHED' && (
+                        {p.status === 'PUBLISHED' && !inFlow.has(p.id) && (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -545,7 +582,7 @@ export function ProgramsAdminClient({
               Send back
             </Button>
             <Button
-              disabled={isPending}
+              disabled={isPending || (reviewTarget !== null && inFlow.has(reviewTarget.id))}
               onClick={() =>
                 run(async () => {
                   const result = await approveProgram(reviewTarget!.id)

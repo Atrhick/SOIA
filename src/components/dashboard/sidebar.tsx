@@ -246,6 +246,7 @@ const adminNavSections: NavSection[] = [
     items: [
       { href: '/admin/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
       { href: '/admin/programs', label: 'Program Pages', icon: Megaphone },
+      { href: '/admin/program-pages', label: 'Program page queue', icon: ListChecks },
       { href: '/admin/resource-centers', label: 'Resource Centers', icon: Building2 },
     ],
   },

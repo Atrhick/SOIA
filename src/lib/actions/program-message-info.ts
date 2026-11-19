@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { isProgramOwnedBy, type ProgramOwnerIdentity } from '@/lib/program-owner'
+import { IN_FLOW_TEXT_MESSAGE, isInProgramInfoFlow } from '@/lib/program-pages-core'
 import { BUSINESS_NAME_MAX, MESSAGE_LINE_MAX } from '@/components/program-pages/message-preview'
 
 export interface ProgramMessageInfo {
@@ -74,6 +75,8 @@ export async function saveProgramMessageInfo(input: unknown): Promise<{ ok: true
   const ctx = await ownerContext(parsed.data.programId)
   if (!ctx) return { ok: false, error: 'Program not found' }
   if (ctx.session.user.isImpersonating) return { ok: false, error: 'Not available while viewing as someone else.' }
+  // In the program info workflow the message line goes live with an approved page version, never directly.
+  if (await isInProgramInfoFlow(parsed.data.programId)) return { ok: false, error: IN_FLOW_TEXT_MESSAGE }
   const { programId, businessName, messageLine } = parsed.data
   try {
     await prisma.$transaction([

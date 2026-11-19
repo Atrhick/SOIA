@@ -72,6 +72,15 @@ const nextConfig = {
           },
         ],
       },
+      // The program page preview frame is shown scaled inside our own screens (ScaledPreviewFrame), so it
+      // may be framed by this site only. Listed last: for the same key, the last matching rule wins.
+      {
+        source: '/page-preview/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+        ],
+      },
     ]
   },
 }

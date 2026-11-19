@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { Sidebar } from '@/components/dashboard/sidebar'
@@ -6,6 +7,7 @@ import { MobileNavProvider } from '@/components/dashboard/mobile-nav'
 import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { NotificationsCard } from '@/components/pwa/notifications-card'
 import { prisma } from '@/lib/prisma'
+import { CALLBACK_PATH_HEADER, loginPath } from '@/lib/safe-callback'
 import { isAssociateRole, isSwitchableRole, rolesOf, type AssociateRole } from '@/lib/roles'
 
 export default async function DashboardLayout({
@@ -16,7 +18,8 @@ export default async function DashboardLayout({
   const session = await auth()
 
   if (!session) {
-    redirect('/login')
+    // Deep links (program pages) carry their path from src/middleware.ts so sign-in comes back to them.
+    redirect(loginPath(headers().get(CALLBACK_PATH_HEADER)))
   }
 
   // Cast to the supported role types

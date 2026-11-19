@@ -6,7 +6,6 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { isFeatureEnabled } from '@/lib/actions/feature-config'
 import {
   AGE_BAND_LABELS,
   CHILD_AGE_BANDS,
@@ -36,9 +35,21 @@ import {
   programOwnerRole,
   programsBasePath,
   type ProgramOwnerColumns,
-  type ProgramOwnerIdentity,
 } from '@/lib/program-owner'
 import { flattenProgramLeads } from '@/lib/program-leads'
+import { notifyProgramPage } from '@/lib/program-info/notify'
+import {
+  IN_FLOW_ADMIN_MESSAGE,
+  IN_FLOW_MESSAGE,
+  IN_FLOW_OFFLINE_MESSAGE,
+  audit,
+  buildSnapshot,
+  isInProgramInfoFlow,
+  requireAdmin,
+  requireProgramUser,
+  revalidateOwnerPages,
+  type ProgramRecord,
+} from '@/lib/program-pages-core'
 
 // ============================================
 // Schemas
@@ -92,11 +103,11 @@ const programContentSchema = z.object({
   name: z.string().min(1).max(150),
   organization: z.string().min(1).max(150),
   targetMarket: z.string().max(300),
-  internshipOffering: z.string().max(300),
+  internshipOffering: z.string().max(300).optional(),
   servicesDescription: z.string().max(4000),
-  weeklyEngagement1: z.string().max(200),
-  weeklyEngagement2: z.string().max(200),
-  monthlyGrowthGoal: z.string().max(200),
+  weeklyEngagement1: z.string().max(200).optional(),
+  weeklyEngagement2: z.string().max(200).optional(),
+  monthlyGrowthGoal: z.string().max(200).optional(),
   monthlyImpactGoal: z.string().max(200),
   pageTitle: z.string().max(150).nullable().optional(),
   headline: z.string().max(200).nullable().optional(),
@@ -165,103 +176,9 @@ const createProgramSchema = z.object({
   monthlyImpactGoal: z.string().max(200).optional(),
 })
 
-// Fields copied into publishedSnapshot on approval. The public page reads
-// only this snapshot, never the live columns.
-const SNAPSHOT_FIELDS = [
-  'name',
-  'organization',
-  'targetMarket',
-  'internshipOffering',
-  'servicesDescription',
-  'weeklyEngagement1',
-  'weeklyEngagement2',
-  'monthlyGrowthGoal',
-  'monthlyImpactGoal',
-  'pageTitle',
-  'headline',
-  'coachBio',
-  'showCoachBio',
-  'programDescription',
-  'eventDatesText',
-  'zoomUrl',
-  'zoomLabel',
-  'secondMeetingUrl',
-  'secondMeetingLabel',
-  'zoomInstructions',
-  'qualificationIntro',
-  'extraQuestions',
-  'showMeetingDetails',
-  'coachVideoUrl',
-  'ntVideoUrl',
-  'ntVideoIntro',
-] as const
-
-type ProgramRecord = Record<string, unknown>
-
-function buildSnapshot(program: ProgramRecord) {
-  const snapshot: ProgramRecord = {}
-  for (const field of SNAPSHOT_FIELDS) snapshot[field] = program[field] ?? null
-  snapshot.snapshotAt = new Date().toISOString()
-  return snapshot
-}
-
 // ============================================
 // Owner helpers (coach or ambassador)
 // ============================================
-
-// Guards return an `ok` discriminant rather than relying on `'error' in x`
-// narrowing - a union whose members differ only by an optional property does
-// not narrow reliably and leaks into every caller's return type.
-
-/**
- * An impersonating admin may look but not touch: they can read a coach's pages
- * to see exactly what the coach sees, but must not author or publish content in
- * the coach's name, because coach-side actions write no audit trail.
- *
- * Reads pass `allowImpersonation: true`; every write leaves it off.
- *
- * A program owner is a COACH (matched on their CoachProfile id) or an
- * AMBASSADOR (matched on their Ambassador id), with Program Pages enabled for
- * them by role default or a per-user grant from /admin/users.
- */
-async function requireProgramUser({ allowImpersonation = false } = {}) {
-  const session = await auth()
-  const role = session?.user.role
-  if (!session || (role !== 'COACH' && role !== 'AMBASSADOR')) {
-    return { ok: false as const, error: 'Unauthorized' }
-  }
-  if (session.user.isImpersonating && !allowImpersonation) {
-    return { ok: false as const, error: 'Not available while impersonating another user' }
-  }
-  const enabled = await isFeatureEnabled('PROGRAM_PAGES', role, session.user.id)
-  if (!enabled) {
-    return { ok: false as const, error: 'This feature is not enabled for your account' }
-  }
-
-  let owner: ProgramOwnerIdentity
-  if (role === 'COACH') {
-    const coachProfile = await prisma.coachProfile.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true },
-    })
-    if (!coachProfile) return { ok: false as const, error: 'Coach profile not found' }
-    owner = { role: 'COACH', coachId: coachProfile.id }
-  } else {
-    const ambassador = await prisma.ambassador.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true },
-    })
-    if (!ambassador) return { ok: false as const, error: 'Ambassador profile not found' }
-    owner = { role: 'AMBASSADOR', ambassadorId: ambassador.id }
-  }
-
-  return {
-    ok: true as const,
-    session,
-    owner,
-    readOnly: Boolean(session.user.isImpersonating),
-  }
-}
 
 async function requireProgramOwner(programId: string, opts?: { allowImpersonation?: boolean }) {
   const ctx = await requireProgramUser(opts)
@@ -281,14 +198,6 @@ async function requireProgramOwner(programId: string, opts?: { allowImpersonatio
   }
 }
 
-/** Refresh the owner's list and editor after a change to one program. */
-function revalidateOwnerPages(programId: string) {
-  for (const base of [programsBasePath('COACH'), programsBasePath('AMBASSADOR')]) {
-    revalidatePath(base)
-    revalidatePath(`${base}/${programId}`)
-  }
-}
-
 /** Every page that shows program leads to their owner. */
 function revalidateLeadPages() {
   revalidatePath('/coach/business-excellence')
@@ -296,32 +205,7 @@ function revalidateLeadPages() {
   revalidatePath(programsBasePath('AMBASSADOR'), 'layout')
 }
 
-async function requireAdmin() {
-  const session = await auth()
-  if (!session || session.user.role !== 'ADMIN') {
-    return { ok: false as const, error: 'Unauthorized' }
-  }
-  if (session.user.isImpersonating) {
-    return { ok: false as const, error: 'Not available while impersonating another user' }
-  }
-  return { ok: true as const, session }
-}
 
-async function audit(userId: string, action: string, entityId: string, details: unknown) {
-  try {
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action,
-        entityType: 'CoachProgram',
-        entityId,
-        details: JSON.stringify(details),
-      },
-    })
-  } catch (error) {
-    console.error('Audit log failed:', error)
-  }
-}
 
 // ============================================
 // Owner actions (coach or ambassador)
@@ -415,7 +299,13 @@ export async function updateProgram(programId: string, data: unknown) {
 
   // The URL fields accept '' so a coach can clear them in the form; store
   // that as NULL rather than an empty string the public page would render.
-  const { zoomUrl, secondMeetingUrl, coachVideoUrl, ntVideoUrl, ...rest } = parsed.data
+  // The grant fields (internship offering, weekly engagement, monthly goals) are set by the team only:
+  // an owner's values are dropped here (only owners reach this action).
+  const {
+    zoomUrl, secondMeetingUrl, coachVideoUrl, ntVideoUrl,
+    internshipOffering: _io, weeklyEngagement1: _w1, weeklyEngagement2: _w2, monthlyGrowthGoal: _mg, monthlyImpactGoal: _mi,
+    ...rest
+  } = parsed.data
   await prisma.coachProgram.update({
     where: { id: programId },
     data: {
@@ -466,6 +356,7 @@ export async function submitProgramForReview(programId: string) {
   if (p.status === 'PENDING_REVIEW') {
     return { error: 'This program is already awaiting review' }
   }
+  if (await isInProgramInfoFlow(programId)) return { error: IN_FLOW_MESSAGE }
 
   const missing: string[] = []
   if (!p.programDescription?.trim()) missing.push('program description')
@@ -494,6 +385,8 @@ export async function submitProgramForReview(programId: string) {
 export async function unpublishProgram(programId: string) {
   const ctx = await requireProgramOwner(programId)
   if (!ctx.ok) return { error: ctx.error }
+  // The workflow's offline sets offlineAt (so it can be put back online); this old path would not.
+  if (await isInProgramInfoFlow(programId)) return { error: IN_FLOW_OFFLINE_MESSAGE }
 
   // Prisma.DbNull writes a real SQL NULL (a bare `null` would store the JSON
   // value `null`). One statement, so status and snapshot cannot diverge.
@@ -739,14 +632,16 @@ export async function assignProgramOwner(programId: string, owner: string) {
   }
 
   const columns = ownerAssignment(choice)
-  await prisma.coachProgram.update({
-    where: { id: programId },
-    data: {
-      ...columns,
-      assignedAt: choice ? new Date() : null,
-      assignedBy: choice ? ctx.session.user.id : null,
-    },
-  })
+  const ownerData = {
+    ...columns,
+    assignedAt: choice ? new Date() : null,
+    assignedBy: choice ? ctx.session.user.id : null,
+  }
+  // Group pages (program info workflow) always share their main program's owner.
+  await prisma.$transaction([
+    prisma.coachProgram.update({ where: { id: programId }, data: ownerData }),
+    prisma.coachProgram.updateMany({ where: { parentProgramId: programId }, data: ownerData }),
+  ])
 
   await audit(ctx.session.user.id, choice ? 'ASSIGN_PROGRAM' : 'UNASSIGN_PROGRAM', programId, {
     ...columns,
@@ -755,6 +650,9 @@ export async function assignProgramOwner(programId: string, owner: string) {
   })
   revalidatePath('/admin/programs')
   revalidateOwnerPages(programId)
+  // A14: the new owner hears about it ("Tell us about your ... page"). Unassigning sends nothing.
+  const ownerChanged = choice !== null && (columns.coachId !== program.coachId || columns.ambassadorId !== program.ambassadorId)
+  if (ownerChanged) await notifyProgramPage('C8_TELL_US', { programId, actorId: ctx.session.user.id })
   return { success: true }
 }
 
@@ -765,6 +663,7 @@ export async function approveProgram(programId: string) {
   const program = await prisma.coachProgram.findUnique({ where: { id: programId } })
   if (!program) return { error: 'Program not found' }
   if (!hasProgramOwner(program)) return { error: 'Assign a coach or ambassador before publishing' }
+  if (await isInProgramInfoFlow(programId)) return { error: IN_FLOW_MESSAGE }
 
   await prisma.coachProgram.update({
     where: { id: programId },
@@ -837,6 +736,7 @@ export async function rejectProgram(programId: string, reason: string) {
 
   const trimmed = (reason ?? '').trim()
   if (!trimmed) return { error: 'Please give the coach a reason' }
+  if (await isInProgramInfoFlow(programId)) return { error: IN_FLOW_ADMIN_MESSAGE }
 
   const program = await prisma.coachProgram.findUnique({
     where: { id: programId },
@@ -866,6 +766,7 @@ export async function adminUnpublishProgram(programId: string, reason: string) {
 
   const trimmed = (reason ?? '').trim()
   if (!trimmed) return { error: 'Please give a reason for taking this page down' }
+  if (await isInProgramInfoFlow(programId)) return { error: IN_FLOW_ADMIN_MESSAGE }
 
   const program = await prisma.coachProgram.findUnique({
     where: { id: programId },
@@ -1088,9 +989,11 @@ export async function deleteProgram(programId: string) {
 
   const program = await prisma.coachProgram.findUnique({
     where: { id: programId },
-    select: { id: true, slug: true, name: true, _count: { select: { leads: true } } },
+    select: { id: true, slug: true, name: true, _count: { select: { leads: true, groupPages: true } } },
   })
   if (!program) return { error: 'Program not found' }
+  // Group pages would be left behind as standalone pages (onDelete SetNull), some of them live.
+  if (program._count.groupPages > 0) return { error: 'Remove its group pages first' }
 
   await prisma.coachProgram.delete({ where: { id: programId } })
 

@@ -24,11 +24,24 @@ export interface InviteProgram {
   company: string
   /** The approved program paragraph, or null if none is approved yet (standard welcome email). */
   note: string | null
+  /**
+   * What pickers show: "<Program> · <Group>" for a page of a program with several groups
+   * (audienceLabel set), else the program name. `name` stays the plain program name for emails.
+   */
+  label: string
+  /** The group this page is for ("Families"), or null on a one-group program. */
+  audienceLabel: string | null
 }
 
-const SELECT = { id: true, slug: true, name: true, organization: true, welcomeNote: true, welcomeNoteApprovedAt: true } as const
-const toInvite = (p: { id: string; slug: string; name: string; organization: string; welcomeNote: string | null; welcomeNoteApprovedAt: Date | null }): InviteProgram => ({
+const SELECT = { id: true, slug: true, name: true, organization: true, welcomeNote: true, welcomeNoteApprovedAt: true, audienceLabel: true } as const
+/** "<Program> · <Group>" when the page belongs to a program with groups, else the program name. */
+export function programPageLabel(name: string, audienceLabel: string | null | undefined): string {
+  const g = audienceLabel?.trim()
+  return g ? `${name} · ${g}` : name
+}
+const toInvite = (p: { id: string; slug: string; name: string; organization: string; welcomeNote: string | null; welcomeNoteApprovedAt: Date | null; audienceLabel: string | null }): InviteProgram => ({
   id: p.id, slug: p.slug, name: p.name, company: p.organization, note: p.welcomeNoteApprovedAt && p.welcomeNote ? p.welcomeNote : null,
+  label: programPageLabel(p.name, p.audienceLabel), audienceLabel: p.audienceLabel,
 })
 
 /** A program share link (/join/[slug]/[program]): the program must be live and owned by the inviter. */
@@ -90,7 +103,7 @@ export async function userOwnsProgram(userId: string, programId: string): Promis
 
 /** The inviter's live programs, for share links on One-A-Day. */
 export async function invitePrograms(userId: string): Promise<InviteProgram[]> {
-  const rows = await prisma.coachProgram.findMany({ where: { AND: [LIVE, ownedByUser(userId)] }, orderBy: { reviewedAt: 'desc' }, select: SELECT })
+  const rows = await prisma.coachProgram.findMany({ where: { AND: [LIVE, ownedByUser(userId)] }, orderBy: [{ reviewedAt: 'desc' }, { createdAt: 'asc' }], select: SELECT })
   return rows.map(toInvite)
 }
 
@@ -144,9 +157,34 @@ export async function offerLinkForProgram(programSlug: string): Promise<string |
   if (!programSlug || programSlug.length > 120) return null
   const p = await prisma.coachProgram.findFirst({
     where: { AND: [{ slug: programSlug }, LIVE, { NOT: { offerPage: { equals: Prisma.DbNull } } }] },
-    select: { slug: true, coach: { select: { user: { select: { inviteSlug: true, status: true } } } }, ambassador: { select: { user: { select: { inviteSlug: true, status: true } } } } },
+    select: {
+      slug: true,
+      coach: { select: { user: { select: { inviteSlug: true, status: true } } } },
+      ambassador: { select: { user: { select: { inviteSlug: true, status: true } } } },
+    },
   })
+  // Group pages carry a copy of the root's owner (createGroupPage / assignProgramOwner), and the
+  // /join page checks ownership on this row, so the link must use this row's owner too.
   const owner = p?.coach?.user ?? p?.ambassador?.user ?? null
   if (!p || !owner?.inviteSlug || owner.status !== 'ACTIVE') return null
   return `/join/${encodeURIComponent(owner.inviteSlug)}/${encodeURIComponent(p.slug)}`
+}
+
+/**
+ * An old /p/<slug> link to a page that is offline (taken down in the program info workflow): like the
+ * /join program link, it falls back to the owner's main sign-up link. Null when the page is not offline or
+ * the owner has no active invite link (then /p keeps its not-found page).
+ */
+export async function offlineFallbackForProgram(programSlug: string): Promise<string | null> {
+  if (!programSlug || programSlug.length > 120) return null
+  const p = await prisma.coachProgram.findFirst({
+    where: { slug: programSlug, offlineAt: { not: null }, status: { not: 'PUBLISHED' } },
+    select: {
+      coach: { select: { user: { select: { inviteSlug: true, status: true } } } },
+      ambassador: { select: { user: { select: { inviteSlug: true, status: true } } } },
+    },
+  })
+  const owner = p?.coach?.user ?? p?.ambassador?.user ?? null
+  if (!p || !owner?.inviteSlug || owner.status !== 'ACTIVE') return null
+  return `/join/${encodeURIComponent(owner.inviteSlug)}`
 }

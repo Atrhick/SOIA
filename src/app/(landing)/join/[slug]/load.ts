@@ -78,6 +78,6 @@ export async function loadOfferLanding(programId: string, inviterId: string, slu
   return {
     page,
     business: p.playbook?.businessName?.trim() || p.organization?.trim() || 'NowTRANSFORMED',
-    more: others.map((o) => ({ label: o.name, href: `/join/${encodeURIComponent(slug)}/${encodeURIComponent(o.slug)}${qs ? `?${qs}` : ''}` })),
+    more: others.map((o) => ({ label: o.label, href: `/join/${encodeURIComponent(slug)}/${encodeURIComponent(o.slug)}${qs ? `?${qs}` : ''}` })),
   }
 }

@@ -64,7 +64,7 @@ export async function PlaybookPage({ role, programParam }: { role: 'COACH' | 'AM
   const data: PlaybookData = {
     role,
     programs: [
-      ...programs.map((p) => ({ id: p.id, name: p.name })),
+      ...programs.map((p) => ({ id: p.id, name: p.label })),
       ...(programs.length ? [{ id: GENERAL, name: 'Any program (main link)' }] : []),
     ],
     current: chosen?.id ?? GENERAL,

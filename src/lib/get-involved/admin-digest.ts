@@ -2,6 +2,8 @@
  * Daily summary email to every active admin: who signed up in the last 24 hours, who has been waiting
  * 2+ days without booking a call, and who asked us to reach out. Sent once per Central-time day, from
  * 8 AM, by the 15-minute reminders cron. Nothing to report = no email.
+ * Also a "Program pages" block (the program info workflow): pages waiting on us, stalled pages and the
+ * oldest wait, with a link to the team queue; left out when all are zero.
  * Server only (not 'use server'). The email builder is pure and tested in admin-digest.test.ts.
  */
 import prisma from '@/lib/prisma'
@@ -9,6 +11,8 @@ import { sendEmail } from '@/lib/email'
 import { BUSINESS_TZ, ageRangeLabel } from './core'
 import { P, SMALL, appUrl, esc, layout } from './emails'
 import { userDisplayName } from './server'
+import { teamQueue } from '@/lib/program-info/server'
+import { TEAM_QUEUE_PATH } from '@/lib/program-info/paths'
 
 export const DIGEST_HOUR = 8
 const WAITING_AFTER_DAYS = 2
@@ -23,6 +27,33 @@ export interface DigestData {
   waitingTotal: number
   reachOut: number
   callsNext24h: number
+  /** Program info workflow. Optional so older callers and tests keep working. */
+  programPages?: ProgramPagesDigest
+}
+
+export interface ProgramPagesDigest {
+  /** Pages where the team acts next ("Our move"). */
+  ourMove: number
+  /** Pages stalled on the owner (day 10). */
+  stalled: number
+  /** Days the longest-waiting "Our move" page has waited (0 when none). */
+  oldestWaitingDays: number
+}
+
+const hasProgramPages = (pp?: ProgramPagesDigest) => !!pp && (pp.ourMove > 0 || pp.stalled > 0)
+
+/** The "Program pages" block, or '' when there is nothing to report. */
+export function programPagesBlock(pp: ProgramPagesDigest | undefined): string {
+  if (!pp || !hasProgramPages(pp)) return ''
+  const row = (label: string, value: string) => `<li style="margin:0 0 6px">${esc(label)}: <strong>${esc(value)}</strong></li>`
+  const items = [
+    row('Our move (pages to write, fix or send)', String(pp.ourMove)),
+    row('Stalled (10+ days waiting on the owner)', String(pp.stalled)),
+    pp.ourMove > 0 ? row('Oldest one waiting on us', plural(pp.oldestWaitingDays, 'day', 'days')) : '',
+  ].join('')
+  return `<p style="color:#111827;font-size:16px;font-weight:700;margin:18px 0 8px">Program pages</p>
+    <ul style="${P};padding-left:20px">${items}</ul>
+    <p style="${P}"><a href="${esc(appUrl(TEAM_QUEUE_PATH))}" style="color:#0369a1;font-weight:600">Open program pages</a></p>`
 }
 
 /** Central-time calendar day key and hour. */
@@ -36,7 +67,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /** The email, or null when there is nothing to act on. */
 export function adminDigestEmail(d: DigestData, adminFirst: string): { subject: string; html: string } | null {
-  if (d.newSignups.length === 0 && d.waitingTotal === 0 && d.reachOut === 0) return null
+  if (d.newSignups.length === 0 && d.waitingTotal === 0 && d.reachOut === 0 && !hasProgramPages(d.programPages)) return null
   const link = (id: string, name: string) => `<a href="${esc(appUrl(`/admin/prospects/${id}`))}" style="color:#0369a1;font-weight:600">${esc(name)}</a>`
   const who = (p: DigestPerson) => `${link(p.id, p.name)} <span style="color:#6b7280">· ${esc(p.age)}${p.inviter ? ` · invited by ${esc(p.inviter)}` : ''}</span>`
   const list = (items: string[]) => `<ul style="${P};padding-left:20px">${items.map((i) => `<li style="margin:0 0 6px">${i}</li>`).join('')}</ul>`
@@ -59,9 +90,15 @@ export function adminDigestEmail(d: DigestData, adminFirst: string): { subject: 
     body += h(`Asked us to reach out: ${d.reachOut}`)
     body += `<p style="${P}">${plural(d.reachOut, 'person', 'people')} couldn't find a call time that works and asked for someone to contact them. Their details are in your notifications (the bell at the top of the back office).</p>`
   }
+  body += programPagesBlock(d.programPages)
   if (d.callsNext24h) body += `<p style="${SMALL}">${plural(d.callsNext24h, 'discovery call is', 'discovery calls are')} booked in the next 24 hours.</p>`
+  const prospects = d.newSignups.length > 0 || d.waitingTotal > 0 || d.reachOut > 0
+  const pagesPart = d.programPages && d.programPages.ourMove > 0 ? plural(d.programPages.ourMove, 'program page needs us', 'program pages need us') : ''
+  const subject = prospects
+    ? `NowTransformed daily summary: ${d.newSignups.length} new, ${d.waitingTotal} waiting for a call${pagesPart ? `, ${pagesPart}` : ''}`
+    : `NowTransformed daily summary: ${pagesPart || plural(d.programPages?.stalled ?? 0, 'program page stalled', 'program pages stalled')}`
   return {
-    subject: `NowTransformed daily summary: ${d.newSignups.length} new, ${d.waitingTotal} waiting for a call`,
+    subject,
     html: layout(body, { label: 'Open Prospects', url: appUrl('/admin/prospects') }, `<p style="${SMALL}">You get this because you're an admin. It's sent once a day, only when there is something to look at.</p>`, { audience: 'team', signOff: 'Thanks,' }),
   }
 }
@@ -93,6 +130,19 @@ export async function loadDigestData(now: Date): Promise<DigestData> {
     waitingTotal,
     reachOut,
     callsNext24h,
+    programPages: await loadProgramPagesDigest(now),
+  }
+}
+
+/** Counts for the "Program pages" block. Never fails the digest. */
+export async function loadProgramPagesDigest(now: Date): Promise<ProgramPagesDigest | undefined> {
+  try {
+    const q = await teamQueue(now)
+    const ours = q.items.filter((i) => i.bucket === 'OUR_MOVE')
+    return { ourMove: q.counts.OUR_MOVE, stalled: q.counts.STALLED, oldestWaitingDays: ours.reduce((m, i) => Math.max(m, i.waitingDays), 0) }
+  } catch (e) {
+    console.error('[CRON] program pages digest failed', e)
+    return undefined
   }
 }
 

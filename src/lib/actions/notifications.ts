@@ -2,7 +2,6 @@
 
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { NotificationType } from '@prisma/client'
 
 // ============================================
 // GET NOTIFICATIONS
@@ -47,6 +46,10 @@ export async function getAllNotifications(page = 1, limit = 20) {
   if (!session) {
     return { error: 'Unauthorized' }
   }
+
+  // Public endpoint: never trust the paging numbers.
+  page = Math.max(1, Math.floor(Number(page) || 1))
+  limit = Math.min(50, Math.max(1, Math.floor(Number(limit) || 20)))
 
   try {
     const skip = (page - 1) * limit
@@ -120,6 +123,9 @@ export async function markNotificationAsRead(notificationId: string) {
     return { error: 'Unauthorized' }
   }
 
+  // An admin viewing as someone must not change that person's notifications.
+  if (session.user.isImpersonating) return { success: true }
+
   try {
     await prisma.adminNotification.update({
       where: {
@@ -145,6 +151,9 @@ export async function markAllNotificationsAsRead() {
     return { error: 'Unauthorized' }
   }
 
+  // An admin viewing as someone must not change that person's notifications.
+  if (session.user.isImpersonating) return { success: true }
+
   try {
     await prisma.adminNotification.updateMany({
       where: {
@@ -164,80 +173,9 @@ export async function markAllNotificationsAsRead() {
   }
 }
 
-// ============================================
-// CREATE NOTIFICATION (Internal use)
-// ============================================
-
-export async function createNotification(data: {
-  userId: string
-  type: NotificationType
-  title: string
-  message: string
-  entityType?: string
-  entityId?: string
-  actionUrl?: string
-}) {
-  try {
-    const notification = await prisma.adminNotification.create({
-      data: {
-        userId: data.userId,
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        entityType: data.entityType,
-        entityId: data.entityId,
-        actionUrl: data.actionUrl,
-      },
-    })
-
-    return { success: true, notification }
-  } catch (error) {
-    console.error('Error creating notification:', error)
-    return { error: 'Failed to create notification' }
-  }
-}
-
-export async function createNotificationForAdmins(data: {
-  type: NotificationType
-  title: string
-  message: string
-  entityType?: string
-  entityId?: string
-  actionUrl?: string
-  excludeUserId?: string
-}) {
-  try {
-    const admins = await prisma.user.findMany({
-      where: {
-        role: 'ADMIN',
-        status: 'ACTIVE',
-        ...(data.excludeUserId ? { id: { not: data.excludeUserId } } : {}),
-      },
-      select: { id: true },
-    })
-
-    if (admins.length === 0) {
-      return { success: true, count: 0 }
-    }
-
-    await prisma.adminNotification.createMany({
-      data: admins.map(admin => ({
-        userId: admin.id,
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        entityType: data.entityType,
-        entityId: data.entityId,
-        actionUrl: data.actionUrl,
-      })),
-    })
-
-    return { success: true, count: admins.length }
-  } catch (error) {
-    console.error('Error creating notifications for admins:', error)
-    return { error: 'Failed to create notifications' }
-  }
-}
+// Notifications are created server-side only (prisma.adminNotification.create in server code,
+// e.g. src/lib/program-info/notify.ts). There is deliberately no exported "create" action here:
+// everything exported from a 'use server' file is a public endpoint.
 
 // ============================================
 // DELETE NOTIFICATION
@@ -248,6 +186,9 @@ export async function deleteNotification(notificationId: string) {
   if (!session) {
     return { error: 'Unauthorized' }
   }
+
+  // An admin viewing as someone must not change that person's notifications.
+  if (session.user.isImpersonating) return { success: true }
 
   try {
     await prisma.adminNotification.delete({
@@ -269,6 +210,9 @@ export async function deleteAllReadNotifications() {
   if (!session) {
     return { error: 'Unauthorized' }
   }
+
+  // An admin viewing as someone must not change that person's notifications.
+  if (session.user.isImpersonating) return { success: true }
 
   try {
     await prisma.adminNotification.deleteMany({

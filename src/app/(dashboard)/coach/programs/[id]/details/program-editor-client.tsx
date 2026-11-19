@@ -31,7 +31,6 @@ import {
   ExternalLink,
   Loader2,
   Plus,
-  Send,
   Trash2,
 } from 'lucide-react'
 import {
@@ -44,7 +43,6 @@ import {
 } from '@/lib/program-question-types'
 import {
   saveExtraQuestions,
-  submitProgramForReview,
   updateProgram,
 } from '@/lib/actions/program-pages'
 
@@ -178,9 +176,9 @@ export function ProgramEditorClient({
   }
 
   const saveContent = () =>
-    run(() => updateProgram(program.id, { ...form, showMeetingDetails, showCoachBio }), 'Saved. Press "Submit for review" when you are ready for it to go live.')
+    run(() => updateProgram(program.id, { ...form, showMeetingDetails, showCoachBio }), 'Saved.')
   const saveQuestions = () =>
-    run(() => saveExtraQuestions(program.id, questions), 'Questions saved. Press "Submit for review" when you are ready.')
+    run(() => saveExtraQuestions(program.id, questions), 'Questions saved.')
 
   const addQuestion = (type: ProgramQuestionType) => {
     if (questions.length >= MAX_EXTRA_QUESTIONS) {
@@ -212,9 +210,6 @@ export function ProgramEditorClient({
     }
   }
 
-  const submitDisabled = isPending || readOnly || program.status === 'PENDING_REVIEW'
-  const submit = () => run(() => submitProgramForReview(program.id), 'Sent for review. We’ll email you when it’s approved.')
-  const submitLabel = program.status === 'PENDING_REVIEW' ? 'Waiting for review' : 'Submit for review'
 
   return (
     <div className="space-y-6 min-w-0">
@@ -253,22 +248,9 @@ export function ProgramEditorClient({
               </button>
             </>
           )}
-          <button type="button" className={`${kit.primary} hidden sm:inline-flex`} disabled={submitDisabled} onClick={submit}>
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
-            {submitLabel}
-          </button>
         </div>
       </div>
 
-      {/* Phones: "Submit for review" always within reach at the bottom of the screen. */}
-      {!readOnly && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
-          <button type="button" className={kit.primaryBlock} disabled={submitDisabled} onClick={submit}>
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
-            {submitLabel}
-          </button>
-        </div>
-      )}
 
       {readOnly && (
         <AlertBanner
@@ -281,7 +263,7 @@ export function ProgramEditorClient({
       {program.hasLiveVersion && (
         <AlertBanner
           variant="info"
-          message="Your edits to the page don't change the live page until an admin approves them. Save, then press Submit for review."
+          message="Your edits here don't change the live page. Your page goes live, or changes, only when you check a new version and press Looks good."
         />
       )}
 
@@ -650,47 +632,13 @@ export function ProgramEditorClient({
                 These came from your original program sheet. You can change them; an admin approves
                 the change before it appears publicly.
               </p>
+              {/* Grant fields (internship offering, weekly engagements, monthly goals) are admin-only: /admin/programs. */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field label="Target market" htmlFor="targetMarket">
                   <Input
                     id="targetMarket"
                     value={form.targetMarket}
                     onChange={(e) => set('targetMarket', e.target.value)}
-                  />
-                </Field>
-                <Field label="Internship offering" htmlFor="internshipOffering">
-                  <Input
-                    id="internshipOffering"
-                    value={form.internshipOffering}
-                    onChange={(e) => set('internshipOffering', e.target.value)}
-                  />
-                </Field>
-                <Field label="Weekly engagement 1" htmlFor="weeklyEngagement1">
-                  <Input
-                    id="weeklyEngagement1"
-                    value={form.weeklyEngagement1}
-                    onChange={(e) => set('weeklyEngagement1', e.target.value)}
-                  />
-                </Field>
-                <Field label="Weekly engagement 2" htmlFor="weeklyEngagement2">
-                  <Input
-                    id="weeklyEngagement2"
-                    value={form.weeklyEngagement2}
-                    onChange={(e) => set('weeklyEngagement2', e.target.value)}
-                  />
-                </Field>
-                <Field label="Monthly growth goal" htmlFor="monthlyGrowthGoal">
-                  <Input
-                    id="monthlyGrowthGoal"
-                    value={form.monthlyGrowthGoal}
-                    onChange={(e) => set('monthlyGrowthGoal', e.target.value)}
-                  />
-                </Field>
-                <Field label="Monthly impact goal" htmlFor="monthlyImpactGoal">
-                  <Input
-                    id="monthlyImpactGoal"
-                    value={form.monthlyImpactGoal}
-                    onChange={(e) => set('monthlyImpactGoal', e.target.value)}
                   />
                 </Field>
               </div>

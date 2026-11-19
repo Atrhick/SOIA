@@ -192,8 +192,11 @@ export async function getCoachDashboard() {
     prisma.cRMContact.count({
       where: { ownerId: coachId, status: 'CONVERTED', updatedAt: { gte: monthStart } },
     }),
+    // Goals are set per program, on the ROOT row. Group pages (parentProgramId set) carry a copy
+    // of the root's goals, so counting them too would double the target. Their sign-ups still
+    // count above (program.coachId), which rolls them up into the program.
     prisma.coachProgram.findMany({
-      where: { coachId },
+      where: { coachId, parentProgramId: null },
       select: {
         id: true,
         name: true,

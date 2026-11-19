@@ -9,7 +9,9 @@
  *   on day 2 and day 7, the "Maybe later" check-in.
  * - Deletes under-18 sign-ups whose parent never answered within 14 days.
  * - Journey reminders (assessment after 2 days; orientation at the time the prospect picked).
- * - Daily summary to admins from 8 AM Central (admin-digest.ts): new sign-ups, people waiting for a call.
+ * - Program page reminders (program-info/reminders.ts): day 3/7 reminders to page owners 9:00-19:00 Central,
+ *   day-10 stalls to the team.
+ * - Daily summary to admins from 8 AM Central (admin-digest.ts): new sign-ups, people waiting for a call, program pages.
  * Opted-out prospects (emailOptOutAt) get none of the automatic emails EXCEPT the day-before and
  * 1-hour reminders for a call they booked themselves.
  */
@@ -23,6 +25,7 @@ import { journeyUrl, userDisplayName } from '@/lib/get-involved/server'
 import { runJourneyReminders } from '@/lib/get-involved/journey-steps'
 import { runOutreachEmails } from '@/lib/get-involved/nudges'
 import { runAdminDigest } from '@/lib/get-involved/admin-digest'
+import { runProgramPageReminders } from '@/lib/program-info/reminders'
 import { primeEmailFooter } from '@/lib/get-involved/emails/footer-settings'
 import { dayBeforeReminderEmail } from '@/lib/get-involved/emails/reminders'
 
@@ -96,8 +99,9 @@ export async function POST(req: Request) {
     const deleted = await sweepUnansweredConsent()
     const journey = await runJourneyReminders()
     const outreach = await runOutreachEmails()
+    const programPages = await runProgramPageReminders().catch((e) => { console.error('[CRON] program page reminders failed', e); return null })
     const adminDigest = await runAdminDigest().catch((e) => { console.error('[CRON] admin digest failed', e); return 0 })
-    return NextResponse.json({ ok: true, sent, deleted, journey, outreach, adminDigest })
+    return NextResponse.json({ ok: true, sent, deleted, journey, outreach, programPages, adminDigest })
   } catch (e) {
     console.error('[CRON] discovery reminders failed', e)
     return NextResponse.json({ ok: false }, { status: 500 })
