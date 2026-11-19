@@ -78,6 +78,10 @@ export async function requireProgramUser({ allowImpersonation = false, allowSupp
   if (session.user.isImpersonating && !allowImpersonation && !allowSupport) {
     return { ok: false as const, error: 'Not available while impersonating another user' }
   }
+  // A write while viewing as must be recorded under the admin; without their id, refuse rather than credit the owner.
+  if (session.user.isImpersonating && allowSupport && !session.user.originalAdminId) {
+    return { ok: false as const, error: 'Switch back and view as this person again, then try once more.' }
+  }
   const enabled = await isFeatureEnabled('PROGRAM_PAGES', role, session.user.id)
   if (!enabled) {
     return { ok: false as const, error: 'This feature is not enabled for your account' }
@@ -106,7 +110,7 @@ export async function requireProgramUser({ allowImpersonation = false, allowSupp
     owner,
     readOnly: Boolean(session.user.isImpersonating),
     /** Who did it: the admin when viewing as the owner, else the owner. */
-    actorId: (session.user.isImpersonating && session.user.originalAdminId) || session.user.id,
+    actorId: session.user.isImpersonating ? (session.user.originalAdminId ?? session.user.id) : session.user.id,
   }
 }
 

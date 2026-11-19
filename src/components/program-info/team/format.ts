@@ -103,6 +103,13 @@ export function eventSentence(e: Ev, ownerFirst: string): string {
       return 'Marked as stalled'
     case 'MIGRATED':
       return `Brought over from the old page as approved version${n}`
+    case 'EDITED_FOR_OWNER': {
+      const keys = Array.isArray(d.keys) ? (d.keys as unknown[]).filter((k): k is string => typeof k === 'string') : []
+      const undo = keys.includes('undo')
+      const count = keys.filter((k) => k !== 'undo').length
+      const parts = [count ? `changed ${count} answer${count === 1 ? '' : 's'}` : '', undo ? 'undid the changes' : ''].filter(Boolean).join(' and ')
+      return `${who} ${parts || 'changed answers'} while viewing as ${ownerFirst}`
+    }
     case 'SUGGESTIONS_ADDED':
       return `The team filled ${typeof d.count === 'number' ? d.count : 'some'} empty answers from the live page, for the owner to check`
     default:

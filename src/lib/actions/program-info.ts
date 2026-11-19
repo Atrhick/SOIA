@@ -80,10 +80,35 @@ const OUT_OF_DATE = 'This version is out of date. Reload the page.'
 type Tx = Prisma.TransactionClient
 type EventKind =
   | 'ANSWERS_SENT' | 'QUESTION_ASKED' | 'QUESTION_ANSWERED' | 'DRAFT_SAVED' | 'SENT_TO_CHECK' | 'CHANGES_ASKED' | 'APPROVED'
-  | 'PUBLISHED_ON_BEHALF' | 'TAKEN_OFFLINE' | 'BACK_ONLINE' | 'GROUP_ADDED' | 'NAMES_CHANGED' | 'REMINDER_SENT' | 'STALLED' | 'MIGRATED' | 'SUGGESTIONS_ADDED'
+  | 'PUBLISHED_ON_BEHALF' | 'TAKEN_OFFLINE' | 'BACK_ONLINE' | 'GROUP_ADDED' | 'NAMES_CHANGED' | 'REMINDER_SENT' | 'STALLED' | 'MIGRATED' | 'SUGGESTIONS_ADDED' | 'EDITED_FOR_OWNER'
 
 function logEvent(tx: Tx, programId: string, actorId: string | null, kind: EventKind, detail?: Record<string, unknown>) {
   return tx.programPageEvent.create({ data: { programId, actorId, kind, detail: (detail ?? undefined) as Prisma.InputJsonValue | undefined } })
+}
+
+/**
+ * An admin viewing as the owner changed answers: one history row per admin and page per 30 minutes,
+ * listing the questions touched (autosave would otherwise write a row per keystroke pause).
+ */
+async function logSupportEdit(programId: string, actorId: string, keys: string[]) {
+  try {
+    const since = new Date(Date.now() - 30 * 60 * 1000)
+    const last = await prisma.programPageEvent.findFirst({
+      where: { programId, actorId, kind: 'EDITED_FOR_OWNER', createdAt: { gte: since } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, detail: true },
+    })
+    if (last) {
+      const prev = (last.detail as { keys?: unknown } | null)?.keys
+      const had = Array.isArray(prev) ? prev.filter((k): k is string => typeof k === 'string') : []
+      const all = Array.from(new Set([...had, ...keys]))
+      if (all.length !== had.length) await prisma.programPageEvent.update({ where: { id: last.id }, data: { detail: { keys: all } } })
+      return
+    }
+    await prisma.programPageEvent.create({ data: { programId, actorId, kind: 'EDITED_FOR_OWNER', detail: { keys } } })
+  } catch (e) {
+    console.error('[PROGRAM-INFO] support edit log failed', e)
+  }
 }
 
 async function notify(event: ProgramPageNotifyEvent, programId: string, actorId: string | null, extra?: NotifyExtra) {
@@ -514,6 +539,7 @@ export async function saveAnswer(programId: string, key: string, value: unknown)
     console.error('[PROGRAM-INFO] saveAnswer failed', e)
     return fail('Could not save. Please try again.')
   }
+  if (ctx.readOnly) await logSupportEdit(ctx.page.id, ctx.actorId, [parsed.key])
   const after = await loadPageWithRoot(ctx.page.id)
   const progress = pageProgress(mergeAnswers(after?.page.infoAnswers, after?.root.sharedAnswers))
   revalidateInfo(ctx.page.id)
@@ -704,6 +730,7 @@ export async function undoAnswerChanges(programId: string): Promise<ActionResult
     console.error('[PROGRAM-INFO] undoAnswerChanges failed', e)
     return fail(GENERIC)
   }
+  if (ctx.readOnly) await logSupportEdit(page.id, ctx.actorId, ['undo'])
   revalidateInfo(page.id)
   return { ok: true }
 }
