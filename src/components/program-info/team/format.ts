@@ -103,6 +103,8 @@ export function eventSentence(e: Ev, ownerFirst: string): string {
       return 'Marked as stalled'
     case 'MIGRATED':
       return `Brought over from the old page as approved version${n}`
+    case 'SUGGESTIONS_ADDED':
+      return `The team filled ${typeof d.count === 'number' ? d.count : 'some'} empty answers from the live page, for the owner to check`
     default:
       return `${who}: ${e.kind.toLowerCase().replace(/_/g, ' ')}`
   }

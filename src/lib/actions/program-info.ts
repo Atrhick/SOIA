@@ -80,7 +80,7 @@ const OUT_OF_DATE = 'This version is out of date. Reload the page.'
 type Tx = Prisma.TransactionClient
 type EventKind =
   | 'ANSWERS_SENT' | 'QUESTION_ASKED' | 'QUESTION_ANSWERED' | 'DRAFT_SAVED' | 'SENT_TO_CHECK' | 'CHANGES_ASKED' | 'APPROVED'
-  | 'PUBLISHED_ON_BEHALF' | 'TAKEN_OFFLINE' | 'BACK_ONLINE' | 'GROUP_ADDED' | 'NAMES_CHANGED' | 'REMINDER_SENT' | 'STALLED' | 'MIGRATED'
+  | 'PUBLISHED_ON_BEHALF' | 'TAKEN_OFFLINE' | 'BACK_ONLINE' | 'GROUP_ADDED' | 'NAMES_CHANGED' | 'REMINDER_SENT' | 'STALLED' | 'MIGRATED' | 'SUGGESTIONS_ADDED'
 
 function logEvent(tx: Tx, programId: string, actorId: string | null, kind: EventKind, detail?: Record<string, unknown>) {
   return tx.programPageEvent.create({ data: { programId, actorId, kind, detail: (detail ?? undefined) as Prisma.InputJsonValue | undefined } })
