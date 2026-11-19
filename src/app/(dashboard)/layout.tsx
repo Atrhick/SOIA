@@ -9,6 +9,7 @@ import { NotificationsCard } from '@/components/pwa/notifications-card'
 import { prisma } from '@/lib/prisma'
 import { CALLBACK_PATH_HEADER, loginPath } from '@/lib/safe-callback'
 import { isAssociateRole, isSwitchableRole, rolesOf, type AssociateRole } from '@/lib/roles'
+import { newSupportCount } from '@/lib/support/server'
 
 export default async function DashboardLayout({
   children,
@@ -23,7 +24,7 @@ export default async function DashboardLayout({
   }
 
   // Cast to the supported role types
-  const role = session.user.role as 'ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
+  const role = session.user.role as 'ADMIN' | 'SUB_ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
   const isImpersonating = session.user.isImpersonating || false
 
   // Fetch the profile name based on role
@@ -68,10 +69,13 @@ export default async function DashboardLayout({
     ? rolesOf(me).filter((r) => isSwitchableRole(r) && (r !== 'COACH' || me.coachProfile) && (r !== 'AMBASSADOR' || me.ambassadorProfile))
     : []
 
+  // Sidebar badge: support messages nobody has picked up yet (admins and sub-admins).
+  const supportNew = role === 'ADMIN' || role === 'SUB_ADMIN' ? await newSupportCount({ id: session.user.id, role }) : 0
+
   return (
     <MobileNavProvider>
     <div className="min-h-screen bg-gray-50">
-      <Sidebar role={role} />
+      <Sidebar role={role} badges={supportNew ? { '/admin/support': supportNew, '/team/support': supportNew } : undefined} />
       <Header user={{
         email: viewingEmail ?? session.user.email,
         role: session.user.role,

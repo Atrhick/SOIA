@@ -23,8 +23,10 @@ export default async function Home() {
   }
   if (role === 'AMBASSADOR') redirect('/ambassador')
   if (isAssociateRole(role)) redirect('/associate')
+  // Sub-admins have one area: the support inbox (they can't open any other admin page).
+  if (role === 'SUB_ADMIN') redirect('/team/support')
 
-  // Every role must be listed above. Anything else - PARENT, SUB_ADMIN, or a
+  // Every role must be listed above. Anything else - PARENT, or a
   // role added later - lands on /login rather than falling through to /coach,
   // which rejects non-coaches and sends them back here in an endless loop.
   redirect('/login')

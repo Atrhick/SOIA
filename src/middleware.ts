@@ -30,5 +30,9 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/coach/programs/:path*', '/ambassador/programs/:path*', '/admin/program-pages/:path*'],
+  matcher: [
+    '/coach/programs/:path*', '/ambassador/programs/:path*', '/admin/program-pages/:path*',
+    // Support message links in emails and push notifications.
+    '/coach/support/:path*', '/ambassador/support/:path*', '/associate/support/:path*', '/admin/support/:path*', '/team/:path*',
+  ],
 }

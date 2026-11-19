@@ -50,12 +50,16 @@ import { BellRing,
   Wallet,
   Contact,
   Gift,
+  LifeBuoy,
+  Inbox,
 } from 'lucide-react'
 import { ASSOCIATE_LABELS, isAssociateRole, type AssociateRole } from '@/lib/roles'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
 
 interface SidebarProps {
-  role: 'ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
+  role: 'ADMIN' | 'SUB_ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
+  /** Small count beside a link, by href (e.g. new support messages). */
+  badges?: Record<string, number>
 }
 
 interface NavItem {
@@ -125,6 +129,7 @@ const ambassadorNavSections: NavSection[] = [
     icon: User,
     items: [
       { href: '/ambassador/profile', label: 'Profile', icon: User },
+      { href: '/ambassador/support', label: 'Get help', icon: LifeBuoy },
     ],
   },
 ]
@@ -178,6 +183,7 @@ const coachNavSections: NavSection[] = [
       { href: '/coach/collaboration/channels', label: 'Channels', icon: Hash },
       { href: '/coach/collaboration/messages', label: 'Direct Messages', icon: Mail },
       { href: '/coach/collaboration/files', label: 'Files', icon: FileText },
+      { href: '/coach/support', label: 'Get help', icon: LifeBuoy },
     ],
   },
   {
@@ -201,6 +207,18 @@ const associateNavSections: NavSection[] = [
     icon: UserCog,
     items: [
       { href: '/associate/profile', label: 'My Profile', icon: UserCog },
+      { href: '/associate/support', label: 'Get help', icon: LifeBuoy },
+    ],
+  },
+]
+
+// Sub-admins: only the support inbox (no other admin page is open to them).
+const subAdminNavSections: NavSection[] = [
+  {
+    title: 'Support',
+    icon: LifeBuoy,
+    items: [
+      { href: '/team/support', label: 'Support inbox', icon: Inbox },
     ],
   },
 ]
@@ -264,6 +282,7 @@ const adminNavSections: NavSection[] = [
     title: 'Communication',
     icon: Megaphone,
     items: [
+      { href: '/admin/support', label: 'Support inbox', icon: Inbox },
       { href: '/admin/notifications', label: 'Send a notification', icon: BellRing },
       { href: '/admin/collaboration/channels', label: 'Channels', icon: Hash },
       { href: '/admin/collaboration/messages', label: 'Direct Messages', icon: Mail },
@@ -291,8 +310,10 @@ function NavSectionComponent({
   accentColor = 'primary',
   isOpen,
   onToggle,
+  badges,
 }: {
   section: NavSection
+  badges?: Record<string, number>
   pathname: string
   basePath: string
   accentColor?: 'primary' | 'amber'
@@ -320,6 +341,7 @@ function NavSectionComponent({
         <div className="flex items-center gap-2">
           <SectionIcon className="h-4 w-4" />
           <span>{section.title}</span>
+          {!isOpen && section.items.some((i) => badges?.[i.href]) && <span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" />}
         </div>
         <ChevronDown
           className={cn(
@@ -359,7 +381,10 @@ function NavSectionComponent({
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {!!badges?.[item.href] && (
+                    <span className="rounded-full bg-sky-600 px-2 text-xs font-semibold text-white" aria-label={`${badges[item.href]} new`}>{badges[item.href]}</span>
+                  )}
                 </Link>
               </li>
             )
@@ -380,7 +405,7 @@ function findActiveSectionIndex(sections: NavSection[], pathname: string, basePa
   return index >= 0 ? index : null
 }
 
-export function Sidebar({ role }: SidebarProps) {
+export function Sidebar({ role, badges }: SidebarProps) {
   const pathname = usePathname()
   const mobileNav = useMobileNav()
 
@@ -390,6 +415,7 @@ export function Sidebar({ role }: SidebarProps) {
     if (isAssociateRole(role)) return '/associate'
     switch (role) {
       case 'ADMIN': return '/admin'
+      case 'SUB_ADMIN': return '/team/support'
       case 'AMBASSADOR': return '/ambassador'
       default: return '/coach'
     }
@@ -399,6 +425,7 @@ export function Sidebar({ role }: SidebarProps) {
     if (isAssociateRole(role)) return `${ASSOCIATE_LABELS[role]} Portal`
     switch (role) {
       case 'ADMIN': return 'Admin Portal'
+      case 'SUB_ADMIN': return 'Team Portal'
       case 'AMBASSADOR': return 'Ambassador Portal'
       default: return 'Coach Portal'
     }
@@ -416,6 +443,7 @@ export function Sidebar({ role }: SidebarProps) {
     if (isAssociateRole(role)) return associateNavSections
     switch (role) {
       case 'ADMIN': return adminNavSections
+      case 'SUB_ADMIN': return subAdminNavSections
       case 'AMBASSADOR': return ambassadorNavSections
       default: return coachNavSections
     }
@@ -491,9 +519,36 @@ export function Sidebar({ role }: SidebarProps) {
           accentColor="amber"
           isOpen={openSectionIndex === index}
           onToggle={() => handleSectionToggle(index)}
+          badges={badges}
         />
       ))}
     </div>
+  )
+
+  // Sub-admins: just their inbox link (no Dashboard: the inbox is their home).
+  const renderSubAdminNav = () => (
+    <ul className="space-y-1">
+      {subAdminNavSections[0].items.map((item) => {
+        const Icon = item.icon
+        const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+        return (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              prefetch={true}
+              className={cn(
+                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
+                active ? 'bg-primary-50 text-primary-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="flex-1">{item.label}</span>
+              {!!badges?.[item.href] && <span className="rounded-full bg-sky-600 px-2 text-xs font-semibold text-white" aria-label={`${badges[item.href]} new`}>{badges[item.href]}</span>}
+            </Link>
+          </li>
+        )
+      })}
+    </ul>
   )
 
   // Render sectioned navigation for Admin and Coach
@@ -543,6 +598,7 @@ export function Sidebar({ role }: SidebarProps) {
           accentColor="primary"
           isOpen={openSectionIndex === index}
           onToggle={() => handleSectionToggle(index)}
+          badges={badges}
         />
       ))}
     </div>
@@ -589,7 +645,9 @@ export function Sidebar({ role }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-4">
-          {role === 'ADMIN'
+          {role === 'SUB_ADMIN'
+            ? renderSubAdminNav()
+            : role === 'ADMIN'
             ? renderSectionedNav(adminNavSections)
             : role === 'COACH'
               ? renderSectionedNav(coachNavSections)

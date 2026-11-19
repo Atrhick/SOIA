@@ -76,5 +76,6 @@ export function homeForRole(role: string): string {
   if (role === 'COACH') return '/coach'
   if (role === 'AMBASSADOR') return '/ambassador'
   if (isAssociateRole(role)) return '/associate'
+  if (role === 'SUB_ADMIN') return '/team/support'
   return '/'
 }

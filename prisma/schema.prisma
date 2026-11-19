@@ -54,19 +54,23 @@ model User {
   timeEntryEdits      TimeEntryChange[]    @relation("TimeEntryEditor")
 
   // Get Involved / One-A-Day
-  inviteSlug           String?               @unique
-  invitePhoto          String?               @db.Text // small JPEG data URL from the invite profile
-  inviteWhy            String? // one line, "why I do this"
-  inviteProgramId      String? // program their main link shares (null = latest approved)
-  outreachShares       OutreachShare[]
-  outreachInvites      OutreachInvite[]
-  outreachGroups       OutreachGroupMember[]
-  pushSubscriptions    PushSubscription[]
-  invitedProspects     Prospect[]            @relation("ProspectInviter")
-  discoveryHost        DiscoveryHost?
-  hostedDiscoveryCalls DiscoveryCall[]       @relation("DiscoveryCallHost")
+  inviteSlug              String?               @unique
+  invitePhoto             String?               @db.Text // small JPEG data URL from the invite profile
+  inviteWhy               String? // one line, "why I do this"
+  inviteProgramId         String? // program their main link shares (null = latest approved)
+  outreachShares          OutreachShare[]
+  outreachInvites         OutreachInvite[]
+  outreachGroups          OutreachGroupMember[]
+  pushSubscriptions       PushSubscription[]
+  invitedProspects        Prospect[]            @relation("ProspectInviter")
+  discoveryHost           DiscoveryHost?
+  hostedDiscoveryCalls    DiscoveryCall[]       @relation("DiscoveryCallHost")
   // Get Involved phase 2/3: the prospect record this login was created from.
-  journeyProspect      Prospect?             @relation("ProspectUser")
+  journeyProspect         Prospect?             @relation("ProspectUser")
+  // Support messages (Get help): sent by this person / assigned to this team member / replies written.
+  supportMessagesSent     SupportMessage[]      @relation("SupportSender")
+  supportMessagesAssigned SupportMessage[]      @relation("SupportAssignee")
+  supportReplies          SupportReply[]        @relation("SupportReplyAuthor")
 
   @@index([role, status])
   @@map("users")
@@ -2079,6 +2083,7 @@ enum NotificationType {
   PAYMENT_RECEIVED
   ACCOUNT_CREATED
   PROGRAM_PAGE
+  SUPPORT
 }
 
 model Prospect {
@@ -3352,4 +3357,61 @@ model PartnerCode {
 
   @@index([prospectId])
   @@map("partner_codes")
+}
+
+// ============================================
+// SUPPORT MESSAGES ("Get help")
+// ============================================
+
+/// NEW = nobody assigned yet; ASSIGNED = a team member has it; WAITING_ON_SENDER = the team asked the sender
+/// something; DONE = closed (a reply from the sender reopens it). Rules in src/lib/support/core.ts.
+enum SupportStatus {
+  NEW
+  ASSIGNED
+  WAITING_ON_SENDER
+  DONE
+}
+
+/// A message from a coach, ambassador or associate to the admin team. Category is a key of
+/// SUPPORT_CATEGORIES (src/lib/support/core.ts), kept as text so categories can change without a schema change.
+model SupportMessage {
+  id             String         @id @default(cuid())
+  senderId       String
+  sender         User           @relation("SupportSender", fields: [senderId], references: [id], onDelete: Cascade)
+  /// The view the sender was in (COACH, AMBASSADOR or an associate role): their links go to that area.
+  senderRole     UserRole
+  category       String
+  subject        String
+  body           String         @db.Text
+  status         SupportStatus  @default(NEW)
+  assignedToId   String?
+  assignedTo     User?          @relation("SupportAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedById   String?
+  assignedAt     DateTime?
+  closedAt       DateTime?
+  lastActivityAt DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  replies        SupportReply[]
+
+  @@index([status, lastActivityAt])
+  @@index([assignedToId, status])
+  @@index([senderId, createdAt])
+  @@map("support_messages")
+}
+
+model SupportReply {
+  id        String         @id @default(cuid())
+  messageId String
+  message   SupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// Null when the author's login was deleted.
+  authorId  String?
+  author    User?          @relation("SupportReplyAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  body      String         @db.Text
+  /// true = written by an admin or sub-admin (shown to the sender as "the NowTRANSFORMED team").
+  fromTeam  Boolean
+  createdAt DateTime       @default(now())
+
+  @@index([messageId, createdAt])
+  @@map("support_replies")
 }

@@ -18,7 +18,7 @@ import { getUsersForImpersonation, getImpersonationData } from '@/lib/actions/im
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { OPEN_INSTALL_EVENT, isInstalled } from '@/components/pwa/install-prompt'
 import { pushState, turnOnPush, turnOffPush, type PushState } from '@/components/pwa/push-client'
-import { ROLE_VIEW_NAMES, isSwitchableRole } from '@/lib/roles'
+import { ASSOCIATE_LABELS, ROLE_VIEW_NAMES, isAssociateRole, isSwitchableRole } from '@/lib/roles'
 import { useToast } from '@/components/ui/kit/toast'
 import { updateSession } from '@/lib/session-update'
 
@@ -151,8 +151,8 @@ export function Header({ user }: HeaderProps) {
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-            {/* Notifications: admins, coaches and ambassadors (each sees only their own). */}
-            {(user.role === 'ADMIN' || user.role === 'COACH' || user.role === 'AMBASSADOR') && (
+            {/* Notifications: everyone with a dashboard (each sees only their own). */}
+            {(user.role === 'ADMIN' || user.role === 'SUB_ADMIN' || user.role === 'COACH' || user.role === 'AMBASSADOR' || isAssociateRole(user.role)) && (
               <NotificationBell viewAllHref={user.role === 'ADMIN' ? '/admin/notifications' : null} />
             )}
 
@@ -165,7 +165,7 @@ export function Header({ user }: HeaderProps) {
                   </div>
                   <div className="hidden sm:block text-left">
                     <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
-                    <p className="text-xs text-gray-500 capitalize">{user.role.toLowerCase()}</p>
+                    <p className="text-xs text-gray-500 capitalize">{user.role === 'SUB_ADMIN' ? 'sub-admin' : isAssociateRole(user.role) ? ASSOCIATE_LABELS[user.role].toLowerCase() : user.role.toLowerCase()}</p>
                   </div>
                   <ChevronDown className="h-4 w-4 text-gray-500" />
                 </Button>

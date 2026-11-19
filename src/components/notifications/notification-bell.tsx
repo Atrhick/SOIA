@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Bell, Check, CheckCheck, Trash2, ExternalLink, ClipboardCheck, ArrowRightLeft, CreditCard, UserPlus, FileText, type LucideIcon } from 'lucide-react'
+import { Bell, Check, CheckCheck, Trash2, ExternalLink, LifeBuoy, ClipboardCheck, ArrowRightLeft, CreditCard, UserPlus, FileText, type LucideIcon } from 'lucide-react'
 import type { NotificationType } from '@prisma/client'
 import { Button } from '@/components/ui/button'
 import {
@@ -40,6 +40,7 @@ const NOTIFICATION_STYLES: Record<NotificationType, { icon: LucideIcon; classNam
   PAYMENT_RECEIVED: { icon: CreditCard, className: 'bg-green-100 text-green-600', label: 'Payment' },
   ACCOUNT_CREATED: { icon: UserPlus, className: 'bg-purple-100 text-purple-600', label: 'New account' },
   PROGRAM_PAGE: { icon: FileText, className: 'bg-primary-100 text-primary-700', label: 'Program page' },
+  SUPPORT: { icon: LifeBuoy, className: 'bg-sky-100 text-sky-700', label: 'Help message' },
 }
 const FALLBACK_STYLE = { icon: Bell, className: 'bg-gray-100 text-gray-600', label: 'Notification' }
 export function notificationStyle(type: string) {
