@@ -2,20 +2,21 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { callbackFromLocation } from '@/lib/safe-callback'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
+import { SignedInNotice } from './signed-in-notice'
 import Image from 'next/image'
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [focusedField, setFocusedField] = useState<string | null>(null)
+  const { status: sessionStatus } = useSession()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,8 +34,7 @@ export default function LoginPage() {
         setError('Invalid email or password')
       } else {
         // Back to the link that sent them here (email/push deep links), same-site paths only.
-        router.push(callbackFromLocation('/'))
-        router.refresh()
+        window.location.assign(callbackFromLocation('/'))
       }
     } catch {
       setError('An error occurred. Please try again.')
@@ -64,7 +64,8 @@ export default function LoginPage() {
 
         {/* Form section */}
         <div className="px-8 pb-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {sessionStatus === 'authenticated' && <SignedInNotice onSignInAgain={() => window.location.reload()} />}
+          <form onSubmit={handleSubmit} className={sessionStatus === 'authenticated' ? 'hidden' : 'space-y-5'}>
             {/* Error message */}
             {error && (
               <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl animate-slide-up flex items-center gap-2">

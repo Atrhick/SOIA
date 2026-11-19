@@ -77,6 +77,14 @@ describe('offer pages', () => {
     expect(parseOfferPage(minimal)?.theme).toBeUndefined()
   })
 
+  it('callout: a short second-audience section with title, text and an optional photo and points', () => {
+    const c = { title: 'Own a small business?', text: 'Ask how your team could get it too.', image: { src: '/offers/x/team.webp', alt: 'A team' }, cta: 'Ask about my team' }
+    expect(parseOfferPage({ ...minimal, callout: c })?.callout?.points).toEqual([])
+    expect(parseOfferPage({ ...minimal, callout: { ...c, title: '' } })).toBeNull()
+    expect(parseOfferPage({ ...minimal, callout: { ...c, points: [1, 2, 3, 4].map((n) => ({ lead: `L${n}`, text: 't' })) } })).toBeNull()
+    expect(parseOfferPage(minimal)?.callout).toBeUndefined()
+  })
+
   it('images only from our own /offers files or https links', () => {
     const withImg = (src: string) => parseOfferPage({ ...minimal, heroImage: { src, alt: 'x' } })
     expect(withImg('/offers/explorenation/listing-phone.webp')).not.toBeNull()

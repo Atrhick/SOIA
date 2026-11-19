@@ -67,6 +67,15 @@ export const OfferPageSchema = z.object({
     soon: z.object({ label: text(30), text: text(200), images: z.array(shot).max(3).default([]) }).optional(),
     cta: z.string().trim().max(60).optional(),
   }).optional(),
+  /** A short side section for a second audience (e.g. "Own a small business?"), shown after the options cards. */
+  callout: z.object({
+    eyebrow: z.string().trim().max(60).optional(),
+    title: text(120),
+    text: text(500),
+    points: z.array(z.object({ lead: text(60), text: text(200) })).max(3).default([]),
+    image: shot.optional(),
+    cta: z.string().trim().max(60).optional(),
+  }).optional(),
   story: z.object({ title: text(120), paragraphs: z.array(text(600)).min(1).max(3), image: image.optional() }).optional(),
   /** The headline gift: what the NowTRANSFORMED sponsorship is, who it is for, how to find out (up to 3 points). */
   sponsorship: z.object({ title: text(120), text: text(500), points: z.array(z.object({ lead: text(60), text: text(200) })).max(3).default([]), cta: text(40) }).optional(),

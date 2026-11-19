@@ -214,6 +214,31 @@ export function OfferLanding({ signup, page, business, more, preview = false }: 
           </section>
         )}
 
+        {page.callout && (
+          <section aria-labelledby="callout-h" className="mx-auto max-w-[1120px] px-5 pt-14">
+            <div className="flex flex-wrap items-center gap-8 rounded-[20px] border border-slate-200 bg-[var(--lp-tint)] p-6 sm:p-8">
+              {page.callout.image && (
+                <img src={page.callout.image.src} alt={page.callout.image.alt} loading="lazy"
+                  style={page.callout.image.focus ? { objectPosition: page.callout.image.focus } : undefined}
+                  className="aspect-[4/3] min-w-0 flex-[1_1_300px] rounded-2xl object-cover" />
+              )}
+              <div className="min-w-0 flex-[1_1_360px]">
+                {page.callout.eyebrow && <p className={`mb-1.5 ${eyebrowCls}`}>{page.callout.eyebrow}</p>}
+                <h2 id="callout-h" className={`mb-3 ${h2}`}>{page.callout.title}</h2>
+                <p className={`mb-0 ${body}`}>{page.callout.text}</p>
+                {page.callout.points.length > 0 && (
+                  <ul className="mt-4 space-y-2 pl-0">
+                    {page.callout.points.map((pt) => (
+                      <li key={pt.lead} className="list-none text-base leading-relaxed text-slate-700"><strong className="text-slate-900">{pt.lead}</strong> {pt.text}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="mt-6"><a href="#get-started" className={btn}>{page.callout.cta || 'Book my free call'}</a></div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {page.story && (
           <section aria-labelledby="story-h" className="mx-auto flex max-w-[1120px] flex-wrap items-center gap-8 px-5 py-14">
             {page.story.image && <img src={page.story.image.src} alt={page.story.image.alt} loading="lazy" className="aspect-[4/3] min-w-0 flex-[1_1_320px] rounded-[20px] object-cover" />}
