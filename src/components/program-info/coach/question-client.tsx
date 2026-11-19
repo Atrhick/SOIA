@@ -19,7 +19,7 @@ import { LocalDate } from './local-date'
 import { ui } from './ui'
 
 export function QuestionForm({
-  role, programId, questions, currentAnswers, focusId, readOnly,
+  role, programId, questions, currentAnswers, focusId,
 }: {
   role: OwnerRole
   programId: string
@@ -69,7 +69,7 @@ export function QuestionForm({
   const keyedCount = questions.filter((q) => q.answerKey).length
   return (
     <form onSubmit={send} className="flex flex-col gap-4">
-      <fieldset disabled={readOnly || busy} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
+      <fieldset disabled={busy} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
         {questions.map((q, i) => {
           const def = q.answerKey ? questionById(q.answerKey) : undefined
           return (
@@ -104,7 +104,7 @@ export function QuestionForm({
         })}
       </fieldset>
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[15px] text-red-900">{error}</div>}
-      <button type="submit" className={`${ui.primary} w-full`} disabled={readOnly || busy}>
+      <button type="submit" className={`${ui.primary} w-full`} disabled={busy}>
         {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
         {questions.length > 1 ? 'Send my answers' : 'Send my answer'}
       </button>

@@ -85,7 +85,7 @@ export async function AnswersRoute({ role, id, section }: { role: OwnerRole; id:
   if (gate.kind === 'disabled') return disabled()
   const { detail, readOnly } = await loadOwnerPage(role, id)
   // A1: names and groups first.
-  if (detail.needsSetup) redirect(coachSetupPath(role, detail.rootId))
+  if (detail.needsSetup && !readOnly) redirect(coachSetupPath(role, detail.rootId))
   // A live page's answers are changed from the Update screen (its sections open here).
   if (detail.stage === 'DONE' && !sectionId) redirect(coachPagePath(role, detail.id, '/update'))
   return <AnswersScreen detail={detail} role={role} readOnly={readOnly} sectionId={sectionId} />
@@ -484,7 +484,7 @@ export async function UpdateRoute({ role, id }: { role: OwnerRole; id: string })
   const gate = await ownerGate(role, coachPagePath(role, id, '/update'))
   if (gate.kind === 'disabled') return disabled()
   const { detail, readOnly } = await loadOwnerPage(role, id)
-  if (detail.needsSetup && !detail.isLive) redirect(coachSetupPath(role, detail.rootId))
+  if (detail.needsSetup && !detail.isLive && !readOnly) redirect(coachSetupPath(role, detail.rootId))
   if (detail.stage !== 'DONE') redirect(detail.isLive || detail.offline ? coachPagePath(role, detail.id, '/live') : coachPagePath(role, detail.id))
   const sharedWith = detail.sections.find((s) => s.shared)?.sharedWith ?? []
   return (

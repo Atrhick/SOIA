@@ -86,7 +86,7 @@ export function SetupScreen({
         <p className="m-0 mt-1.5 text-base leading-relaxed text-gray-700">{firstTime ? 'Two quick things before the questions.' : 'Change the names, or who the program is for.'}</p>
       </div>
 
-      <fieldset disabled={readOnly || busy} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
+      <fieldset disabled={busy} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
         <section aria-labelledby="names-h" className={`${ui.card} flex flex-col gap-3.5 p-[18px]`}>
           <h2 id="names-h" className="m-0 text-lg font-extrabold">1. Names</h2>
           <div className="flex flex-col gap-1">
@@ -157,7 +157,7 @@ export function SetupScreen({
       </fieldset>
 
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[15px] text-red-900">{error}</div>}
-      <button type="submit" className={`${ui.primary} w-full`} disabled={readOnly || busy}>
+      <button type="submit" className={`${ui.primary} w-full`} disabled={busy}>
         {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
         {firstTime ? 'Continue to the questions' : 'Save names and groups'}
       </button>

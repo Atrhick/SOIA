@@ -61,17 +61,21 @@ export function buildSnapshot(program: ProgramRecord) {
  *
  * Reads pass `allowImpersonation: true`; every write leaves it off.
  *
+ * Exception, the program info workflow (`allowSupport: true`): an admin viewing as the owner can help them
+ * fill in and send their answers. Those writes are recorded under the ADMIN's id (`actorId`), never the
+ * owner's. Approving a page and taking it offline stay the owner's own actions.
+ *
  * A program owner is a COACH (matched on their CoachProfile id) or an
  * AMBASSADOR (matched on their Ambassador id), with Program Pages enabled for
  * them by role default or a per-user grant from /admin/users.
  */
-export async function requireProgramUser({ allowImpersonation = false } = {}) {
+export async function requireProgramUser({ allowImpersonation = false, allowSupport = false } = {}) {
   const session = await auth()
   const role = session?.user.role
   if (!session || (role !== 'COACH' && role !== 'AMBASSADOR')) {
     return { ok: false as const, error: 'Unauthorized' }
   }
-  if (session.user.isImpersonating && !allowImpersonation) {
+  if (session.user.isImpersonating && !allowImpersonation && !allowSupport) {
     return { ok: false as const, error: 'Not available while impersonating another user' }
   }
   const enabled = await isFeatureEnabled('PROGRAM_PAGES', role, session.user.id)
@@ -101,6 +105,8 @@ export async function requireProgramUser({ allowImpersonation = false } = {}) {
     session,
     owner,
     readOnly: Boolean(session.user.isImpersonating),
+    /** Who did it: the admin when viewing as the owner, else the owner. */
+    actorId: (session.user.isImpersonating && session.user.originalAdminId) || session.user.id,
   }
 }
 

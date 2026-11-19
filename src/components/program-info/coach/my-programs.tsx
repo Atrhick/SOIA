@@ -61,7 +61,7 @@ export function MyPrograms({ role, groups, readOnly, askPrefill }: { role: Owner
       ) : (
         <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
           <div className="flex min-w-0 flex-1 flex-col gap-4 lg:gap-6">
-            {groups.map((g) => <ProgramCard key={g.rootId} role={role} group={g} />)}
+            {groups.map((g) => <ProgramCard key={g.rootId} role={role} group={g} viewingAs={readOnly} />)}
           </div>
           <aside aria-labelledby="how-h" className={`${ui.card} hidden w-[300px] flex-none flex-col gap-3 p-6 lg:flex`}>
             <h2 id="how-h" className="m-0 text-base font-bold">How a page gets made</h2>
@@ -81,8 +81,9 @@ export function MyPrograms({ role, groups, readOnly, askPrefill }: { role: Owner
   )
 }
 
-function ProgramCard({ role, group }: { role: OwnerRole; group: OwnerProgramGroup }) {
-  const needsSetup = !group.groupsConfirmedAt
+function ProgramCard({ role, group, viewingAs }: { role: OwnerRole; group: OwnerProgramGroup; viewingAs: boolean }) {
+  // An admin viewing as the owner goes straight to any page; the owner confirms names and groups first.
+  const needsSetup = !group.groupsConfirmedAt && !viewingAs
   const pages = group.pages
   const sub = [group.companyName, `${pages.length} page${pages.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')
   const hid = `prog-${group.rootId}`

@@ -26,7 +26,7 @@ type Props = { detail: PageDetail; role: OwnerRole; readOnly: boolean; sectionId
 
 export function AnswersScreen(props: Props) {
   return (
-    <AutosaveProvider programId={props.detail.id} initialAnswers={props.detail.answers} readOnly={props.readOnly || props.detail.stage === 'READY_TO_CHECK'} urlKeys={URL_KEYS}>
+    <AutosaveProvider programId={props.detail.id} initialAnswers={props.detail.answers} readOnly={props.detail.stage === 'READY_TO_CHECK'} urlKeys={URL_KEYS}>
       <Answers {...props} />
     </AutosaveProvider>
   )
@@ -139,7 +139,7 @@ function Answers({ detail, role, readOnly, sectionId }: Props) {
             </nav>
           </div>
 
-          <SendCard detail={detail} role={role} readOnly={readOnly} missing={missing} group={group} />
+          <SendCard detail={detail} role={role} missing={missing} group={group} />
 
           {!isLiveEdit && (
             <div className={`${ui.card} p-4`}>
@@ -193,7 +193,7 @@ function Answers({ detail, role, readOnly, sectionId }: Props) {
 }
 
 /** The Send area, by stage. */
-function SendCard({ detail, role, readOnly, missing, group }: { detail: PageDetail; role: OwnerRole; readOnly: boolean; missing: MissingAnswer[]; group: string }) {
+function SendCard({ detail, role, missing, group }: { detail: PageDetail; role: OwnerRole; missing: MissingAnswer[]; group: string }) {
   const router = useRouter()
   const { flush } = useAutosave()
   const [busy, setBusy] = useState(false)
@@ -246,7 +246,7 @@ function SendCard({ detail, role, readOnly, missing, group }: { detail: PageDeta
   const bySection = shown ? Array.from(new Set(shown.map((m) => m.sectionId))) : []
   return (
     <div className="flex flex-col gap-2.5 lg:rounded-2xl lg:border lg:border-gray-200 lg:bg-white lg:p-4">
-      <button type="button" className={`${ui.primary} w-full lg:min-h-[48px] lg:text-base`} onClick={send} disabled={busy || readOnly}>
+      <button type="button" className={`${ui.primary} w-full lg:min-h-[48px] lg:text-base`} onClick={send} disabled={busy}>
         {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
         Send my {group} answers
       </button>

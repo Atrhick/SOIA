@@ -6,7 +6,7 @@ import { ChevronRight, Loader2 } from 'lucide-react'
 import { requestAnotherProgram } from '@/lib/actions/program-info'
 import { ui } from './ui'
 
-export function AskTeamForm({ readOnly, prefill }: { readOnly: boolean; prefill?: string | null }) {
+export function AskTeamForm({ prefill }: { readOnly?: boolean; prefill?: string | null }) {
   const [open, setOpen] = useState(Boolean(prefill))
   const [text, setText] = useState(prefill ?? '')
   const [busy, setBusy] = useState(false)
@@ -48,11 +48,11 @@ export function AskTeamForm({ readOnly, prefill }: { readOnly: boolean; prefill?
           <h2 className="m-0 text-[17px] font-bold">Need another program? Ask the team</h2>
           <label htmlFor="ask-text" className="text-[15px] leading-relaxed text-gray-700">What would it be, and who is it for? A sentence or two is enough. The team will get back to you.</label>
           <p id="ask-ex" className={ui.hint}>Example: &quot;A Medicare help program for people turning 65, in English and Vietnamese.&quot;</p>
-          <textarea id="ask-text" ref={boxRef} rows={3} className={ui.box} value={text} maxLength={2000} aria-describedby="ask-ex" disabled={readOnly || busy} onChange={(e) => { setText(e.target.value); setSent(false) }} />
+          <textarea id="ask-text" ref={boxRef} rows={3} className={ui.box} value={text} maxLength={2000} aria-describedby="ask-ex" disabled={busy} onChange={(e) => { setText(e.target.value); setSent(false) }} />
           {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-900">{error}</div>}
           <p aria-live="polite" className="m-0 min-h-[1px] text-sm font-semibold text-green-700">{sent ? 'Sent. The team will get back to you.' : ''}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="submit" className={ui.primarySm} disabled={readOnly || busy || !text.trim()}>
+            <button type="submit" className={ui.primarySm} disabled={busy || !text.trim()}>
               {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Send to the team
             </button>
             <button type="button" className={ui.secondary} onClick={() => { setOpen(false); setError(null) }}>Close</button>

@@ -40,12 +40,13 @@ export function ApproveBox({ role, programId, versionId, readOnly }: { role: Own
         {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Looks good, put it live
       </button>
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-900">{error}</div>}
+      {readOnly && <p className="m-0 text-center text-[13px] leading-snug text-amber-900">Only the owner can press this. To put it live for them, use the team page.</p>}
       <p className="m-0 text-center text-[13px] leading-snug text-gray-600">We keep a record of exactly what you approved, and when.</p>
     </section>
   )
 }
 
-export function ChangeBox({ role, versionId, readOnly, onLive, changeRound }: { role: OwnerRole; versionId: string; readOnly: boolean; onLive: boolean; changeRound: number }) {
+export function ChangeBox({ role, versionId, onLive, changeRound }: { role: OwnerRole; versionId: string; readOnly?: boolean; onLive: boolean; changeRound: number }) {
   const router = useRouter()
   const toast = useToast()
   const [text, setText] = useState('')
@@ -76,9 +77,9 @@ export function ChangeBox({ role, versionId, readOnly, onLive, changeRound }: { 
           : "Tell us what's wrong or missing, and in which part. We'll fix it and send it back to you."}
       </label>
       <p id="chg-ex" className={ui.hint}>Example: &quot;Page: the Wednesday session is at 7 p.m. now. Welcome email: please mention Medicare plans.&quot;</p>
-      <textarea id="chg" rows={4} className={ui.box} value={text} maxLength={4000} aria-describedby="chg-ex" disabled={readOnly || busy} onChange={(e) => setText(e.target.value)} />
+      <textarea id="chg" rows={4} className={ui.box} value={text} maxLength={4000} aria-describedby="chg-ex" disabled={busy} onChange={(e) => setText(e.target.value)} />
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-900">{error}</div>}
-      <button type="submit" className={`${ui.outline} w-full`} disabled={readOnly || busy || !text.trim()}>
+      <button type="submit" className={`${ui.outline} w-full`} disabled={busy || !text.trim()}>
         {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Ask for these changes
       </button>
       {!onLive && (

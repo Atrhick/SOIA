@@ -113,13 +113,13 @@ async function mergeJsonColumn(db: Tx | typeof prisma, column: 'infoAnswers' | '
 // ---------- guards ----------
 
 /** The signed-in owner of this page's ROOT program. */
-async function requirePageOwner(programId: string, opts: { allowImpersonation?: boolean } = {}) {
+async function requirePageOwner(programId: string, opts: { allowImpersonation?: boolean; allowSupport?: boolean } = {}) {
   if (!Id.safeParse(programId).success) return { ok: false as const, error: 'Page not found' }
   const ctx = await requireProgramUser(opts)
   if (!ctx.ok) return { ok: false as const, error: ctx.error }
   const loaded = await loadPageWithRoot(programId)
   if (!loaded || !isProgramOwnedBy(loaded.root, ctx.owner)) return { ok: false as const, error: 'Page not found' }
-  return { ok: true as const, session: ctx.session, owner: ctx.owner, readOnly: ctx.readOnly, page: loaded.page, root: loaded.root, programOwner: loaded.owner }
+  return { ok: true as const, session: ctx.session, owner: ctx.owner, readOnly: ctx.readOnly, actorId: ctx.actorId, page: loaded.page, root: loaded.root, programOwner: loaded.owner }
 }
 
 // ---------- answers ----------
@@ -396,7 +396,7 @@ const NamesSchema = z.object({
  * sharedAnswers and reach the live page only when a version is approved.
  */
 export async function saveNamesAndGroups(rootId: string, input: unknown): Promise<ActionResult<{ groups: { id: string; label: string | null }[] }>> {
-  const ctx = await requirePageOwner(rootId)
+  const ctx = await requirePageOwner(rootId, { allowSupport: true })
   if (!ctx.ok) return fail(ctx.error)
   if (ctx.page.id !== ctx.root.id) return fail('Open Names and groups from the main program.')
   const parsed = NamesSchema.safeParse(input)
@@ -437,7 +437,7 @@ export async function saveNamesAndGroups(rootId: string, input: unknown): Promis
   const single = resolved.length <= 1
   const rootLabel = single ? null : resolved[rootIdx]?.label ?? null
   const now = new Date()
-  const actorId = ctx.session.user.id
+  const actorId = ctx.actorId
   const oldNames = namesOf(root)
   const summary: string[] = []
   const namesChanged = root.groupsConfirmedAt !== null && (oldNames.programName !== programName || oldNames.companyName !== companyName)
@@ -501,7 +501,7 @@ export async function saveNamesAndGroups(rootId: string, input: unknown): Promis
  * writes the price columns. Editing a live page never changes what is live.
  */
 export async function saveAnswer(programId: string, key: string, value: unknown): Promise<ActionResult<{ savedAt: string; sectionsDone: number; sectionsTotal: number; missingText: string }>> {
-  const ctx = await requirePageOwner(programId)
+  const ctx = await requirePageOwner(programId, { allowSupport: true })
   if (!ctx.ok) return fail(ctx.error)
   // A5: while a version waits for the owner's check, answers are read-only.
   if (ctx.page.infoStage === 'READY_TO_CHECK') return fail('Your page is ready to check. To change something, use Ask for these changes.')
@@ -509,7 +509,7 @@ export async function saveAnswer(programId: string, key: string, value: unknown)
   if (!parsed.ok) return fail(parsed.error)
   const now = new Date()
   try {
-    await prisma.$transaction((tx) => writeAnswer(tx, ctx.page, ctx.root, parsed.key, parsed.value, ctx.session.user.id, now))
+    await prisma.$transaction((tx) => writeAnswer(tx, ctx.page, ctx.root, parsed.key, parsed.value, ctx.actorId, now))
   } catch (e) {
     console.error('[PROGRAM-INFO] saveAnswer failed', e)
     return fail('Could not save. Please try again.')
@@ -525,7 +525,7 @@ export async function saveAnswer(programId: string, key: string, value: unknown)
  * WITH_TEAM (a page with an open question stays QUESTION_OPEN). Also used for changes to a live page.
  */
 export async function sendAnswers(programId: string, note?: string): Promise<ActionResult<{ changed: boolean; alsoSentPageIds: string[] }>> {
-  const ctx = await requirePageOwner(programId)
+  const ctx = await requirePageOwner(programId, { allowSupport: true })
   if (!ctx.ok) return fail(ctx.error)
   const noteParsed = z.string().trim().max(2000, 'At most 2000 characters').optional().safeParse(note)
   if (!noteParsed.success) return fail(noteParsed.error.issues[0]?.message ?? 'Check the note')
@@ -552,7 +552,7 @@ export async function sendAnswers(programId: string, note?: string): Promise<Act
     return snap !== null && sharedChanged(snap, mergeAnswers(sib.infoAnswers, root.sharedAnswers))
   })
   const now = new Date()
-  const actorId = ctx.session.user.id
+  const actorId = ctx.actorId
   try {
     await prisma.$transaction(async (tx) => {
       const r = await tx.coachProgram.updateMany({
@@ -601,7 +601,7 @@ const AnswerItemSchema = z.object({
  * is left open, QUESTION_OPEN goes back to WITH_TEAM.
  */
 export async function answerQuestions(programId: string, items: unknown): Promise<ActionResult<{ answered: number; stillOpen: number }>> {
-  const ctx = await requirePageOwner(programId)
+  const ctx = await requirePageOwner(programId, { allowSupport: true })
   if (!ctx.ok) return fail(ctx.error)
   const parsed = z.array(AnswerItemSchema).min(1, 'Please answer the question.').max(20).safeParse(items)
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? 'Check your answers')
@@ -629,7 +629,7 @@ export async function answerQuestions(programId: string, items: unknown): Promis
   }
 
   const now = new Date()
-  const actorId = ctx.session.user.id
+  const actorId = ctx.actorId
   let stillOpen = 0
   try {
     await prisma.$transaction(async (tx) => {
@@ -678,7 +678,7 @@ export async function answerQuestion(questionId: string, input: unknown): Promis
  * of the live (latest APPROVED) version. Shared answers are restored on the root too.
  */
 export async function undoAnswerChanges(programId: string): Promise<ActionResult> {
-  const ctx = await requirePageOwner(programId)
+  const ctx = await requirePageOwner(programId, { allowSupport: true })
   if (!ctx.ok) return fail(ctx.error)
   const { page, root } = ctx
   if (page.infoStage !== 'DONE') return fail('There is nothing to undo here.')
@@ -712,18 +712,19 @@ export async function undoAnswerChanges(programId: string): Promise<ActionResult
  * A15: "Need another program? Ask the team". T8 to the team (in-app + email) and a receipt to the owner.
  */
 export async function requestAnotherProgram(text: string): Promise<ActionResult> {
-  const ctx = await requireProgramUser()
+  const ctx = await requireProgramUser({ allowSupport: true })
   if (!ctx.ok) return fail(ctx.error)
   const body = z.string().trim().min(1, 'Tell us a little about the program.').max(2000, 'At most 2000 characters').safeParse(text)
   if (!body.success) return fail(body.error.issues[0]?.message ?? 'Tell us a little about the program.')
-  const actorId = ctx.session.user.id
+  // The notices identify the OWNER from this id (no program yet); the audit row records who pressed it.
+  const ownerUserId = ctx.session.user.id
   try {
-    await prisma.auditLog.create({ data: { userId: actorId, action: 'PROGRAM_PAGE_ANOTHER_PROGRAM_ASKED', entityType: 'User', entityId: actorId, details: JSON.stringify({ text: body.data }) } })
+    await prisma.auditLog.create({ data: { userId: ctx.actorId, action: 'PROGRAM_PAGE_ANOTHER_PROGRAM_ASKED', entityType: 'User', entityId: ownerUserId, details: JSON.stringify({ text: body.data }) } })
   } catch (e) {
     console.error('[PROGRAM-INFO] request audit failed', e)
   }
-  await notifyProgramPage('T8_ANOTHER_PROGRAM', { programId: null, actorId, extra: { requestText: body.data } })
-  await notifyProgramPage('C10_REQUEST_RECEIVED', { programId: null, actorId })
+  await notifyProgramPage('T8_ANOTHER_PROGRAM', { programId: null, actorId: ownerUserId, extra: { requestText: body.data } })
+  await notifyProgramPage('C10_REQUEST_RECEIVED', { programId: null, actorId: ownerUserId })
   return { ok: true }
 }
 
@@ -753,7 +754,7 @@ export async function requestChanges(versionId: string, text: string): Promise<A
   if (!body.success) return fail(body.error.issues[0]?.message ?? 'Tell us what to change.')
   const v = await prisma.programPageVersion.findUnique({ where: { id: versionId }, select: { id: true, programId: true, number: true, status: true } })
   if (!v) return fail('Version not found')
-  const ctx = await requirePageOwner(v.programId)
+  const ctx = await requirePageOwner(v.programId, { allowSupport: true })
   if (!ctx.ok) return fail(ctx.error === 'Page not found' ? 'Version not found' : ctx.error)
   const latestSent = ctx.page.pageVersions.find((x) => x.status === 'SENT')
   const currentApproved = ctx.page.pageVersions.find((x) => x.status === 'APPROVED')
@@ -762,7 +763,7 @@ export async function requestChanges(versionId: string, text: string): Promise<A
   if (!onSent && !onLive) return fail(OUT_OF_DATE)
   const from = ctx.page.infoStage as InfoStage
   const now = new Date()
-  const actorId = ctx.session.user.id
+  const actorId = ctx.actorId
   try {
     await prisma.$transaction(async (tx) => {
       // A SENT version becomes CHANGES_ASKED; the live APPROVED one keeps its status (it is still what is live).

@@ -32,7 +32,7 @@ function changeLine(c: AnswerChange): string {
 }
 
 export function UpdateScreenClient({
-  role, programId, changes, sharedWith, readOnly,
+  role, programId, changes, sharedWith,
 }: {
   role: OwnerRole
   programId: string
@@ -106,16 +106,16 @@ export function UpdateScreenClient({
       <div className="flex flex-col gap-2.5">
         <label htmlFor="note" className="text-base font-bold">Anything else we should know? <span className={ui.optional}>Optional</span></label>
         <p id="note-ex" className={ui.hint}>Example: &quot;Please use the new photo from my Wednesday session.&quot;</p>
-        <textarea id="note" rows={3} className={ui.box} maxLength={2000} value={note} aria-describedby="note-ex" disabled={readOnly} onChange={(e) => setNote(e.target.value)} />
+        <textarea id="note" rows={3} className={ui.box} maxLength={2000} value={note} aria-describedby="note-ex" disabled={false} onChange={(e) => setNote(e.target.value)} />
         {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-900">{error}</div>}
-        <button type="button" className={`${ui.primary} w-full`} onClick={send} disabled={readOnly || busy !== null || (n === 0 && !note.trim())}>
+        <button type="button" className={`${ui.primary} w-full`} onClick={send} disabled={busy !== null || (n === 0 && !note.trim())}>
           {busy === 'send' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{sendLabel}
         </button>
         <p className="m-0 text-center text-[13px] leading-snug text-gray-600">
           {n === 0 ? 'Nothing has changed yet. Open a section to change an answer.' : 'Your page row then says "Live, new version being written".'}
         </p>
         {n > 0 && (
-          <button type="button" className={`${ui.link} justify-center`} onClick={undo} disabled={readOnly || busy !== null}>
+          <button type="button" className={`${ui.link} justify-center`} onClick={undo} disabled={busy !== null}>
             {busy === 'undo' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Undo my changes
           </button>
         )}
