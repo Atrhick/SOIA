@@ -3353,3 +3353,33 @@ model PartnerCode {
   @@index([prospectId])
   @@map("partner_codes")
 }
+
+/// One line on the Running costs page (/admin/running-costs): a service the organization pays for or will.
+/// Monthly amounts are estimates in USD. `key` is the seed script's stable id (scripts/running-costs/seed.ts);
+/// rows added by hand on the page have no key.
+model CostItem {
+  id              String    @id @default(cuid())
+  key             String?   @unique
+  /// HOSTING, EMAIL, PHONE, AI, STORAGE, PAYMENTS, DOMAIN (see src/lib/running-costs/core.ts)
+  category        String
+  service         String
+  whatFor         String?
+  provider        String?
+  pricingNote     String?
+  unitPrice       String?
+  monthlyLow      Decimal?  @db.Decimal(10, 2)
+  monthlyExpected Decimal?  @db.Decimal(10, 2)
+  monthlyHigh     Decimal?  @db.Decimal(10, 2)
+  /// IN_USE, PLANNED, SUGGESTED
+  status          String    @default("PLANNED")
+  sourceUrl       String?
+  checkedAt       DateTime?
+  notes           String?
+  sortOrder       Int       @default(0)
+  updatedById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([category, sortOrder])
+  @@map("cost_items")
+}

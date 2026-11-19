@@ -8,6 +8,7 @@ export const FEATURES = {
   SCHEDULING: 'SCHEDULING',
   KNOWLEDGE_BASE: 'KNOWLEDGE_BASE',
   PROGRAM_PAGES: 'PROGRAM_PAGES',
+  RUNNING_COSTS: 'RUNNING_COSTS',
 } as const
 
 export type FeatureName = (typeof FEATURES)[keyof typeof FEATURES]

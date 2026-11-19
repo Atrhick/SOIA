@@ -96,6 +96,10 @@ const FEATURE_INFO: Record<string, { label: string; description: string }> = {
     label: 'Program Pages',
     description: 'Public program landing pages and leads (coaches and ambassadors)',
   },
+  RUNNING_COSTS: {
+    label: 'Running costs',
+    description: 'See what the app and its services cost each month (read only)',
+  },
 }
 
 export function UsersAdminClient({

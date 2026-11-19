@@ -13,7 +13,8 @@ import {
   BookOpen,
   Megaphone,
   Settings2,
-  Loader2
+  Loader2,
+  Wallet,
 } from 'lucide-react'
 import { updateFeatureConfig } from '@/lib/actions/feature-config'
 
@@ -72,6 +73,12 @@ const FEATURE_META: Record<string, {
     description: 'Public program landing pages and lead qualification',
     icon: Megaphone,
     color: 'bg-teal-500',
+  },
+  RUNNING_COSTS: {
+    label: 'Running costs',
+    description: 'Monthly cost of the app and its services. Admins always see it; grant others per person in User Management',
+    icon: Wallet,
+    color: 'bg-emerald-500',
   },
 }
 
