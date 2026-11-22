@@ -146,6 +146,7 @@ export function CollaborationAdminClient({
   const [showNewDMDialog, setShowNewDMDialog] = useState(false)
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string>('')
+  const [dmError, setDmError] = useState<string | null>(null)
   const [dmLoading, setDmLoading] = useState(false)
 
   // Load DMs on mount
@@ -256,7 +257,9 @@ export function CollaborationAdminClient({
     if (!selectedUserId) return
     setDmLoading(true)
     try {
+      setDmError(null)
       const result = await getOrCreateDirectMessage(selectedUserId)
+      if ('error' in result && result.error) setDmError(result.error)
       if (result.channelId) {
         await handleSelectDM(result.channelId)
         setShowNewDMDialog(false)
@@ -822,6 +825,9 @@ export function CollaborationAdminClient({
             </div>
           </div>
 
+          {dmError && (
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{dmError}</div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"

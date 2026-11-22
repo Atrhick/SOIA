@@ -599,6 +599,19 @@ export async function leaveChannel(channelId: string) {
   }
 
   try {
+    // A parent can't step out of a private conversation that their under-18 child is in with an adult.
+    const channel = await prisma.collaborationChannel.findUnique({
+      where: { id: channelId },
+      select: { type: true, members: { select: { userId: true } } },
+    })
+    if (channel && channel.type !== 'CHANNEL') {
+      const remaining = channel.members.map(m => m.userId).filter(id => id !== session.user.id)
+      const check = await checkGuardians(remaining)
+      if (!check.ok || check.parentIds.length > 0) {
+        return { error: 'You need to stay in this conversation because your child is in it with an adult.' }
+      }
+    }
+
     await prisma.channelMember.delete({
       where: {
         channelId_userId: {
