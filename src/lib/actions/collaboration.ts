@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { STAFF_ROLES } from '@/lib/roles'
 import { checkGuardians } from '@/lib/messaging/guardians-server'
 
-/** Parents see only the channels and conversations they were added to; everyone else goes by the channel's roles. */
+/** Parents see only the channels and conversations they were added to; everyone else goes by the channel's roles, plus any private channel they are a member of. */
 async function canUseChannel(
   user: { id: string; role: string },
   channel: { id: string; allowedRoles: string[] },
@@ -19,7 +19,13 @@ async function canUseChannel(
     })
     return !!member
   }
-  return user.role === 'ADMIN' || channel.allowedRoles.includes(user.role)
+  if (user.role === 'ADMIN' || channel.allowedRoles.includes(user.role)) return true
+  // Private channels (e.g. an ambassador group's chat, allowedRoles []) are open to their members.
+  const member = await prisma.channelMember.findUnique({
+    where: { channelId_userId: { channelId: channel.id, userId: user.id } },
+    select: { id: true },
+  })
+  return !!member
 }
 
 // Channel schemas
@@ -63,7 +69,7 @@ export async function getChannels() {
           ? {}
           : session.user.role === 'PARENT'
             ? { members: { some: { userId: session.user.id } } }
-            : { allowedRoles: { has: session.user.role } }),
+            : { OR: [{ allowedRoles: { has: session.user.role } }, { members: { some: { userId: session.user.id } } }] }),
       },
       include: {
         _count: {
@@ -1196,7 +1202,7 @@ export async function getMentionableUsers(channelId: string) {
     const roleAllowed =
       channel.type === 'CHANNEL' &&
       session.user.role !== 'PARENT' &&
-      (channel.allowedRoles.length === 0 || channel.allowedRoles.includes(session.user.role))
+      channel.allowedRoles.includes(session.user.role)
     if (session.user.role !== 'ADMIN' && !isMember && !roleAllowed) {
       return { error: 'Channel not found' }
     }
