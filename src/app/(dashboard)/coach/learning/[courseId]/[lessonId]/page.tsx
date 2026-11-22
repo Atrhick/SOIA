@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getLessonContent } from '@/lib/actions/lms/enrollment'
+import { loadLessonAudioView } from '@/lib/lessons/audio-view'
 import { LessonViewerClient } from './lesson-viewer-client'
 
 interface PageProps {
@@ -26,11 +27,15 @@ export default async function LessonViewerPage({ params }: PageProps) {
     notFound()
   }
 
+  const audioView = await loadLessonAudioView(lessonId, session.user.id)
+
   return (
     <LessonViewerClient
       lesson={result.lesson}
       progress={result.progress}
       navigation={result.navigation}
+      audio={audioView.audio}
+      listen={audioView.listen}
     />
   )
 }
