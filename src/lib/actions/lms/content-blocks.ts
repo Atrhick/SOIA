@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
+import { queueLessonAudio } from '@/lib/lessons/audio'
 
 // ============================================
 // VALIDATION SCHEMAS
@@ -166,6 +167,7 @@ export async function createContentBlock(formData: FormData) {
       },
     })
 
+    if (block.type === 'TEXT') queueLessonAudio(block.lessonId)
     revalidatePath(`/admin/lms/${lesson.module.courseId}`)
     return { success: true, contentBlockId: block.id }
   } catch (error) {
@@ -204,7 +206,7 @@ export async function updateContentBlock(contentBlockId: string, formData: FormD
   try {
     const block = await prisma.lMSContentBlock.findUnique({
       where: { id: contentBlockId },
-      select: { type: true, lesson: { select: { module: { select: { courseId: true } } } } },
+      select: { type: true, lessonId: true, lesson: { select: { module: { select: { courseId: true } } } } },
     })
 
     if (!block) {
@@ -229,6 +231,7 @@ export async function updateContentBlock(contentBlockId: string, formData: FormD
       },
     })
 
+    if (block.type === 'TEXT') queueLessonAudio(block.lessonId)
     revalidatePath(`/admin/lms/${block.lesson.module.courseId}`)
     return { success: true }
   } catch (error) {

@@ -19,6 +19,7 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { updateContentProgress, markLessonComplete } from '@/lib/actions/lms/enrollment'
+import { LessonAudioPlayer, type LessonAudioInfo } from '@/components/learning/lesson-audio-player'
 
 interface ContentBlock {
   id: string
@@ -72,6 +73,8 @@ interface LessonViewerClientProps {
   progress: Progress
   navigation: Navigation
   basePath?: string
+  audio?: LessonAudioInfo | null
+  listen?: { positionSec: number; completed: boolean }
 }
 
 const contentTypeIcons = {
@@ -81,7 +84,7 @@ const contentTypeIcons = {
   DOCUMENT: File,
 }
 
-export function LessonViewerClient({ lesson, progress, navigation, basePath = '/coach/learning' }: LessonViewerClientProps) {
+export function LessonViewerClient({ lesson, progress, navigation, basePath = '/coach/learning', audio = null, listen }: LessonViewerClientProps) {
   const router = useRouter()
   const [activeBlockIndex, setActiveBlockIndex] = useState(0)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -117,6 +120,23 @@ export function LessonViewerClient({ lesson, progress, navigation, basePath = '/
       console.error('Error marking complete:', error)
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  // Listening to the whole lesson counts as reading its text.
+  const handleAudioCompleted = async () => {
+    const textBlocks = lesson.contentBlocks.filter(
+      (b) => b.type === 'TEXT' && localProgress[b.id]?.status !== 'COMPLETED'
+    )
+    for (const b of textBlocks) {
+      try {
+        const result = await updateContentProgress(b.id, undefined, true)
+        if (result.success) {
+          setLocalProgress((prev) => ({ ...prev, [b.id]: { status: 'COMPLETED', progressValue: 100 } }))
+        }
+      } catch (error) {
+        console.error('Error marking text complete after listening:', error)
+      }
     }
   }
 
@@ -210,6 +230,16 @@ export function LessonViewerClient({ lesson, progress, navigation, basePath = '/
                 </p>
               )}
             </div>
+
+            {lesson.contentBlocks.some((b) => b.type === 'TEXT') && (
+              <LessonAudioPlayer
+                lessonId={lesson.id}
+                audio={audio}
+                startAt={listen?.positionSec ?? 0}
+                alreadyCompleted={listen?.completed ?? false}
+                onCompleted={handleAudioCompleted}
+              />
+            )}
 
             {/* Content Block Display */}
             {activeBlock && (

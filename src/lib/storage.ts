@@ -10,7 +10,7 @@ import path from 'path'
 export const storageConfigured = () => Boolean(process.env.STORAGE_BUCKET)
 
 const safeKey = (key: string) => {
-  const k = key.replace(/\/g, '/').replace(/^\/+/, '')
+  const k = key.replace(/\\/g, '/').replace(/^\/+/, '')
   if (!k || k.split('/').some((p) => p === '..' || p === '')) throw new Error('Bad storage key')
   return k
 }

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { LessonAudioAdmin } from '@/components/learning/lesson-audio-admin'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -879,6 +880,9 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
                         {/* Lesson Content Blocks */}
                         {expandedLessons.has(lesson.id) && (
                           <div className="p-3 space-y-2 bg-white">
+                            {lesson.contentBlocks.some((block) => block.type === 'TEXT') && (
+                              <LessonAudioAdmin lessonId={lesson.id} />
+                            )}
                             {lesson.contentBlocks.map((block) => {
                               const Icon = contentTypeIcons[block.type]
                               return (
