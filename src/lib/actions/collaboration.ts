@@ -5,6 +5,22 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { STAFF_ROLES } from '@/lib/roles'
+import { checkGuardians } from '@/lib/messaging/guardians-server'
+
+/** Parents see only the channels and conversations they were added to; everyone else goes by the channel's roles. */
+async function canUseChannel(
+  user: { id: string; role: string },
+  channel: { id: string; allowedRoles: string[] },
+): Promise<boolean> {
+  if (user.role === 'PARENT') {
+    const member = await prisma.channelMember.findUnique({
+      where: { channelId_userId: { channelId: channel.id, userId: user.id } },
+      select: { id: true },
+    })
+    return !!member
+  }
+  return user.role === 'ADMIN' || channel.allowedRoles.includes(user.role)
+}
 
 // Channel schemas
 const createChannelSchema = z.object({
@@ -45,7 +61,9 @@ export async function getChannels() {
         type: 'CHANNEL',
         ...(session.user.role === 'ADMIN'
           ? {}
-          : { allowedRoles: { has: session.user.role } }),
+          : session.user.role === 'PARENT'
+            ? { members: { some: { userId: session.user.id } } }
+            : { allowedRoles: { has: session.user.role } }),
       },
       include: {
         _count: {
@@ -107,7 +125,7 @@ export async function getChannel(channelId: string) {
     }
 
     // Check access
-    if (session.user.role !== 'ADMIN' && !channel.allowedRoles.includes(session.user.role)) {
+    if (!(await canUseChannel(session.user, channel))) {
       return { error: 'Access denied' }
     }
 
@@ -290,7 +308,7 @@ export async function createPost(formData: FormData) {
       return { error: 'Channel not found' }
     }
 
-    if (session.user.role !== 'ADMIN' && !channel.allowedRoles.includes(session.user.role)) {
+    if (!(await canUseChannel(session.user, channel))) {
       return { error: 'Access denied' }
     }
 
@@ -327,6 +345,24 @@ export async function createReply(formData: FormData) {
   }
 
   try {
+    // Only someone who can use the post's channel may reply to it.
+    const post = await prisma.channelPost.findUnique({
+      where: { id: validated.data.postId },
+      select: { channel: { select: { id: true, type: true, allowedRoles: true } } },
+    })
+    if (!post) {
+      return { error: 'Post not found' }
+    }
+    const allowed = post.channel.type === 'CHANNEL'
+      ? await canUseChannel(session.user, post.channel)
+      : !!(await prisma.channelMember.findUnique({
+          where: { channelId_userId: { channelId: post.channel.id, userId: session.user.id } },
+          select: { id: true },
+        }))
+    if (!allowed) {
+      return { error: 'Access denied' }
+    }
+
     const reply = await prisma.channelPostReply.create({
       data: {
         postId: validated.data.postId,
@@ -529,7 +565,8 @@ export async function joinChannel(channelId: string) {
       return { error: 'Channel not found' }
     }
 
-    if (session.user.role !== 'ADMIN' && !channel.allowedRoles.includes(session.user.role)) {
+    // Parents can't join channels themselves; they are added to their child's groups. Nobody joins a private conversation.
+    if (channel.type !== 'CHANNEL' || session.user.role === 'PARENT' || !(await canUseChannel(session.user, channel))) {
       return { error: 'Access denied' }
     }
 
@@ -562,6 +599,19 @@ export async function leaveChannel(channelId: string) {
   }
 
   try {
+    // A parent can't step out of a private conversation that their under-18 child is in with an adult.
+    const channel = await prisma.collaborationChannel.findUnique({
+      where: { id: channelId },
+      select: { type: true, members: { select: { userId: true } } },
+    })
+    if (channel && channel.type !== 'CHANNEL') {
+      const remaining = channel.members.map(m => m.userId).filter(id => id !== session.user.id)
+      const check = await checkGuardians(remaining)
+      if (!check.ok || check.parentIds.length > 0) {
+        return { error: 'You need to stay in this conversation because your child is in it with an adult.' }
+      }
+    }
+
     await prisma.channelMember.delete({
       where: {
         channelId_userId: {
@@ -682,17 +732,21 @@ export async function getOrCreateDirectMessage(otherUserId: string) {
   }
 
   try {
-    // Check if DM already exists between these two users
+    // An adult never messages an under-18 ambassador alone: their parent joins the conversation.
+    const guardians = await checkGuardians([session.user.id, otherUserId])
+    if (!guardians.ok) {
+      return { error: guardians.error }
+    }
+    const memberIds = guardians.memberIds
+
+    // Check if a DM already exists with exactly these people
     const existingDM = await prisma.collaborationChannel.findFirst({
       where: {
         type: 'DIRECT_MESSAGE',
-        AND: [
-          { members: { some: { userId: session.user.id } } },
-          { members: { some: { userId: otherUserId } } },
-        ],
+        AND: memberIds.map(userId => ({ members: { some: { userId } } })),
         members: {
           every: {
-            userId: { in: [session.user.id, otherUserId] }
+            userId: { in: memberIds }
           }
         }
       },
@@ -702,8 +756,7 @@ export async function getOrCreateDirectMessage(otherUserId: string) {
       }
     })
 
-    // If exists and has exactly 2 members, return it
-    if (existingDM && existingDM._count.members === 2) {
+    if (existingDM && existingDM._count.members === memberIds.length) {
       return { channelId: existingDM.id, isNew: false }
     }
 
@@ -716,10 +769,7 @@ export async function getOrCreateDirectMessage(otherUserId: string) {
         createdById: session.user.id,
         allowedRoles: [],
         members: {
-          create: [
-            { userId: session.user.id },
-            { userId: otherUserId },
-          ]
+          create: memberIds.map(userId => ({ userId }))
         }
       },
     })
@@ -1142,9 +1192,11 @@ export async function getMentionableUsers(channelId: string) {
     // Without this, possession of a channel id returned every member's email
     // and role to any logged-in account.
     const isMember = channel.members.some(m => m.userId === session.user.id)
+    // Private conversations and parents: members only.
     const roleAllowed =
-      channel.allowedRoles.length === 0 ||
-      channel.allowedRoles.includes(session.user.role)
+      channel.type === 'CHANNEL' &&
+      session.user.role !== 'PARENT' &&
+      (channel.allowedRoles.length === 0 || channel.allowedRoles.includes(session.user.role))
     if (session.user.role !== 'ADMIN' && !isMember && !roleAllowed) {
       return { error: 'Channel not found' }
     }
