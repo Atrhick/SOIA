@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { checkGuardians } from '@/lib/messaging/guardians-server'
 
 // Validation schemas
 const createThreadSchema = z.object({
@@ -55,7 +56,12 @@ export async function createMessageThread(formData: FormData) {
 
     // Create thread with the user and all admins as participants
     const participantIds = [user.id, ...admins.map((a) => a.id)]
-    const uniqueParticipantIds = Array.from(new Set(participantIds))
+    // An adult never messages an under-18 ambassador alone: their parent joins the thread.
+    const guardians = await checkGuardians(participantIds)
+    if (!guardians.ok) {
+      return { error: guardians.error }
+    }
+    const uniqueParticipantIds = guardians.memberIds
 
     const thread = await prisma.messageThread.create({
       data: {
