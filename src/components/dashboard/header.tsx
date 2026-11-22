@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { signOut } from 'next-auth/react'
 import { LogOut, Search, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu, Smartphone, Bell, BellOff } from 'lucide-react'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
@@ -147,7 +148,7 @@ export function Header({ user }: HeaderProps) {
               <Menu className="h-5 w-5" />
             </button>
             {/* Each page has its own title and the home pages greet by name, so the bar only names the app (phones; the sidebar shows it on desktop). */}
-            <p className="truncate text-lg font-semibold text-gray-900 lg:hidden">NowTRANSFORMED</p>
+            <Image src="/brand/nowtransformed-logo.png" alt="NowTRANSFORMED" width={800} height={201} className="h-9 w-auto min-w-0 lg:hidden" />
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">

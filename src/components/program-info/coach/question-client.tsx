@@ -6,6 +6,7 @@
  * takes free text ("Anything to add?", or the whole answer when it isn't tied to one). One Send for all.
  */
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { answerQuestions } from '@/lib/actions/program-info'
@@ -75,7 +76,7 @@ export function QuestionForm({
           return (
             <section key={q.id} id={`tq-${q.id}`} aria-labelledby={`tq-${q.id}-h`} className={`${ui.card} flex scroll-mt-24 flex-col gap-3.5 p-[18px]`}>
               <div className="flex items-center gap-2.5">
-                <div aria-hidden className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-violet-700 text-[13px] font-bold text-white">NT</div>
+                <Image src="/brand/nowtransformed-mark.png" alt="" width={36} height={36} className="h-9 w-9 flex-none" />
                 <div>
                   <p className="m-0 text-sm font-bold">NowTRANSFORMED team</p>
                   <p className="m-0 text-[13px] text-gray-600"><LocalDate iso={q.createdAt} format="day" /></p>
