@@ -47,3 +47,4 @@ tmpclaude-*
 # Git cannot index a file named `nul` on Windows ("invalid path"), which makes
 # `git add -A` fail outright unless it is ignored.
 nul
+public/uploads/

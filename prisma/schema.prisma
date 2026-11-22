@@ -130,6 +130,7 @@ model CoachProfile {
   eventRSVPs            EventRSVP[]
   sponsorshipRequests   SponsorshipRequest[]
   classes               CoachClass[]
+  ambassadorGroups      AmbassadorGroup[]
 
   // CRM Relations
   crmContacts CRMContact[]
@@ -240,6 +241,9 @@ model Ambassador {
   onboardingProgress  AmbassadorOnboardingProgress[]
   businessIdea        BusinessIdea?
   classEnrollments    ClassEnrollment[]
+  groupMemberships    AmbassadorGroupMember[]
+  groupAttendance     GroupAttendance[]
+  portfolio           PortfolioSubmission[]
 
   @@index([coachId])
   @@index([status])
@@ -3444,4 +3448,144 @@ model CostItem {
 
   @@index([category, sortOrder])
   @@map("cost_items")
+}
+
+
+// ============================================
+// AMBASSADOR WEEK (groups, meetings, register, portfolio, lesson audio) - added 2026-11-22
+// ============================================
+
+/// One coach's ambassadors who start together. Meets weekly.
+model AmbassadorGroup {
+  id      String       @id @default(cuid())
+  coachId String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  name           String
+  meetingWeekday Int // 0 = Sunday ... 6 = Saturday, in `timezone`
+  meetingTime    String // "18:00", 24-hour, in `timezone`
+  timezone       String  @default("America/New_York")
+  durationMin    Int     @default(60)
+  meetingLink    String?
+  location       String?
+  startDate      DateTime // first meeting date (week 1)
+  weeks          Int      @default(8)
+
+  channelId String? @unique // CollaborationChannel for the group chat
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  AmbassadorGroupMember[]
+  sessions GroupSession[]
+  portfolio PortfolioSubmission[]
+
+  @@index([coachId])
+  @@map("ambassador_groups")
+}
+
+model AmbassadorGroupMember {
+  id           String          @id @default(cuid())
+  groupId      String
+  group        AmbassadorGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  ambassadorId String
+  ambassador   Ambassador      @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
+  joinedAt     DateTime        @default(now())
+  leftAt       DateTime?
+
+  @@unique([groupId, ambassadorId])
+  @@index([ambassadorId])
+  @@map("ambassador_group_members")
+}
+
+/// One weekly meeting of a group.
+model GroupSession {
+  id              String          @id @default(cuid())
+  groupId         String
+  group           AmbassadorGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  weekNo          Int?
+  startsAt        DateTime
+  endsAt          DateTime
+  calendarEventId String?
+  cancelled       Boolean         @default(false)
+  notes           String?         @db.Text
+
+  attendance GroupAttendance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([groupId, startsAt])
+  @@index([startsAt])
+  @@map("group_sessions")
+}
+
+model GroupAttendance {
+  id           String       @id @default(cuid())
+  sessionId    String
+  session      GroupSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  ambassadorId String
+  ambassador   Ambassador   @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
+  status       String // PRESENT | ABSENT | EXCUSED
+  markedById   String
+  markedAt     DateTime     @default(now())
+
+  @@unique([sessionId, ambassadorId])
+  @@map("group_attendance")
+}
+
+/// The week's portfolio piece and the coach's feedback.
+model PortfolioSubmission {
+  id           String           @id @default(cuid())
+  ambassadorId String
+  ambassador   Ambassador       @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
+  groupId      String?
+  group        AmbassadorGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  weekNo       Int
+  lessonId     String?
+  title        String
+  body         String?          @db.Text
+  fileUrl      String?
+  fileType     String?
+  status       String           @default("SUBMITTED") // SUBMITTED | REVIEWED | REDO
+  submittedAt  DateTime         @default(now())
+  feedback     String?          @db.Text
+  feedbackById String?
+  feedbackAt   DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@index([ambassadorId, weekNo])
+  @@index([groupId])
+  @@map("portfolio_submissions")
+}
+
+/// Generated "listen" audio for a text lesson (until videos exist).
+model LessonAudio {
+  id          String   @id @default(cuid())
+  lessonId    String   @unique
+  textHash    String // hash of the lesson text the audio was made from
+  url         String?
+  durationSec Int?
+  voice       String?
+  status      String   @default("PENDING") // PENDING | READY | FAILED
+  error       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("lesson_audio")
+}
+
+/// Where a person is in a lesson's audio, and whether they finished it.
+model LessonListen {
+  id          String    @id @default(cuid())
+  userId      String
+  lessonId    String
+  positionSec Int       @default(0)
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, lessonId])
+  @@map("lesson_listens")
 }
