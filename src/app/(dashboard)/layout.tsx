@@ -25,7 +25,7 @@ export default async function DashboardLayout({
   }
 
   // Cast to the supported role types
-  const role = session.user.role as 'ADMIN' | 'SUB_ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
+  const role = session.user.role as 'ADMIN' | 'SUB_ADMIN' | 'COACH' | 'AMBASSADOR' | 'PARENT' | AssociateRole
   const isImpersonating = session.user.isImpersonating || false
 
   // Fetch the profile name based on role

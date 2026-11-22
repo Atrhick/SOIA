@@ -52,12 +52,14 @@ import { BellRing,
   Gift,
   LifeBuoy,
   Inbox,
+  CalendarCheck,
+  Home,
 } from 'lucide-react'
 import { ASSOCIATE_LABELS, isAssociateRole, type AssociateRole } from '@/lib/roles'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
 
 interface SidebarProps {
-  role: 'ADMIN' | 'SUB_ADMIN' | 'COACH' | 'AMBASSADOR' | AssociateRole
+  role: 'ADMIN' | 'SUB_ADMIN' | 'COACH' | 'AMBASSADOR' | 'PARENT' | AssociateRole
   /** Small count beside a link, by href (e.g. new support messages). */
   badges?: Record<string, number>
   /** Non-admins granted the RUNNING_COSTS feature get an extra "Organization" section. */
@@ -110,6 +112,7 @@ const ambassadorNavSections: NavSection[] = [
     items: [
       { href: '/ambassador/learning', label: 'Courses', icon: GraduationCap },
       { href: '/ambassador/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
+      { href: '/ambassador/portfolio', label: 'My portfolio', icon: Briefcase },
     ],
   },
   {
@@ -156,6 +159,8 @@ const coachNavSections: NavSection[] = [
       { href: '/coach/my-team', label: 'My Team', icon: UsersRound },
       { href: '/coach/discovery-calls', label: 'Discovery Calls', icon: PhoneCall },
       { href: '/coach/ambassadors', label: 'Ambassadors', icon: Users },
+      { href: '/coach/groups', label: 'My groups', icon: UsersRound },
+      { href: '/coach/portfolio', label: 'Portfolio work', icon: Briefcase },
     ],
   },
   {
@@ -216,6 +221,18 @@ const associateNavSections: NavSection[] = [
     items: [
       { href: '/associate/profile', label: 'My Profile', icon: UserCog },
       { href: '/associate/support', label: 'Get help', icon: LifeBuoy },
+    ],
+  },
+]
+
+// Parents: their home (their child's details) and the conversations they were added to.
+const parentNavSections: NavSection[] = [
+  {
+    title: 'Parent',
+    icon: Home,
+    items: [
+      { href: '/parent', label: 'Home', icon: Home },
+      { href: '/parent/messages', label: 'Messages', icon: Mail },
     ],
   },
 ]
@@ -426,6 +443,7 @@ export function Sidebar({ role, badges, showRunningCosts = false }: SidebarProps
       case 'ADMIN': return '/admin'
       case 'SUB_ADMIN': return '/team/support'
       case 'AMBASSADOR': return '/ambassador'
+      case 'PARENT': return '/parent'
       default: return '/coach'
     }
   }
@@ -436,6 +454,7 @@ export function Sidebar({ role, badges, showRunningCosts = false }: SidebarProps
       case 'ADMIN': return 'Admin Portal'
       case 'SUB_ADMIN': return 'Team Portal'
       case 'AMBASSADOR': return 'Ambassador Portal'
+      case 'PARENT': return 'Parent Portal'
       default: return 'Coach Portal'
     }
   }
@@ -454,6 +473,7 @@ export function Sidebar({ role, badges, showRunningCosts = false }: SidebarProps
       case 'ADMIN': return adminNavSections
       case 'SUB_ADMIN': return subAdminNavSections
       case 'AMBASSADOR': return ambassadorNavSections
+      case 'PARENT': return parentNavSections
       default: return coachNavSections
     }
   }
@@ -491,6 +511,22 @@ export function Sidebar({ role, badges, showRunningCosts = false }: SidebarProps
   // Render sectioned navigation for Ambassador (with amber accent)
   const renderAmbassadorNav = () => (
     <div className="space-y-1">
+      {/* This week - the ambassador's group week, first thing they see */}
+      <Link
+        href="/ambassador/this-week"
+        prefetch={true}
+        onClick={handleTopLevelClick}
+        className={cn(
+          'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 mb-1',
+          pathname === '/ambassador/this-week' || pathname.startsWith('/ambassador/this-week/')
+            ? 'bg-amber-50 text-amber-700'
+            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+        )}
+      >
+        <CalendarCheck className="h-4 w-4" />
+        This week
+      </Link>
+
       {/* Dashboard - always at top, not in a section */}
       <Link
         href={basePath}
@@ -539,12 +575,12 @@ export function Sidebar({ role, badges, showRunningCosts = false }: SidebarProps
     </div>
   )
 
-  // Sub-admins: just their inbox link (no Dashboard: the inbox is their home).
-  const renderSubAdminNav = () => (
+  // A plain list of links, no sections (sub-admins and parents). A parent's Home link is only active on /parent itself.
+  const renderFlatNav = (items: NavItem[]) => (
     <ul className="space-y-1">
-      {subAdminNavSections[0].items.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+        const active = pathname === item.href || (!(role === 'PARENT' && item.href === basePath) && pathname.startsWith(`${item.href}/`))
         return (
           <li key={item.href}>
             <Link
@@ -660,7 +696,9 @@ export function Sidebar({ role, badges, showRunningCosts = false }: SidebarProps
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-4">
           {role === 'SUB_ADMIN'
-            ? renderSubAdminNav()
+            ? renderFlatNav(subAdminNavSections[0].items)
+            : role === 'PARENT'
+              ? renderFlatNav(parentNavSections[0].items)
             : role === 'AMBASSADOR'
               ? renderAmbassadorNav()
               : renderSectionedNav(sections)}

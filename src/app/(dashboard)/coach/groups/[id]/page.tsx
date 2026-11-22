@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
-import { CalendarPlus, ClipboardCheck, ArrowLeft } from 'lucide-react'
+import { CalendarPlus, ClipboardCheck, ArrowLeft, ListChecks } from 'lucide-react'
 import { requireGroupPageAccess, formatMeeting } from '../group-access'
 import { WEEKDAYS } from '../group-form'
 import { GroupDetailClient } from './group-detail-client'
@@ -52,6 +52,12 @@ export default async function GroupDetailPage({ params }: { params: { id: string
             className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-600 px-4 font-semibold text-white"
           >
             <ClipboardCheck className="h-5 w-5" /> Take the register
+          </Link>
+          <Link
+            href={`/coach/groups/${group.id}/week`}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border px-4 text-gray-700"
+          >
+            <ListChecks className="h-5 w-5" /> This week
           </Link>
           <a
             href={`/api/groups/${group.id}/calendar.ics`}
