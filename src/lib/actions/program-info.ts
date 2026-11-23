@@ -80,7 +80,7 @@ const OUT_OF_DATE = 'This version is out of date. Reload the page.'
 type Tx = Prisma.TransactionClient
 type EventKind =
   | 'ANSWERS_SENT' | 'QUESTION_ASKED' | 'QUESTION_ANSWERED' | 'DRAFT_SAVED' | 'SENT_TO_CHECK' | 'CHANGES_ASKED' | 'APPROVED'
-  | 'PUBLISHED_ON_BEHALF' | 'TAKEN_OFFLINE' | 'BACK_ONLINE' | 'GROUP_ADDED' | 'NAMES_CHANGED' | 'REMINDER_SENT' | 'STALLED' | 'MIGRATED' | 'SUGGESTIONS_ADDED' | 'EDITED_FOR_OWNER'
+  | 'PUBLISHED_ON_BEHALF' | 'TAKEN_OFFLINE' | 'BACK_ONLINE' | 'GROUP_ADDED' | 'NAMES_CHANGED' | 'REMINDER_SENT' | 'STALLED' | 'MIGRATED' | 'SUGGESTIONS_ADDED' | 'EDITED_FOR_OWNER' | 'ADDED_BY_OWNER'
 
 function logEvent(tx: Tx, programId: string, actorId: string | null, kind: EventKind, detail?: Record<string, unknown>) {
   return tx.programPageEvent.create({ data: { programId, actorId, kind, detail: (detail ?? undefined) as Prisma.InputJsonValue | undefined } })
@@ -733,6 +733,64 @@ export async function undoAnswerChanges(programId: string): Promise<ActionResult
   if (ctx.readOnly) await logSupportEdit(page.id, ctx.actorId, ['undo'])
   revalidateInfo(page.id)
   return { ok: true }
+}
+
+/**
+ * "Add a program": a coach or ambassador starts their own program page. It opens at names and groups,
+ * then the questions; when they send their answers the team is told (T1) and writes the page for them to
+ * check, so nothing goes live without the team and the owner.
+ */
+export async function addMyProgram(name: string): Promise<ActionResult<{ programId: string }>> {
+  const ctx = await requireProgramUser({ allowSupport: true })
+  if (!ctx.ok) return fail(ctx.error)
+  const body = z.string().trim().min(2, 'Give your program a name.').max(120, 'At most 120 characters').safeParse(name)
+  if (!body.success) return fail(body.error.issues[0]?.message ?? 'Give your program a name.')
+  const base = slugifyProgramName(body.data)
+  if (!base) return fail('Use letters or numbers in the name.')
+  // A guard against runaway adds: at most 10 programs still being made at once.
+  const ownerWhere: { coachId: string } | { ambassadorId: string } = ctx.owner.role === 'COACH' ? { coachId: ctx.owner.coachId } : { ambassadorId: ctx.owner.ambassadorId }
+  const open = await prisma.coachProgram.count({ where: { ...ownerWhere, parentProgramId: null, status: 'DRAFT' } })
+  if (open >= 10) return fail('You already have 10 programs in progress. Finish one first, or ask the team.')
+  let slug = base
+  for (let n = 2; n < 200; n++) {
+    const taken = await prisma.coachProgram.findUnique({ where: { slug }, select: { id: true } })
+    if (!taken) break
+    slug = `${base}-${n}`
+  }
+  const now = new Date()
+  let programId: string
+  try {
+    programId = await prisma.$transaction(async (tx) => {
+      const p = await tx.coachProgram.create({
+        data: {
+          slug,
+          name: body.data,
+          organization: '', // asked next, on names and groups
+          targetMarket: '',
+          internshipOffering: '',
+          servicesDescription: '',
+          weeklyEngagement1: '',
+          weeklyEngagement2: '',
+          monthlyGrowthGoal: '',
+          monthlyImpactGoal: '',
+          ...ownerWhere,
+          assignedAt: now,
+          assignedBy: ctx.actorId,
+        },
+        select: { id: true },
+      })
+      await logEvent(tx, p.id, ctx.actorId, 'ADDED_BY_OWNER', { name: body.data, viewingAs: ctx.readOnly })
+      return p.id
+    })
+  } catch (e) {
+    console.error('[PROGRAM-INFO] addMyProgram failed', e)
+    return fail(GENERIC)
+  }
+  await audit(ctx.actorId, 'PROGRAM_ADDED_BY_OWNER', programId, { slug, name: body.data, ownerUserId: ctx.session.user.id })
+  revalidatePath(programsHome(ctx.owner.role))
+  revalidatePath(TEAM_QUEUE_PATH)
+  revalidatePath('/admin/programs')
+  return { ok: true, programId }
 }
 
 /**

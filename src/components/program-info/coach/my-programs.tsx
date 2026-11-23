@@ -4,9 +4,9 @@
  * (Desk-Main). Server component.
  */
 import Link from 'next/link'
-import { Megaphone } from 'lucide-react'
 import { coachPagePath, coachSetupPath, type OwnerRole } from '@/lib/program-info/paths'
 import type { OwnerProgramGroup, ProgramPageSummary } from '@/lib/program-info/server'
+import { AddProgramForm } from './add-program-form'
 import { AskTeamForm } from './ask-team-form'
 import { Pill, ViewingAsBanner, ui } from './ui'
 
@@ -53,11 +53,7 @@ export function MyPrograms({ role, groups, readOnly, askPrefill }: { role: Owner
       {readOnly && <ViewingAsBanner />}
 
       {groups.length === 0 ? (
-        <div className={`${ui.card} flex flex-col items-start gap-2 p-5`}>
-          <Megaphone className="h-6 w-6 text-violet-700" aria-hidden />
-          <h2 className="m-0 text-lg font-bold">No programs yet</h2>
-          <p className="m-0 text-[15px] leading-relaxed text-gray-700">The NowTRANSFORMED team gives you a program. When they do, it shows here with the first step. Have one in mind? Ask the team below.</p>
-        </div>
+        <AddProgramForm role={role} first />
       ) : (
         <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
           <div className="flex min-w-0 flex-1 flex-col gap-4 lg:gap-6">
@@ -76,6 +72,7 @@ export function MyPrograms({ role, groups, readOnly, askPrefill }: { role: Owner
         </div>
       )}
 
+      {groups.length > 0 && <AddProgramForm role={role} first={false} />}
       <AskTeamForm readOnly={readOnly} prefill={askPrefill} />
     </div>
   )
