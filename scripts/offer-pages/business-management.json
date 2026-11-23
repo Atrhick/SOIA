@@ -1,0 +1,155 @@
+{
+  "theme": {
+    "accent": "#3730a3",
+    "accentDark": "#312e81",
+    "tint": "#eef2ff",
+    "deep": "#1e1b4b",
+    "deepText": "#e0e7ff"
+  },
+  "eyebrow": "For business owners and young entrepreneurs",
+  "hook": "You've got a business, or the start of one. Is it set up to grow and to apply for grants?",
+  "intro": "Maybe you've had steady customers for years and keep hearing about grants you've never applied for. Maybe you're selling online from your bedroom and nothing is registered yet. Either way, the day a bank or a grant application asks for your business papers, you'll want them ready. Lina Lopez helps you get set up properly, and the first call is free.",
+  "bullets": [
+    {
+      "lead": "Your business, formed properly.",
+      "text": "A business, or a foundation if that's what you're building, set up the right way on paper, so you can open accounts and apply for things in its name."
+    },
+    {
+      "lead": "A registered agent.",
+      "text": "An LLC or a corporation needs an official address for legal and state mail. Lina's resident agent service can be that address, so it doesn't have to be your home."
+    },
+    {
+      "lead": "Help with funding applications.",
+      "text": "Lina helps you write applications for business funding, so you're not staring at a blank form by yourself."
+    },
+    {
+      "lead": "A sponsorship may help with the cost.",
+      "text": "If you're a good fit, NowTRANSFORMED may help pay toward Lina's services. You'll hear on the free call."
+    }
+  ],
+  "hostNote": "LPL MServices · business setup and grant writing",
+  "heroImage": {
+    "src": "/offers/business-management/hero-papers-at-home.webp",
+    "alt": "A woman at a kitchen table reads through papers next to an open laptop",
+    "handNote": "is it all on paper? ↙",
+    "focus": "35% 40%"
+  },
+  "why": {
+    "title": "It usually shows up as a deadline you weren't ready for.",
+    "paragraphs": [
+      "A friend sends you a small-business grant two days before it closes. You open the application and it asks for things you don't have yet. Or you go to open a business bank account, and the bank wants papers that show your business is registered.",
+      "Meanwhile, letters for the business come to your home address, mixed in with the family's mail. Or the idea is still sitting in your notes app a year after you wrote it down, because you weren't sure what to do first.",
+      "Most people only find out what's missing on the day they need it, and by then the deadline has gone. It's a lot easier to sort it out now, with someone who does this work, than the night before an application is due."
+    ]
+  },
+  "sponsorship": {
+    "title": "Start with a free conversation. Decide after.",
+    "text": "It starts with a free 15-minute call. You tell us where your business or your idea is, and we look at whether Lina can help. Nothing gets decided on that call. If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer.",
+    "points": [
+      {
+        "lead": "Help paying for the setup",
+        "text": "A sponsorship goes toward Lina's services, like forming your business or her registered agent service."
+      },
+      {
+        "lead": "For owners and first-time founders",
+        "text": "Whether you've run your business for years or you're just getting your first one on paper."
+      },
+      {
+        "lead": "You'll know before you start",
+        "text": "On the call you hear what it would cost and whether a sponsorship applies, before you agree to anything."
+      }
+    ],
+    "cta": "Book my free call"
+  },
+  "options": {
+    "title": "Is this you?",
+    "items": [
+      {
+        "label": "Business owners",
+        "title": "You've been at it a while, and you're stuck at this size",
+        "text": "The work is steady, but you can't seem to get past this point. You'd like to hire someone, take on bigger jobs or add a service, and something about how the business is set up keeps getting in the way. Lina looks at where things stand today, then tells you what she'd sort out first.",
+        "image": {
+          "src": "/offers/business-management/owner-with-van.webp",
+          "alt": "A woman in a work jacket and cap stands at the open back doors of a white service van",
+          "note": "ready to grow",
+          "focus": "55% 35%"
+        }
+      },
+      {
+        "label": "Young entrepreneurs",
+        "title": "You've got the idea, or your first customers, and no one to ask",
+        "text": "Maybe you sell on Instagram, cut hair or fix phones for friends, and none of it is registered. You can tell it could be a real business. You just don't know what comes first. Lina helps you set it up properly so you can start earning from it. If you're under 18, a parent or guardian joins the call.",
+        "image": {
+          "src": "/offers/business-management/young-seller-at-home.webp",
+          "alt": "A smiling young woman writes notes at a laptop, with shipping boxes and a clothing rack behind her",
+          "note": "first business",
+          "focus": "70% 40%"
+        }
+      }
+    ],
+    "cta": "Book my free call"
+  },
+  "story": {
+    "title": "Why Lina does this",
+    "paragraphs": [
+      "Lina Lopez runs LPL MServices, and she's a coach and Director at NowTRANSFORMED, a youth leadership development program. She works with business owners and young entrepreneurs who want their business set up properly.",
+      "She's passionate about mentoring anyone who needs it, in every field she works in. To her, that's the best measure of her own success. Her way of putting it: \"I am a consultant, to give you guidance. Help me help you.\" The more you tell her about your business, the more useful she can be."
+    ]
+  },
+  "steps": [
+    {
+      "title": "Free 15-minute call",
+      "text": "Fill in the form at the top of this page and pick a time. Tell us where your business or your idea is, and we'll see whether Lina can help."
+    },
+    {
+      "title": "Book a time",
+      "text": "If you want to go ahead, you book a time with Lina to get started."
+    },
+    {
+      "title": "Fill in a short form",
+      "text": "It gives Lina the details she needs about you and your business, so she can get to work."
+    }
+  ],
+  "testimonials": [
+    {
+      "quote": "I am excited to know the many options I have to grow my business, especially access to grants (free money).",
+      "name": "Candace",
+      "role": "Business owner, Las Vegas"
+    }
+  ],
+  "faqs": [
+    {
+      "q": "How much will it cost me to start?",
+      "a": "Nothing. The first call is free. Lina only advises once she understands which service you need, and then you decide whether to go ahead. If you do, her services cost between $250 and $800, paid once."
+    },
+    {
+      "q": "Can Lina guarantee I'll get a grant?",
+      "a": "No, and nobody honest can. The funder decides who gets a grant. Lina helps you write an application that's complete and clear, and that's the part you can control."
+    },
+    {
+      "q": "What is a registered agent?",
+      "a": "It's the person or company named to receive official legal and state mail for your business. When you form an LLC or a corporation, your state asks you to name one. Lina offers this as her resident agent service. Ask on your call which states she covers."
+    },
+    {
+      "q": "My business is already registered. Is this still for me?",
+      "a": "It can be. Being registered is a start, but growing or applying for grants can take more than that. Tell Lina what you have now, and she'll tell you what, if anything, is missing."
+    },
+    {
+      "q": "I don't know if I need a business, a nonprofit or a foundation.",
+      "a": "That's a common place to start, and a good thing to bring to the call. Tell Lina what you want to do, and she'll walk you through the options she sees."
+    },
+    {
+      "q": "I'm under 18. Can I still do this?",
+      "a": "Yes. A parent or guardian joins the call with you, so you can make the decision together."
+    },
+    {
+      "q": "Is this legal or tax advice?",
+      "a": "No. Lina is a consultant who gives business guidance. For legal or tax questions, talk to a lawyer or an accountant."
+    }
+  ],
+  "closing": {
+    "title": "Get set up before the next deadline.",
+    "text": "A free 15-minute call to see if Lina can help. You decide after.",
+    "cta": "Book my free call"
+  }
+}

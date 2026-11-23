@@ -39,3 +39,6 @@ Photographers checked on each photo's pexels.com page on 2026-11-16. Page: https
 | verilyacademy | go-to-person.webp | 9301152 | Mikhail Nilov |
 | verilyacademy | retired-expert.webp | 8123822 | RDNE Stock project |
 | verilyacademy | recording-a-class.webp | 8369774 | RDNE Stock project |
+| business-management | hero-papers-at-home.webp | 6964048 | Mikhail Nilov |
+| business-management | owner-with-van.webp | 6196229 | Tima Miroshnichenko |
+| business-management | young-seller-at-home.webp | 7857583 | Kampus Production |
