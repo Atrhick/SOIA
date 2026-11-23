@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { personPath } from '@/lib/people/hub-core'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -187,6 +188,10 @@ export function CoachDetail({ coach, onboardingTasks }: CoachDetailProps) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link href={personPath(coach.user.id)} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-primary-600 bg-white px-4 text-base font-semibold text-primary-800 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2">
+            <Users className="h-4 w-4" aria-hidden="true" />
+            Everything {coach.firstName} is part of
+          </Link>
           <Badge variant={userStatusVariants[coach.user.status]}>
             {coach.user.status}
           </Badge>

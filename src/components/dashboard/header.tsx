@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { signOut } from 'next-auth/react'
-import { LogOut, Search, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu, Smartphone, Bell, BellOff } from 'lucide-react'
+import { LogOut, Search, User, Users, ChevronDown, ArrowLeftRight, Shield, Menu, Smartphone, Bell, BellOff, Mail } from 'lucide-react'
 import { useMobileNav } from '@/components/dashboard/mobile-nav'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +21,7 @@ import { OPEN_INSTALL_EVENT, isInstalled } from '@/components/pwa/install-prompt
 import { pushState, turnOnPush, turnOffPush, type PushState } from '@/components/pwa/push-client'
 import { ASSOCIATE_LABELS, ROLE_VIEW_NAMES, isAssociateRole, isSwitchableRole } from '@/lib/roles'
 import { useToast } from '@/components/ui/kit/toast'
+import { setMessageEmails } from '@/lib/actions/message-settings'
 import { updateSession } from '@/lib/session-update'
 
 interface HeaderProps {
@@ -32,6 +33,8 @@ interface HeaderProps {
     originalAdminId?: string
     /** The roles this login can switch between (admin, coach, ambassador). */
     views?: string[]
+    /** Emails about unread direct messages; undefined while viewing as someone (no switch shown). */
+    messageEmails?: boolean
   }
 }
 
@@ -65,6 +68,16 @@ export function Header({ user }: HeaderProps) {
   }
 
   const toast = useToast()
+  const [msgEmails, setMsgEmails] = useState(user.messageEmails)
+  const [msgBusy, setMsgBusy] = useState(false)
+  const toggleMessageEmails = async () => {
+    if (msgEmails === undefined || msgBusy) return
+    setMsgBusy(true)
+    const r = await setMessageEmails(!msgEmails)
+    if (r.ok) setMsgEmails(r.on)
+    else toast.error(r.error)
+    setMsgBusy(false)
+  }
 
   const loadUsers = async () => {
     if (user.role !== 'ADMIN' || user.isImpersonating) return
@@ -236,6 +249,15 @@ export function Header({ user }: HeaderProps) {
                         : push === 'needs-install' ? 'Notifications: add to home screen first'
                         : pushBusy ? 'Notifications…' : `Notifications on this device: ${push === 'on' ? 'On' : 'Off'}`}
                     </span>
+                  </DropdownMenuItem>
+                )}
+                {msgEmails !== undefined && (
+                  <DropdownMenuItem
+                    onSelect={(e) => { e.preventDefault(); void toggleMessageEmails() }}
+                    className="cursor-pointer"
+                  >
+                    <Mail className={`mr-2 h-4 w-4 ${msgEmails ? 'text-primary-700' : ''}`} />
+                    <span className="flex-1">{msgBusy ? 'Saving…' : `Emails about unread messages: ${msgEmails ? 'On' : 'Off'}`}</span>
                   </DropdownMenuItem>
                 )}
                 {canInstall && (

@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { STAFF_ROLES } from '@/lib/roles'
 import { checkGuardians } from '@/lib/messaging/guardians-server'
+import { markDirectMessageNoticesRead, notifyDirectMessage } from '@/lib/messaging/notify-message'
 
 /** Parents see only the channels and conversations they were added to; everyone else goes by the channel's roles, plus any private channel they are a member of. */
 async function canUseChannel(
@@ -827,6 +828,9 @@ export async function sendDirectMessage(channelId: string, content: string) {
       data: { updatedAt: new Date() }
     })
 
+    // Tell the other people in the conversation (bell, phone, and email after a quiet hour).
+    await notifyDirectMessage(channelId, session.user.id, message.content)
+
     revalidateCollaboration()
     return {
       success: true,
@@ -871,6 +875,9 @@ export async function getDirectMessageHistory(channelId: string) {
     if (!dm) {
       return { error: 'Conversation not found or access denied' }
     }
+
+    // Opening the conversation clears its bell notice (not when an admin is only viewing as them).
+    if (!session.user.isImpersonating) await markDirectMessageNoticesRead(channelId, session.user.id)
 
     // Get user info for participants
     const memberUserIds = dm.members.map(m => m.userId)

@@ -14,7 +14,8 @@ import { ScaledPreviewFrame } from './scaled-preview-frame'
 
 export type PreviewPageInfo = Pick<PageDetail, 'ownerUserId' | 'ownerRole' | 'ownerName' | 'ownerFirstName' | 'slug' | 'programName' | 'companyName'>
 
-async function previewSignup(d: PreviewPageInfo): Promise<SignupPageProps> {
+/** The sign-up form props a preview shows (also used by the team page editor's live preview). */
+export async function previewSignup(d: PreviewPageInfo): Promise<SignupPageProps> {
   const program = { slug: d.slug, label: d.programName, headline: null, bullets: [] }
   const full = d.ownerName ?? 'Your name'
   const fallback: SignupPageProps = {

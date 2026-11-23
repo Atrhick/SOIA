@@ -25,6 +25,7 @@ import { journeyUrl, userDisplayName } from '@/lib/get-involved/server'
 import { runJourneyReminders } from '@/lib/get-involved/journey-steps'
 import { runOutreachEmails } from '@/lib/get-involved/nudges'
 import { runAdminDigest } from '@/lib/get-involved/admin-digest'
+import { runUnreadMessageEmails } from '@/lib/messaging/notify-message'
 import { runProgramPageReminders } from '@/lib/program-info/reminders'
 import { primeEmailFooter } from '@/lib/get-involved/emails/footer-settings'
 import { dayBeforeReminderEmail } from '@/lib/get-involved/emails/reminders'
@@ -101,7 +102,8 @@ export async function POST(req: Request) {
     const outreach = await runOutreachEmails()
     const programPages = await runProgramPageReminders().catch((e) => { console.error('[CRON] program page reminders failed', e); return null })
     const adminDigest = await runAdminDigest().catch((e) => { console.error('[CRON] admin digest failed', e); return 0 })
-    return NextResponse.json({ ok: true, sent, deleted, journey, outreach, programPages, adminDigest })
+    const messageEmails = await runUnreadMessageEmails().catch((e) => { console.error('[CRON] unread message emails failed', e); return 0 })
+    return NextResponse.json({ ok: true, sent, deleted, journey, outreach, programPages, adminDigest, messageEmails })
   } catch (e) {
     console.error('[CRON] discovery reminders failed', e)
     return NextResponse.json({ ok: false }, { status: 500 })

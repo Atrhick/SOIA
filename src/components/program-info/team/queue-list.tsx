@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { TEAM_BUCKET_LABELS, type TeamBucket } from '@/lib/program-info/stage'
 import { TEAM_QUEUE_PATH, teamPagePath } from '@/lib/program-info/paths'
+import { programOwnerPath } from '@/lib/people/hub-core'
 import type { TeamQueueItem } from '@/lib/program-info/server'
 import { BUCKET_PARAM, BUCKET_PILL, CHIPS, waitingText } from './format'
 
@@ -64,15 +65,26 @@ export function QueueList({ items, counts, show, selectedId }: {
             {shown.map((i) => {
               const current = i.id === selectedId
               return (
-                <li key={i.id}>
-                  <Link
-                    href={`${teamPagePath(i.id)}?show=${BUCKET_PARAM[show]}`}
-                    aria-current={current ? 'page' : undefined}
-                    className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-3.5 text-gray-900 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-600 ${current ? 'bg-primary-50 shadow-[inset_3px_0_0_theme(colors.primary.700)]' : ''}`}
+                <li key={i.id} className="relative">
+                  {/* The row opens the page (stretched link); the owner's name is its own link to their person page. */}
+                  <div
+                    className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-3.5 text-gray-900 hover:bg-gray-50 ${current ? 'bg-primary-50 shadow-[inset_3px_0_0_theme(colors.primary.700)]' : ''}`}
                   >
                     <span className="min-w-0">
                       <span className="block text-[15px] font-bold">
-                        {i.hasOwner ? i.ownerName : 'No owner'} · {i.programName}{i.audienceLabel ? ` · ${i.audienceLabel}` : ''}
+                        {i.hasOwner ? (
+                          <Link href={programOwnerPath(i.rootId)} className="relative z-10 underline decoration-gray-400 underline-offset-2 hover:text-primary-700 hover:decoration-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 rounded" title={`Everything ${i.ownerName ?? 'this person'} is part of`}>
+                            {i.ownerName}
+                          </Link>
+                        ) : 'No owner'}
+                        {' · '}
+                        <Link
+                          href={`${teamPagePath(i.id)}?show=${BUCKET_PARAM[show]}`}
+                          aria-current={current ? 'page' : undefined}
+                          className="after:absolute after:inset-0 after:content-[''] focus:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary-600"
+                        >
+                          {i.programName}{i.audienceLabel ? ` · ${i.audienceLabel}` : ''}
+                        </Link>
                       </span>
                       <span className="mt-0.5 block text-sm text-gray-600">{subLine(i)}</span>
                     </span>
@@ -80,7 +92,7 @@ export function QueueList({ items, counts, show, selectedId }: {
                       {!i.hasOwner && <span className="whitespace-nowrap rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-bold text-gray-800">No owner</span>}
                       <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${BUCKET_PILL[i.bucket]}`}>{i.teamLabel}</span>
                     </span>
-                  </Link>
+                  </div>
                 </li>
               )
             })}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseOfferPage } from './offer-page'
+import { SPONSORSHIP_LINE, pageWarnings } from '../program-info/page-checks'
 
 const en = JSON.parse(readFileSync(join(process.cwd(), 'scripts/offer-pages/explorenation.json'), 'utf8'))
 const minimal = { hook: 'A hook', intro: 'An intro.', steps: [{ title: 'Book', text: 'Pick a time.' }], closing: { title: 'Ready?', cta: 'Book my free call' } }
@@ -50,15 +51,13 @@ describe('offer pages', () => {
   })
 
   it('every saved page leads with the sponsorship: a hero bullet and a full section with the exact line', () => {
-    const LINE = "If you're a good fit, you may qualify for a NowTRANSFORMED sponsorship toward this offer."
+    // The same rule the page editor uses (src/lib/program-info/page-checks.ts), so the two never disagree.
     const dir = join(process.cwd(), 'scripts/offer-pages')
     for (const f of readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-      const page = parseOfferPage(JSON.parse(readFileSync(join(dir, f), 'utf8')))!
-      expect(page.sponsorship?.text, f).toContain(LINE)
-      expect(page.sponsorship?.points, f).toHaveLength(3)
-      expect(page.bullets.some((b) => /sponsorship/i.test(`${b.lead} ${b.text}`)), `${f}: hero bullet`).toBe(true)
-      const words = JSON.stringify(page.sponsorship) + JSON.stringify(page.bullets)
-      expect(words, f).not.toMatch(/\$\d|\bgrant\b|\bseats?\b|nonprofit/i)
+      const raw = JSON.parse(readFileSync(join(dir, f), 'utf8'))
+      expect(parseOfferPage(raw), f).not.toBeNull()
+      expect(pageWarnings(raw).filter((w) => w.kind === 'sponsorship').map((w) => w.message), f).toEqual([])
+      expect(raw.sponsorship?.text, f).toContain(SPONSORSHIP_LINE)
     }
   })
 

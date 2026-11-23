@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { ago, personPath } from '@/lib/people/hub-core'
 import { ClientPager, usePaged } from '@/components/ui/client-pager'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -58,6 +60,8 @@ type User = {
   firstName: string | null
   lastName: string | null
   status: string | null
+  /** Last time they used the app (at most 10 minutes stale); null = never recorded. */
+  lastSeenAt?: string | null
   coachId: string | null
   ambassadorId: string | null
 }
@@ -106,13 +110,17 @@ export function UsersAdminClient({
   users: initialUsers,
   features,
   currentUserId,
+  initialQuery = '',
 }: {
   users: User[]
   features: FeatureConfig[]
   currentUserId: string
+  /** From ?q= (the person page's "Edit account" sends their email). */
+  initialQuery?: string
 }) {
   const [users, setUsers] = useState(initialUsers)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialQuery)
+  const [sortByActive, setSortByActive] = useState(false)
   const [roleFilter, setRoleFilter] = useState<string>('all')
 
   // Dialog states
@@ -149,7 +157,10 @@ export function UsersAdminClient({
 
     return matchesSearch && matchesRole
   })
-  const paged = usePaged(filteredUsers, 25, `${searchQuery}|${roleFilter}`)
+  // "Last active" sort: most recent first, never-seen last (otherwise the server's newest-account order).
+  if (sortByActive) filteredUsers.sort((a, b) => (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? ''))
+  const paged = usePaged(filteredUsers, 25, `${searchQuery}|${roleFilter}|${sortByActive}`)
+  const now = new Date()
 
   const resetCreateForm = () => {
     setNewEmail('')
@@ -178,6 +189,16 @@ export function UsersAdminClient({
       setIsLoadingPermissions(false)
     }
   }
+
+  // "Edit account" from the person page: ?q=<their email> opens their settings straight away.
+  const openedFromQuery = useRef(false)
+  useEffect(() => {
+    if (openedFromQuery.current || !initialQuery.includes('@')) return
+    openedFromQuery.current = true
+    const match = initialUsers.find((u) => u.email.toLowerCase() === initialQuery.trim().toLowerCase())
+    if (match) void handleOpenUserDetail(match)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const getRoleDefaultAccess = (role: string, feature: string): boolean => {
     if (role === 'ADMIN') return true
@@ -467,6 +488,11 @@ export function UsersAdminClient({
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Role</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Status</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Created</th>
+                  <th className="hidden sm:table-cell text-left px-4 py-3 text-sm font-medium text-gray-500" aria-sort={sortByActive ? 'descending' : 'none'}>
+                    <button type="button" onClick={() => setSortByActive((v) => !v)} className="inline-flex items-center gap-1 font-medium text-gray-600 underline decoration-dotted underline-offset-2 hover:text-gray-900" title={sortByActive ? 'Back to newest accounts first' : 'Sort by last active'}>
+                      Last active{sortByActive ? ' ↓' : ''}
+                    </button>
+                  </th>
                   <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Actions</th>
                 </tr>
               </thead>
@@ -479,12 +505,20 @@ export function UsersAdminClient({
                   >
                     <td className="px-4 py-3">
                       <div>
-                        <p className="font-medium">{user.email}</p>
+                        {/* The name opens everything this person is part of; the rest of the row still opens their settings. */}
+                        <p className="font-medium">
+                          {user.firstName || user.lastName ? user.email : (
+                            <Link href={personPath(user.id)} onClick={(e) => e.stopPropagation()} className="underline decoration-gray-300 underline-offset-2 hover:text-primary-700 hover:decoration-primary-700">{user.email}</Link>
+                          )}
+                        </p>
                         {(user.firstName || user.lastName) && (
                           <p className="text-sm text-gray-500">
-                            {user.firstName} {user.lastName}
+                            <Link href={personPath(user.id)} onClick={(e) => e.stopPropagation()} className="font-medium text-gray-700 underline decoration-gray-300 underline-offset-2 hover:text-primary-700 hover:decoration-primary-700" title="Everything this person is part of">
+                              {user.firstName} {user.lastName}
+                            </Link>
                           </p>
                         )}
+                        <p className="sm:hidden text-xs text-gray-500" suppressHydrationWarning>Last active: {ago(user.lastSeenAt, now) ?? 'never'}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -520,6 +554,9 @@ export function UsersAdminClient({
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(user.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-500 whitespace-nowrap" suppressHydrationWarning>
+                      {ago(user.lastSeenAt, now) ?? 'Never'}
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-2">

@@ -160,6 +160,10 @@ export function ProgramsAdminClient({
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
 
   const [showCreate, setShowCreate] = useState(false)
+  // List filters: search by program, company or owner; status; owner type.
+  const [q, setQ] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'DRAFT' | 'PENDING_REVIEW'>('ALL')
+  const [ownerFilter, setOwnerFilter] = useState<'ALL' | 'COACH' | 'AMBASSADOR' | 'NONE'>('ALL')
   const [newName, setNewName] = useState('')
   const [newOrg, setNewOrg] = useState('')
 
@@ -183,6 +187,16 @@ export function ProgramsAdminClient({
     () => programs.filter((p) => p.status === 'PENDING_REVIEW' && !inFlow.has(p.id)),
     [programs, inFlow]
   )
+
+  const shown = useMemo(() => {
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    return programs.filter((p) => {
+      if (statusFilter !== 'ALL' && p.status !== statusFilter) return false
+      if (ownerFilter === 'NONE' ? p.ownerRole : ownerFilter !== 'ALL' && p.ownerRole !== ownerFilter) return false
+      const hay = `${p.name} ${p.organization} ${p.ownerName ?? ''} ${p.slug}`.toLowerCase()
+      return words.every((w) => hay.includes(w))
+    })
+  }, [programs, q, statusFilter, ownerFilter])
 
   const run = (fn: () => Promise<{ error?: string; success?: boolean }>, okMessage: string) => {
     setError(null)
@@ -292,7 +306,33 @@ export function ProgramsAdminClient({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">All programs ({programs.length})</CardTitle>
+          <CardTitle className="text-base">
+            {shown.length === programs.length ? `All programs (${programs.length})` : `${shown.length} of ${programs.length} programs`}
+          </CardTitle>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_200px_200px]">
+            <div className="min-w-0">
+              <Label htmlFor="prog-q" className="sr-only">Search</Label>
+              <Input id="prog-q" type="search" placeholder="Search by program, company or owner" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="prog-status" className="sr-only">Status</Label>
+              <select id="prog-status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-base md:text-sm">
+                <option value="ALL">Any status</option>
+                <option value="PUBLISHED">Published</option>
+                <option value="DRAFT">Draft</option>
+                <option value="PENDING_REVIEW">Awaiting review</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="prog-owner" className="sr-only">Owner</Label>
+              <select id="prog-owner" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value as typeof ownerFilter)} className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-base md:text-sm">
+                <option value="ALL">Any owner</option>
+                <option value="COACH">Coaches</option>
+                <option value="AMBASSADOR">Ambassadors</option>
+                <option value="NONE">No owner yet</option>
+              </select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="md:overflow-x-auto">
@@ -308,7 +348,10 @@ export function ProgramsAdminClient({
                 </tr>
               </thead>
               <tbody className="block divide-y divide-gray-100 md:table-row-group">
-                {programs.map((p) => {
+                {shown.length === 0 && (
+                  <tr className="block md:table-row"><td colSpan={6} className="block px-4 py-6 text-gray-600 md:table-cell">No programs match. <button type="button" className="font-semibold text-primary-700 underline" onClick={() => { setQ(''); setStatusFilter('ALL'); setOwnerFilter('ALL') }}>Clear the filters</button></td></tr>
+                )}
+                {shown.map((p) => {
                   const meta = STATUS_META[p.status] ?? { label: p.status, variant: 'outline' as const }
                   return (
                     <tr key={p.id} className="block space-y-3 p-4 align-middle md:table-row md:space-y-0 md:p-0">

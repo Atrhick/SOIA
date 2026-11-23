@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
+import { personPath } from '@/lib/people/hub-core'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -545,7 +547,13 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features, emptyText
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">
-                        {ambassador.firstName} {ambassador.lastName}
+                        {ambassador.userId ? (
+                          <Link href={personPath(ambassador.userId)} className="underline decoration-gray-300 underline-offset-2 hover:text-primary-700 hover:decoration-primary-700" title={`Everything ${ambassador.firstName} is part of`}>
+                            {ambassador.firstName} {ambassador.lastName}
+                          </Link>
+                        ) : (
+                          <>{ambassador.firstName} {ambassador.lastName}</>
+                        )}
                       </p>
                       <p className="text-sm text-gray-500">
                         {ambassador.email || 'No email'}
@@ -555,7 +563,9 @@ export function AdminAmbassadorTable({ ambassadors, coaches, features, emptyText
                 </td>
                 <td className="py-4">
                   <p className="text-gray-900">
-                    {ambassador.coach.firstName} {ambassador.coach.lastName}
+                    <Link href={personPath(ambassador.coach.user.id)} className="underline decoration-gray-300 underline-offset-2 hover:text-primary-700 hover:decoration-primary-700">
+                      {ambassador.coach.firstName} {ambassador.coach.lastName}
+                    </Link>
                   </p>
                   <p className="text-sm text-gray-500">{ambassador.coach.user.email}</p>
                 </td>

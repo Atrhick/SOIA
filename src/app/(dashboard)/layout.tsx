@@ -10,6 +10,8 @@ import { prisma } from '@/lib/prisma'
 import { CALLBACK_PATH_HEADER, loginPath } from '@/lib/safe-callback'
 import { isAssociateRole, isSwitchableRole, rolesOf, type AssociateRole } from '@/lib/roles'
 import { newSupportCount } from '@/lib/support/server'
+import { unreadConversationCount } from '@/lib/messaging/notify-message'
+import { messagesPathFor } from '@/lib/messaging/notify-message-core'
 import { canViewRunningCosts } from '@/lib/running-costs/server'
 
 export default async function DashboardLayout({
@@ -56,6 +58,17 @@ export default async function DashboardLayout({
     }
   }
 
+  // "Last active" on the admin person page: at most one write per user every 10 minutes, never while
+  // an admin is viewing as them. Fire-and-forget so a slow or failed write never holds up the page.
+  if (!isImpersonating) {
+    prisma.user
+      .updateMany({
+        where: { id: session.user.id, OR: [{ lastSeenAt: null }, { lastSeenAt: { lt: new Date(Date.now() - 10 * 60 * 1000) } }] },
+        data: { lastSeenAt: new Date() },
+      })
+      .catch(() => {})
+  }
+
   // The session keeps the admin's email while impersonating, so look up who is really being viewed.
   const viewingEmail = isImpersonating
     ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { email: true } }))?.email ?? null
@@ -64,7 +77,7 @@ export default async function DashboardLayout({
   // The views this login can switch to (only roles it has a profile for). Not offered while viewing as someone.
   const me = isImpersonating ? null : await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { role: true, extraRoles: true, coachProfile: { select: { id: true } }, ambassadorProfile: { select: { id: true } } },
+    select: { role: true, extraRoles: true, messageEmailsOff: true, coachProfile: { select: { id: true } }, ambassadorProfile: { select: { id: true } } },
   })
   const views = me
     ? rolesOf(me).filter((r) => isSwitchableRole(r) && (r !== 'COACH' || me.coachProfile) && (r !== 'AMBASSADOR' || me.ambassadorProfile))
@@ -72,13 +85,18 @@ export default async function DashboardLayout({
 
   // Sidebar badge: support messages nobody has picked up yet (admins and sub-admins).
   const supportNew = role === 'ADMIN' || role === 'SUB_ADMIN' ? await newSupportCount({ id: session.user.id, role }) : 0
+  // Sidebar badge: conversations with unread direct messages (cleared when the conversation is opened).
+  const unreadDms = await unreadConversationCount(session.user.id)
+  const badges: Record<string, number> = {}
+  if (supportNew) { badges['/admin/support'] = supportNew; badges['/team/support'] = supportNew }
+  if (unreadDms) badges[messagesPathFor(role)] = unreadDms
   // Admins have Running costs under System; anyone else sees it only when granted the feature.
   const showRunningCosts = role !== 'ADMIN' && (await canViewRunningCosts({ id: session.user.id, role }))
 
   return (
     <MobileNavProvider>
     <div className="min-h-screen bg-gray-50">
-      <Sidebar role={role} showRunningCosts={showRunningCosts} badges={supportNew ? { '/admin/support': supportNew, '/team/support': supportNew } : undefined} />
+      <Sidebar role={role} showRunningCosts={showRunningCosts} badges={Object.keys(badges).length ? badges : undefined} />
       <Header user={{
         email: viewingEmail ?? session.user.email,
         role: session.user.role,
@@ -86,6 +104,7 @@ export default async function DashboardLayout({
         isImpersonating,
         originalAdminId: session.user.originalAdminId,
         views,
+        messageEmails: me ? !me.messageEmailsOff : undefined,
       }} />
       <main className={`lg:ml-64 ${isImpersonating ? 'pt-[7.25rem] sm:pt-[7.75rem]' : 'pt-20 sm:pt-[5.5rem]'} px-4 pb-6 sm:px-6`}>
         {children}

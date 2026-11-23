@@ -41,6 +41,11 @@ model User {
   status     UserStatus @default(ACTIVE)
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
+  // Admin person page: last successful sign-in, and last time they used the app (updated at most every 10 minutes).
+  lastLoginAt DateTime?
+  lastSeenAt  DateTime?
+  // Off = no emails about unread direct messages (bell and phone notices still come). Set from the menu under their name.
+  messageEmailsOff Boolean @default(false)
 
   // Relations
   coachProfile        CoachProfile?
@@ -2088,6 +2093,7 @@ enum NotificationType {
   ACCOUNT_CREATED
   PROGRAM_PAGE
   SUPPORT
+  MESSAGE // a direct message (src/lib/messaging/notify-message.ts)
 }
 
 model Prospect {
@@ -2431,6 +2437,8 @@ model AdminNotification {
   readAt     DateTime?
   actionUrl  String?
   createdAt  DateTime         @default(now())
+  // MESSAGE notices: when the "still unread" email went out (one per unread stretch; carried to the replacing row).
+  emailedAt  DateTime?
 
   @@index([userId, isRead])
   @@map("admin_notifications")

@@ -150,6 +150,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Successful login — clear any previous failed attempts
         clearAttempts(email)
 
+        // Record the sign-in for the admin person page. Never blocks login. ("View as" doesn't come through here.)
+        try {
+          const now = new Date()
+          await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: now, lastSeenAt: now } })
+        } catch {
+          // ignore: a failed stamp must not stop the sign-in
+        }
+
         return {
           id: user.id,
           email: user.email,

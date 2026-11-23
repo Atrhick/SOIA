@@ -80,7 +80,7 @@ export function Crumbs({ items }: { items: { label: string; href?: string }[] })
 export function ViewingAsBanner() {
   return (
     <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-[15px] leading-relaxed text-amber-900">
-      <b>Only you see this note.</b> You can fill this in for them; only they can put a page live.
+      <b>Only you see this note.</b> You can fill this in for them. Only they can press &ldquo;Looks good&rdquo;; to put a page live for them, use the team page.
     </div>
   )
 }

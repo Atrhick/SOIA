@@ -286,16 +286,13 @@ export function TeamPageDetail({ detail: d, preview }: { detail: PageDetail; pre
             <b>Page</b>
             {workingPage ? ` · saved ${when(working?.updatedAt)}` : d.current.offerPage ? ' · same as the live page' : ' · not loaded yet'}
           </span>
-          {working && !!(workingPage || d.current.offerPage) && (
-            <Link href={`${teamPagePath(d.id)}/version/${working.number}`} className={smallBtn}>Preview full size</Link>
-          )}
+          <span className="flex flex-wrap gap-2">
+            <Link href={`${teamPagePath(d.id)}/edit`} className={kit.primary}>Write / edit the page</Link>
+            {working && !!(workingPage || d.current.offerPage) && (
+              <Link href={`${teamPagePath(d.id)}/version/${working.number}`} className={smallBtn}>Preview full size</Link>
+            )}
+          </span>
         </div>
-        {!workingPage && (
-          <p className="m-0 rounded-xl bg-gray-50 px-3.5 py-2.5 text-sm text-gray-800">
-            Load the page with the save-draft script:{' '}
-            <code className="break-all rounded bg-white px-1 py-0.5 text-[13px]">npx tsx scripts/program-info/save-draft.ts {d.slug} page.json --apply</code>
-          </p>
-        )}
         {preview && (
           <details>
             <summary className={foldSummary}>See the page here <Fold /></summary>
@@ -358,7 +355,7 @@ export function TeamPageDetail({ detail: d, preview }: { detail: PageDetail; pre
         </div>
 
         <p className="m-0 text-sm leading-relaxed text-gray-700">
-          <b>For now:</b> tell Claude “write {first}&apos;s {d.audienceLabel ?? d.programName} page”. Use <b>Copy all answers</b> to give it everything {first} wrote. Claude writes all three, runs the copy check and saves them here as a draft with the save-draft script.
+          Write the page in the editor. Claude can also write a first draft from the answers and save it here.
         </p>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -376,7 +373,7 @@ export function TeamPageDetail({ detail: d, preview }: { detail: PageDetail; pre
         <ErrorBanner text={errAt('send')} />
         <p className="m-0 text-sm text-gray-700">
           {!draft
-            ? 'Sending needs a draft. Save the page with the script, or edit the welcome paragraph or invitation line.'
+            ? 'Sending needs a draft. Write the page in the editor, or edit the welcome paragraph or invitation line.'
             : !hasOwner
               ? 'Assign an owner before sending.'
               : `If a question is still waiting for ${first}'s answer, sending asks you to confirm first.`}

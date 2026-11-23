@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { personPath } from '@/lib/people/hub-core'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
@@ -162,18 +163,19 @@ export default async function CoachesPage({ searchParams }: PageProps) {
                   return (
                     <tr key={coach.id} className="group hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <Link href={`/admin/coaches/${coach.id}`} className="flex items-center gap-3 min-w-0">
-                          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700" aria-hidden="true">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Link href={`/admin/coaches/${coach.id}`} tabIndex={-1} aria-hidden="true" className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
                             {(coach.firstName?.[0] || '?').toUpperCase()}{(coach.lastName?.[0] || '?').toUpperCase()}
-                          </span>
+                          </Link>
                           <span className="min-w-0">
                             <span className="flex items-center gap-2">
-                              <span className="truncate font-semibold text-gray-900 group-hover:text-primary-700">{name}</span>
+                              {/* The name opens everything this person is part of; the rest of the row opens the coach record. */}
+                              <Link href={personPath(coach.user.id)} className="truncate font-semibold text-gray-900 underline decoration-gray-300 underline-offset-2 hover:text-primary-700 hover:decoration-primary-700" title={`Everything ${name} is part of`}>{name}</Link>
                               {account && <Badge variant={coach.user.status === 'SUSPENDED' ? 'destructive' : 'secondary'} className="text-xs">{account}</Badge>}
                             </span>
-                            <span className="block truncate text-gray-500">{coach.user.email}</span>
+                            <Link href={`/admin/coaches/${coach.id}`} className="block truncate text-gray-500 hover:text-primary-700">{coach.user.email}</Link>
                           </span>
-                        </Link>
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {coach.coachStatus === 'ACTIVE_COACH' ? (
