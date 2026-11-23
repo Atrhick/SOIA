@@ -29,10 +29,13 @@ import { BUCKET_PILL, VERSION_STATUS, answerToText, day, endSentence, eventSente
 
 type Result = { ok: true } | { ok: false; error: string; needsConfirm?: boolean }
 
-const box = 'rounded-2xl border border-gray-200 bg-white p-4 sm:p-5'
-const h3 = 'm-0 text-base font-bold text-gray-900'
+const box = 'rounded-2xl border border-gray-300 bg-white p-4 shadow-sm sm:p-5'
+const h3 = 'm-0 text-lg font-bold text-gray-900'
 const part = 'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 px-3.5 py-3 text-base'
-const smallBtn = `inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:opacity-60 ${kit.ring}`
+const smallBtn = `inline-flex min-h-[44px] items-center justify-center rounded-xl border-2 border-primary-600 bg-white px-4 text-sm font-semibold text-primary-700 shadow-sm hover:bg-primary-50 disabled:border-gray-300 disabled:text-gray-500 disabled:shadow-none ${kit.ring}`
+/** A fold-out section header: looks like a bar you can tap, with a chevron and "Show". */
+const foldSummary = 'flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-3 rounded-xl bg-gray-100 px-3.5 text-base font-bold text-gray-900 hover:bg-gray-200 [&::-webkit-details-marker]:hidden'
+const Fold = () => <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700">Show <span aria-hidden>▾</span></span>
 
 function ErrorBanner({ text }: { text: string | null }) {
   if (!text) return null
@@ -245,7 +248,7 @@ export function TeamPageDetail({ detail: d, preview }: { detail: PageDetail; pre
 
       {/* Every answer */}
       <details className={box}>
-        <summary className="flex min-h-[44px] cursor-pointer items-center text-base font-bold text-gray-900">All answers</summary>
+        <summary className={foldSummary}>All answers <Fold /></summary>
         <div className="mt-2 flex flex-col gap-4">
           {INFO_SECTIONS.map((s) => (
             <div key={s.id}>
@@ -295,7 +298,7 @@ export function TeamPageDetail({ detail: d, preview }: { detail: PageDetail; pre
         )}
         {preview && (
           <details>
-            <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold text-primary-700">Show the page here</summary>
+            <summary className={foldSummary}>See the page here <Fold /></summary>
             <div className="mt-2">{preview}</div>
           </details>
         )}
@@ -416,11 +419,12 @@ export function TeamPageDetail({ detail: d, preview }: { detail: PageDetail; pre
       </section>
 
       {/* Owner actions */}
-      <details className={box}>
-        <summary className="flex min-h-[44px] cursor-pointer items-center text-base font-bold text-gray-900">Owner actions</summary>
-        <div className="mt-2 flex flex-col gap-3">
+      <section aria-labelledby="owner-actions-h" className={box}>
+        <h3 id="owner-actions-h" className={h3}>Publish, groups, offline</h3>
+        <p className="m-0 mt-1 text-sm text-gray-700">Use these when {first} can&apos;t do it. Each one is logged.</p>
+        <div className="mt-3 flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={smallBtn} disabled={!publishable} aria-expanded={publishing} onClick={() => setPublishing((x) => !x)}>Publish for the {ownerNoun} (logged)</button>
+            <button type="button" className={kit.primary} disabled={!publishable} aria-expanded={publishing} onClick={() => setPublishing((x) => !x)}>Publish for {first}</button>
             <button type="button" className={smallBtn} aria-expanded={adding} onClick={() => setAdding((x) => !x)}>Add a group page</button>
             {d.isLive && <button type="button" className={`${smallBtn} text-red-700`} aria-expanded={offlining} onClick={() => setOfflining((x) => !x)}>Take offline</button>}
             {d.offlineInfo && (
@@ -485,10 +489,10 @@ export function TeamPageDetail({ detail: d, preview }: { detail: PageDetail; pre
             </form>
           )}
         </div>
-      </details>
+      </section>
 
       <details className={box}>
-        <summary className="flex min-h-[44px] cursor-pointer items-center text-base font-bold text-gray-900">Program goals and grant details (admins only)</summary>
+        <summary className={foldSummary}>Program goals and grant details (admins only) <Fold /></summary>
         <p className="m-0 mt-1 text-sm leading-relaxed text-gray-800">
           Monthly growth and impact goals, weekly engagements, internship offering. Set on the main program, not per page. Coaches no longer see these.{' '}
           <Link href="/admin/programs" className="font-semibold text-primary-700 underline">Open Program Pages</Link>

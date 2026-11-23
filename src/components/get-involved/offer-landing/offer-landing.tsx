@@ -161,7 +161,10 @@ export function OfferLanding({ signup, page, business, more, preview = false }: 
                   {page.sponsorship.points.map((pt, i) => (
                     <li key={pt.lead} className="flex min-w-0 flex-[1_1_240px] gap-3 rounded-2xl bg-white/80 p-4">
                       <span aria-hidden className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-amber-400 font-extrabold text-amber-950">{i + 1}</span>
-                      <span className="text-base leading-relaxed text-slate-800"><strong className="text-slate-900">{pt.lead}</strong> {pt.text}</span>
+                      <span className="min-w-0 pt-0.5">
+                        <strong className="block text-[17px] font-bold leading-snug text-slate-900">{pt.lead}</strong>
+                        <span className="mt-1.5 block text-base leading-relaxed text-slate-700">{pt.text}</span>
+                      </span>
                     </li>
                   ))}
                 </ol>
@@ -229,7 +232,7 @@ export function OfferLanding({ signup, page, business, more, preview = false }: 
                 {page.callout.points.length > 0 && (
                   <ul className="mt-4 space-y-2 pl-0">
                     {page.callout.points.map((pt) => (
-                      <li key={pt.lead} className="list-none text-base leading-relaxed text-slate-700"><strong className="text-slate-900">{pt.lead}</strong> {pt.text}</li>
+                      <li key={pt.lead} className="list-none text-base leading-relaxed text-slate-700"><strong className="block text-slate-900">{pt.lead}</strong>{pt.text}</li>
                     ))}
                   </ul>
                 )}

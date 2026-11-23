@@ -98,8 +98,6 @@ interface Template {
 }
 
 const reasonText = (c: NotifyContext) => trimmed(c.extra.reason)
-const LOOKS_GOOD = 'press "Looks good, put it live"'
-const ASK_CHANGES = 'press "Ask for these changes"'
 const QUESTION_LABEL = 'Our question'
 const LAST_REMINDER = "This is the last reminder we'll send. If now isn't a good time, just reply and tell us."
 
@@ -111,8 +109,8 @@ function reminderParts(c: NotifyContext): { subject: string; message: string; bo
       subject: `${YourPage(c)} is ready for you to check`,
       message: 'About 5 minutes to read. Nothing goes live until you say so.',
       body: para(`${esc(YourPage(c))} is written and ready for you to check. It takes about 5 minutes to read.`)
-        + para(`If it's right, ${LOOKS_GOOD}. If not, ${ASK_CHANGES}. Nothing goes live until you say so.`) + last,
-      button: `Check my ${page(c)}`,
+        + para(`If you're happy with it, you can put it live with one tap. If something isn't right, tell us what to change. ${NOTHING_LIVE}`) + last,
+      button: checkButton(c),
     }
   }
   if (c.stage === 'QUESTION_OPEN') {
@@ -145,6 +143,9 @@ function stalledSentence(c: NotifyContext): string {
 const STALLED_ASK = 'Reminders went out. Please give them a call.'
 
 const openTeamPage = (c: NotifyContext) => `Open the ${page(c)}`
+/** Owner button: "Check my page", or "Check my Families page" when the program has groups (never the long program name). */
+const checkButton = (c: NotifyContext) => (isOneGroup(c) ? 'Check my page' : `Check my ${c.group} page`)
+const NOTHING_LIVE = 'Nothing goes live until you say so.'
 
 const T: Record<ProgramPageNotifyEvent, Template> = {
   // ----- to the page owner (coach or ambassador) -----
@@ -158,23 +159,24 @@ const T: Record<ProgramPageNotifyEvent, Template> = {
   },
   C2_READY_FIRST: {
     subject: (c) => `${YourPage(c)} is ready to check`,
-    message: () => `Have a read. If it's right, ${LOOKS_GOOD}. Nothing goes live until you say so.`,
-    body: (c) => para(`We've written ${esc(yourPage(c))} from your answers, along with the welcome email new sign-ups get and your invitation line.`)
-      + para(`Have a read. If it's right, ${LOOKS_GOOD}. If not, ${ASK_CHANGES}.`),
-    button: (c) => `Check my ${page(c)}`,
+    message: () => `About 5 minutes to read. ${NOTHING_LIVE}`,
+    body: (c) => para(`${esc(YourPage(c))} is written, using your own answers. It takes about 5 minutes to read.`)
+      + para("We also wrote two short pieces to go with it: the welcome email people get when they sign up, and a line you can paste when you invite someone.")
+      + para(`If you're happy with it, you can put it live with one tap. If something isn't right, tell us what to change. ${NOTHING_LIVE}`),
+    button: checkButton,
   },
   C3_CHANGES_MADE: {
     subject: (c) => `We've made your changes to ${yourPage(c)}`,
     message: (c) => `${YourPage(c)} is ready to check again.`,
     body: (c) => para(`We've made the changes you asked for on ${esc(yourPage(c))}.`)
-      + para(`Have another read. If it's right now, ${LOOKS_GOOD}. If something is still off, ${ASK_CHANGES}.`),
-    button: (c) => `Check my ${page(c)}`,
+      + para(`Have another read. If it's right now, you can put it live with one tap. If something is still off, tell us. ${NOTHING_LIVE}`),
+    button: checkButton,
   },
   C4_UPDATE_READY: {
     subject: (c) => `Your updated ${page(c)} is ready to check`,
-    message: () => `Your live page stays as it is until you ${LOOKS_GOOD} on this version.`,
+    message: () => 'Your live page stays as it is until you say this version is right.',
     body: (c) => para(`We've written a new version of ${esc(yourPage(c))} from your changed answers.`)
-      + para(`Your live page stays exactly as it is until you ${LOOKS_GOOD} on this version. If not, ${ASK_CHANGES}.`),
+      + para('Your live page stays exactly as it is until you say this version is right. If something is off, tell us what to change.'),
     button: () => 'Check the new version',
   },
   C5_LIVE: {

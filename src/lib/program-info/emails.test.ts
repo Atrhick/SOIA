@@ -87,9 +87,10 @@ describe('program page notification templates', () => {
     expect(almost.message).toBe('2 sections to go, about 5 minutes. Tap to continue.')
     const c2 = programPageEmail(ctx('C2_READY_FIRST'), 'Justin').html
     expect(c2).toContain('Check my Families page')
-    expect(c2).toContain('press "Looks good, put it live"')
-    expect(c2).toContain('press "Ask for these changes"')
-    expect(programPageText(ctx('C4_UPDATE_READY')).message).toBe('Your live page stays as it is until you press "Looks good, put it live" on this version.')
+    expect(c2).toContain('put it live with one tap')
+    expect(c2).toContain('tell us what to change')
+    expect(programPageEmail({ ...ctx('C2_READY_FIRST'), group: ctx('C2_READY_FIRST').programName }, 'Justin').html).toContain('>Check my page<')
+    expect(programPageText(ctx('C4_UPDATE_READY')).message).toBe('Your live page stays as it is until you say this version is right.')
     expect(programPageText(ctx('C6_PUBLISHED_ON_BEHALF')).title).toBe('We put your Families page live')
     expect(programPageText(ctx('C10_ANSWERS_RECEIVED')).title).toBe('We have your answers for your Families page')
     expect(programPageEmail(ctx('C10_ANSWERS_RECEIVED'), 'J').html).toContain('See what I sent')
