@@ -11,6 +11,7 @@
  * - Journey reminders (assessment after 2 days; orientation at the time the prospect picked).
  * - Program page reminders (program-info/reminders.ts): day 3/7 reminders to page owners 9:00-19:00 Central,
  *   day-10 stalls to the team.
+ * - Bell and phone notices to the inviter and admins when someone has not booked a call (day 2, day 10; no-call-notices.ts).
  * - Daily summary to admins from 8 AM Central (admin-digest.ts): new sign-ups, people waiting for a call, program pages.
  * Opted-out prospects (emailOptOutAt) get none of the automatic emails EXCEPT the day-before and
  * 1-hour reminders for a call they booked themselves.
@@ -24,6 +25,7 @@ import { LINK_VALID_DAYS } from '@/lib/get-involved/core'
 import { journeyUrl, userDisplayName } from '@/lib/get-involved/server'
 import { runJourneyReminders } from '@/lib/get-involved/journey-steps'
 import { runOutreachEmails } from '@/lib/get-involved/nudges'
+import { runNoCallNotices } from '@/lib/get-involved/no-call-notices'
 import { runAdminDigest } from '@/lib/get-involved/admin-digest'
 import { runUnreadMessageEmails } from '@/lib/messaging/notify-message'
 import { runProgramPageReminders } from '@/lib/program-info/reminders'
@@ -102,8 +104,9 @@ export async function POST(req: Request) {
     const outreach = await runOutreachEmails()
     const programPages = await runProgramPageReminders().catch((e) => { console.error('[CRON] program page reminders failed', e); return null })
     const adminDigest = await runAdminDigest().catch((e) => { console.error('[CRON] admin digest failed', e); return 0 })
+    const noCallNotices = await runNoCallNotices().catch((e) => { console.error('[CRON] no-call notices failed', e); return 0 })
     const messageEmails = await runUnreadMessageEmails().catch((e) => { console.error('[CRON] unread message emails failed', e); return 0 })
-    return NextResponse.json({ ok: true, sent, deleted, journey, outreach, programPages, adminDigest, messageEmails })
+    return NextResponse.json({ ok: true, sent, deleted, journey, outreach, programPages, adminDigest, noCallNotices, messageEmails })
   } catch (e) {
     console.error('[CRON] discovery reminders failed', e)
     return NextResponse.json({ ok: false }, { status: 500 })

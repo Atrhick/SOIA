@@ -52,7 +52,7 @@ export interface RecordData {
   payment: { status: string; amount: number; method: string; paidAt: string | null; billing: string | null; failure: string | null } | null
   login: { joinedAt: string | null; email: string | null } | null
   link: { url: string; label: string; expiresAt: string | null; usable: boolean } | null
-  can: { resend: boolean; changeRole: boolean; changeRoleBlockedReason: string | null; notAFit: boolean; assignCoach: boolean }
+  can: { sendBooking: boolean; sendBookingBlocked: string | null; resend: boolean; changeRole: boolean; changeRoleBlockedReason: string | null; notAFit: boolean; assignCoach: boolean }
   /** Active coaches, only filled when can.assignCoach. */
   coachOptions: { id: string; name: string }[]
   roleOptions: { value: string; label: string; price: string }[]
@@ -107,7 +107,7 @@ export async function loadRecord(id: string): Promise<RecordData | null> {
     : []
 
   const audits = await prisma.auditLog.findMany({
-    where: { entityType: 'Prospect', entityId: p.id, action: { in: ['RESEND_ASSESSMENT', 'CHANGE_PROSPECT_ROLE'] } },
+    where: { entityType: 'Prospect', entityId: p.id, action: { in: ['RESEND_ASSESSMENT', 'CHANGE_PROSPECT_ROLE', 'SEND_BOOKING_LINK'] } },
     orderBy: { createdAt: 'desc' },
     take: 100,
   })
@@ -169,12 +169,16 @@ export async function loadRecord(id: string): Promise<RecordData | null> {
     if (c.reminder1hSentAt) activity.push({ at: c.reminder1hSentAt.toISOString(), text: 'Reminder sent (1 hour).', by: 'automatic', kind: 'email' })
     if (c.cancelledAt) activity.push({ at: c.cancelledAt.toISOString(), text: `Call cancelled${c.cancelledBy === 'PROSPECT' ? ' by the prospect' : c.cancelledBy ? ' by staff' : ''}${c.cancelReason ? `: ${c.cancelReason}` : ''}.`, by: null, kind: 'call' })
   }
+  if (p.welcomeEmailSentAt) activity.push({ at: p.welcomeEmailSentAt.toISOString(), text: 'Email with the link to pick a call time.', by: 'automatic', kind: 'email' })
+  if (p.nudge1SentAt) activity.push({ at: p.nudge1SentAt.toISOString(), text: 'Reminder to book a call (day 2).', by: 'automatic', kind: 'email' })
+  if (p.nudge2SentAt) activity.push({ at: p.nudge2SentAt.toISOString(), text: 'Last reminder to book a call (day 7).', by: 'automatic', kind: 'email' })
   if (p.parentConsentRequestedAt) activity.push({ at: p.parentConsentRequestedAt.toISOString(), text: `Parent consent email sent${p.parentEmail ? ` to ${p.parentEmail}` : ''}.`, by: 'automatic', kind: 'email' })
   if (p.assessmentSentAt) activity.push({ at: p.assessmentSentAt.toISOString(), text: `${cfg?.label ?? 'Role'} assessment emailed.${p.assessmentSubmittedAt ? '' : ' Not answered yet.'}`, by: null, kind: 'email' })
   if (p.assessmentReminderSentAt) activity.push({ at: p.assessmentReminderSentAt.toISOString(), text: 'Assessment reminder sent.', by: 'automatic', kind: 'email' })
   if (p.orientationReminderSentAt) activity.push({ at: p.orientationReminderSentAt.toISOString(), text: 'Orientation reminder sent.', by: 'automatic', kind: 'email' })
   if (p.roleTermsAcceptedAt) activity.push({ at: p.roleTermsAcceptedAt.toISOString(), text: `Accepted the ${cfg?.label ?? ''} terms${p.acceptedTerms ? ` (version ${p.acceptedTerms.version})` : ''}.`.replace('the  terms', 'the terms'), by: null, kind: 'status' })
   for (const a of audits) {
+    if (a.action === 'SEND_BOOKING_LINK') activity.push({ at: a.createdAt.toISOString(), text: 'Booking link emailed (a fresh link that works for 14 days).', by: nameOf(a.userId), kind: 'email' })
     if (a.action === 'RESEND_ASSESSMENT') activity.push({ at: a.createdAt.toISOString(), text: 'Assessment questions resent.', by: nameOf(a.userId), kind: 'action' })
     if (a.action === 'CHANGE_PROSPECT_ROLE') {
       let reason: string | null = null
@@ -254,6 +258,8 @@ export async function loadRecord(id: string): Promise<RecordData | null> {
       usable: linkBase ? true : journeyLinkUsable(p, now),
     } : null,
     can: {
+      sendBooking: p.status === 'FORM_SUBMITTED' && !p.discoveryCalls.some((c) => c.status === 'BOOKED'),
+      sendBookingBlocked: p.emailOptOutAt ? 'They asked us to stop emailing them. Reach them by phone or text instead.' : null,
       resend: canAnswerAssessment(p.status) && isGetInvolvedRole(p.journeyRole) && p.journeyRole !== 'SPONSOR',
       changeRole,
       changeRoleBlockedReason: p.status === 'DISCOVERY_BOOKED' ? 'Record the call on the Discovery Calls page first.' : termsAccepted ? 'They have accepted the terms, so the role is fixed.' : null,

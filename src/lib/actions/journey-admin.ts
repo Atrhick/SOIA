@@ -1,7 +1,7 @@
 'use server'
 
 /**
- * Admin actions on a Get Involved prospect record (/admin/prospects/[id]): resend the assessment,
+ * Admin actions on a Get Involved prospect record (/admin/prospects/[id]): email the booking link, resend the assessment,
  * change the role, mark not a fit, add a note. ADMIN only (not SUB_ADMIN), never while
  * impersonating. Every export here is a public endpoint, so each one checks the session itself.
  */
@@ -18,6 +18,7 @@ import { sendGiveLinkAfterCall } from '@/lib/get-involved/call-outcome'
 import { completeJourney } from '@/lib/get-involved/login'
 import { afterLoginExtras } from '@/lib/get-involved/after-login'
 import { isStatusConflict } from '@/lib/get-involved/server'
+import { emailBookingLink } from '@/lib/get-involved/nudges'
 
 type Result = { success: true; message?: string } | { error: string }
 type Guard = { error: string; session?: never } | { session: Session; error?: never }
@@ -69,6 +70,31 @@ export async function resendAssessmentQuestions(prospectId: string): Promise<Res
   if (!sent.ok) return { error: `${sent.error} Please try again.` }
   refresh(p.id)
   return { success: true, message: `Questions sent to ${p.email}${p.ageRange === 'UNDER_18' && p.parentEmail ? ' and their parent' : ''}.` }
+}
+
+/** Email them a fresh link to pick a call time (only while they still need to book). */
+export async function sendBookingLink(prospectId: string): Promise<Result> {
+  const g = await requireAdmin()
+  if (!g.session) return { error: g.error }
+  const id = idSchema.safeParse(prospectId)
+  if (!id.success) return { error: 'Prospect not found.' }
+  const p = await prisma.prospect.findUnique({
+    where: { id: id.data },
+    select: { id: true, email: true, status: true, journeyToken: true, emailOptOutAt: true, discoveryCalls: { where: { status: 'BOOKED' }, select: { id: true } } },
+  })
+  if (!p || !p.journeyToken) return { error: 'Prospect not found.' }
+  if (p.status !== 'FORM_SUBMITTED' || p.discoveryCalls.length > 0) return { error: 'They are past the booking step, so there is no booking link to send.' }
+  if (p.emailOptOutAt) return { error: 'They asked us to stop emailing them. Reach them by phone or text instead.' }
+  const last = await prisma.auditLog.findFirst({ where: { entityType: 'Prospect', entityId: p.id, action: 'SEND_BOOKING_LINK' }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } })
+  if (last && Date.now() - last.createdAt.getTime() < 60_000) return { error: 'The booking link was sent less than a minute ago. Please wait before sending again.' }
+
+  const r = await emailBookingLink(p.id)
+  if (!r) return { error: 'Their record changed just now (for example, they booked a call). Please reload the page.' }
+  if (!r.sent) return { error: 'The email did not go out. Please try again in a minute. If it keeps failing, copy the link from "Their link" and send it yourself.' }
+  const to = r.to
+  await prisma.auditLog.create({ data: { userId: g.session.user.id, action: 'SEND_BOOKING_LINK', entityType: 'Prospect', entityId: p.id, details: JSON.stringify({ to: to.length }) } })
+  refresh(p.id)
+  return { success: true, message: `Booking link sent to ${to.join(' and ')}. It works for 14 days; older links no longer work.` }
 }
 
 const changeRoleSchema = z.object({

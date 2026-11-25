@@ -268,3 +268,34 @@ export async function runOutreachEmails(now = new Date()): Promise<OutreachResul
   try { out.threeDay = await sendThreeDayReminders(now) } catch (e) { console.error('[CRON] 3-day reminders failed', e) }
   return out
 }
+
+/**
+ * An admin pressed "Send booking link" on the prospect record. Issues a NEW token (refreshJourneyToken
+ * rule: older links stop working, the 14-day clock restarts) and sends the same "pick a time" email as the
+ * automatic welcome. For 17 and under the parent gets a copy. Guarded on FORM_SUBMITTED in the same update,
+ * so a call booked at the same moment is never overwritten. Returns null if they no longer need to book,
+ * else who it went to and whether the email to the person themselves was accepted for sending.
+ */
+export async function emailBookingLink(prospectId: string): Promise<{ to: string[]; sent: boolean } | null> {
+  await primeEmailFooter()
+  const p = await prisma.prospect.findUnique({
+    where: { id: prospectId },
+    select: { id: true, firstName: true, email: true, ageRange: true, parentEmail: true, parentName: true, invitedById: true, programId: true },
+  })
+  if (!p) return null
+  const token = newToken()
+  const r = await prisma.prospect.updateMany({
+    where: { id: p.id, status: 'FORM_SUBMITTED', emailOptOutAt: null, discoveryCalls: { none: { status: 'BOOKED' } } },
+    data: { journeyToken: token, journeyTokenIssuedAt: new Date() },
+  })
+  if (r.count === 0) return null
+  const [inviter, program, offer] = await Promise.all([inviterFor(p.invitedById), programFor(p.programId), offerFor(p.programId)])
+  const build = (firstName: string) => welcomeCallEmail({ firstName, bookUrl: journeyUrl(token), inviter, program, offer, prospectId: p.id })
+  const to = [p.email]
+  const a = await sendEmail({ to: p.email, ...build(p.firstName) })
+  if (p.ageRange === 'UNDER_18' && p.parentEmail) {
+    await sendEmail({ to: p.parentEmail, ...build((p.parentName ?? '').trim().split(/\s+/)[0] || 'there') })
+    to.push(p.parentEmail)
+  }
+  return { to, sent: a.sent }
+}

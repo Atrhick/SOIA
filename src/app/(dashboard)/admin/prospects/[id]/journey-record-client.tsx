@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, Copy, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { addProspectNote, assignCoachAndCreateLogin, changeProspectRole, markProspectNotAFit, resendAssessmentQuestions } from '@/lib/actions/journey-admin'
+import { addProspectNote, assignCoachAndCreateLogin, changeProspectRole, markProspectNotAFit, resendAssessmentQuestions, sendBookingLink } from '@/lib/actions/journey-admin'
 import type { ActivityItem, RecordData, StepItem } from './record-data'
 import { ADMIN_TZ, adminClock } from './admin-time'
 
@@ -26,7 +26,7 @@ function fmt(isoStr: string, withTime = true) {
   return withTime ? `${day} ${time}` : day
 }
 
-type Dlg = null | 'resend' | 'role' | 'notfit'
+type Dlg = null | 'booking' | 'resend' | 'role' | 'notfit'
 
 export function JourneyRecordClient({ record: r, readOnly }: { record: RecordData; readOnly: boolean }) {
   const [dlg, setDlg] = useState<Dlg>(null)
@@ -70,6 +70,7 @@ export function JourneyRecordClient({ record: r, readOnly }: { record: RecordDat
         </div>
         {!readOnly && (
           <div className="flex flex-wrap gap-2 lg:justify-end lg:shrink-0">
+            {r.can.sendBooking && <button type="button" onClick={() => setDlg('booking')} className={`h-10 px-4 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2 bg-primary-700 text-white hover:bg-primary-800 ${FOCUS}`}>Send booking link</button>}
             {r.can.resend && <button type="button" onClick={() => setDlg('resend')} className={`${BTN_OUTLINE} border-primary-300 text-primary-800 hover:bg-primary-50`}>Resend questions</button>}
             {r.can.changeRole && r.roleOptions.length > 0 && (
               <button type="button" onClick={() => setDlg('role')} className={`${BTN_OUTLINE} border-primary-300 text-primary-800 hover:bg-primary-50`}>{r.role ? 'Change role' : 'Choose role'}</button>
@@ -107,6 +108,7 @@ export function JourneyRecordClient({ record: r, readOnly }: { record: RecordDat
         <Link href={`/admin/prospects/${r.id}?view=classic`} className={`font-semibold text-primary-700 hover:underline rounded ${FOCUS}`}>View the classic page (read only)</Link>
       </p>
 
+      {dlg === 'booking' && <BookingDialog r={r} onClose={() => setDlg(null)} onDone={done} />}
       {dlg === 'resend' &&<ResendDialog r={r} onClose={() => setDlg(null)} onDone={done} />}
       {dlg === 'role' && <RoleDialog r={r} onClose={() => setDlg(null)} onDone={done} />}
       {dlg === 'notfit' && <NotFitDialog r={r} onClose={() => setDlg(null)} onDone={done} />}
@@ -438,6 +440,25 @@ function useSubmit(run: () => Promise<{ success: true; message?: string } | { er
     }
   }
   return { busy, err, setErr, submit }
+}
+
+function BookingDialog({ r, onClose, onDone }: DlgProps) {
+  const { busy, err, submit } = useSubmit(() => sendBookingLink(r.id), onDone)
+  if (r.can.sendBookingBlocked) {
+    return (
+      <Shell title="We can't email them" onClose={onClose} description={r.can.sendBookingBlocked}>
+        <div className="flex justify-end"><button type="button" onClick={onClose} className={`${BTN_OUTLINE} border-gray-300 text-gray-800 hover:bg-gray-50`}>Close</button></div>
+      </Shell>
+    )
+  }
+  return (
+    <Shell title="Send the booking link?" onClose={onClose} description={<>We&apos;ll email {r.email}{r.minor ? ' and their parent' : ''} a link to pick a time for their free 15-minute call. The link works for 14 days, and any older link they have stops working.</>}>
+      <form onSubmit={submit} className="space-y-3">
+        {err && <p role="alert" className="text-sm text-red-700">{err}</p>}
+        <Footer busy={busy} onClose={onClose} label="Send the link" />
+      </form>
+    </Shell>
+  )
 }
 
 function ResendDialog({ r, onClose, onDone }: DlgProps) {
