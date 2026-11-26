@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ago, personPath } from '@/lib/people/hub-core'
 import { ClientPager, usePaged } from '@/components/ui/client-pager'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -129,6 +130,7 @@ export function UsersAdminClient({
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false)
   const [isUserDetailDialogOpen, setIsUserDetailDialogOpen] = useState(false)
 
+  const router = useRouter()
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -445,7 +447,7 @@ export function UsersAdminClient({
         <CardHeader>
           <CardTitle>All Users</CardTitle>
           <CardDescription>
-            Click on a user to manage their feature permissions
+            Click a person to see everything they are part of. The gear button opens their roles and feature settings.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -501,15 +503,13 @@ export function UsersAdminClient({
                   <tr
                     key={user.id}
                     className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => handleOpenUserDetail(user)}
+                    onClick={() => router.push(personPath(user.id))}
                   >
                     <td className="px-4 py-3">
                       <div>
-                        {/* The name opens everything this person is part of; the rest of the row still opens their settings. */}
+                        {/* The whole row opens everything this person is part of; the gear button opens their settings. */}
                         <p className="font-medium">
-                          {user.firstName || user.lastName ? user.email : (
-                            <Link href={personPath(user.id)} onClick={(e) => e.stopPropagation()} className="underline decoration-gray-300 underline-offset-2 hover:text-primary-700 hover:decoration-primary-700">{user.email}</Link>
-                          )}
+                          <Link href={personPath(user.id)} onClick={(e) => e.stopPropagation()} className="underline decoration-gray-300 underline-offset-2 hover:text-primary-700 hover:decoration-primary-700">{user.email}</Link>
                         </p>
                         {(user.firstName || user.lastName) && (
                           <p className="text-sm text-gray-500">
@@ -564,6 +564,8 @@ export function UsersAdminClient({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleOpenUserDetail(user)}
+                          aria-label="Roles and feature settings"
+                          title="Roles and feature settings"
                         >
                           <Settings className="h-4 w-4" />
                         </Button>
