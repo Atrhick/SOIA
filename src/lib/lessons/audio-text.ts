@@ -3,8 +3,12 @@
  * Pure functions only, so they can be unit tested without a database.
  */
 import { createHash } from 'crypto'
+import { parseMarkdown } from '@/lib/lms/markdown'
+import { paragraphKey, stripInlineMarkdown } from './lesson-paragraphs'
 
 export interface AudioTextBlock {
+  /** Block id: ties each spoken paragraph to the paragraph on the page. */
+  id?: string
   type: string
   sortOrder: number
   content: unknown
@@ -43,39 +47,97 @@ export function htmlToSpeakable(html: string): string {
   return tidy(s)
 }
 
-export function markdownToSpeakable(md: string): string {
-  const lines = md
-    .replace(/```[\s\S]*?```/g, ' ')
+/** Placeholder answer spots in the workbook ("[Write here]", "[Choose one]"): never read aloud. */
+const PLACEHOLDER = /\[(?:write|choose|type|fill|add|your|enter|circle|pick|list|answer|insert)\b[^\]]*\]/gi
+const CHECKBOX = /\[\s?[xX]?\s?\]/g
+
+/** Said at the end of an exercise, after its prompt has been read. */
+export const EXERCISE_CUE = 'Pause the audio here and write your answer.'
+const EXERCISE_HEADING = /^exercise(?:\s+\d+[a-z]?)?\s*(?:[:.\-–—]\s*|$)/i
+
+/** One line of lesson text as the voice should say it; '' when nothing is left to say. */
+export function speakableLine(raw: string): string {
+  let s = stripInlineMarkdown(raw)
     .replace(/<[^>]+>/g, ' ')
-    .split(/\r?\n/)
-  const out: string[] = []
-  for (const raw of lines) {
-    let line = raw
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // images
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // links keep their words
-      .replace(/https?:\/\/\S+/g, ' ')
-      .replace(/`([^`]*)`/g, '$1')
-      .replace(/(\*\*|__)(.*?)\1/g, '$2')
-      .replace(/(\*|_)(.*?)\1/g, '$2')
-      .replace(/~~(.*?)~~/g, '$1')
-    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
-      out.push('')
-      continue
-    }
-    const heading = line.match(/^\s*#{1,6}\s+(.*)$/)
-    if (heading) {
-      out.push('', asSentence(heading[1].replace(/#+\s*$/, '')), '')
-      continue
-    }
-    const listItem = line.match(/^\s*(?:[-*+]|\d+[.)])\s+(.*)$/)
-    if (listItem) {
-      out.push(asSentence(listItem[1]))
-      continue
-    }
-    line = line.replace(/^\s*>\s?/, '')
-    out.push(line)
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(PLACEHOLDER, ' ')
+    .replace(CHECKBOX, ' ')
+    .replace(/_{2,}/g, ' ')
+  s = decodeEntities(s)
+    .replace(/#(?=\d)/g, 'number ')
+    .replace(/[*#|~`>\\]/g, ' ')
+    .replace(/(^|\s)_+|_+(?=\s|$)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .replace(/ ([.,!?;:])/g, '$1')
+    .replace(/^[\s.,;:!?\-–—]+/, '')
+    .trim()
+  return /[A-Za-z0-9À-￿]/.test(s) ? s : ''
+}
+
+export type SpeechUnitKind = 'title' | 'heading' | 'text'
+
+/** One paragraph (or heading) of speech, tied by `key` to the paragraph it reads on the page. */
+export interface SpeechUnit {
+  key: string
+  kind: SpeechUnitKind
+  level?: number
+  label?: string
+  text: string
+}
+
+/** Speech units for one markdown TEXT block, keyed `${keyPrefix}:${paragraph}`. */
+export function markdownSpeechUnits(md: string, keyPrefix: string): SpeechUnit[] {
+  const units: SpeechUnit[] = []
+  let exerciseOpen = false
+  const closeExercise = () => {
+    if (!exerciseOpen) return
+    exerciseOpen = false
+    const last = units[units.length - 1]
+    if (last) last.text = `${asSentence(last.text)} ${EXERCISE_CUE}`
   }
-  return tidy(decodeEntities(out.join('\n')))
+  parseMarkdown(md).forEach((p, index) => {
+    if (p.pageOnly) return // shown on the page only (tables of times, rating lists, references)
+    const key = paragraphKey(keyPrefix, index)
+    if (p.type === 'heading') {
+      closeExercise()
+      const words = speakableLine(p.text)
+      if (!words) return
+      const label = stripInlineMarkdown(p.text).replace(/[*#]/g, '').trim() || words
+      let text = asSentence(words)
+      if (EXERCISE_HEADING.test(words)) {
+        const rest = words.replace(EXERCISE_HEADING, '').trim()
+        text = rest ? `Exercise. ${asSentence(rest)}` : 'Exercise.'
+        exerciseOpen = true
+      }
+      units.push({ key, kind: 'heading', level: p.level, label, text })
+      return
+    }
+    let text = ''
+    const lines = (t: string) => t.split('\n').map(speakableLine).filter(Boolean)
+    if (p.type === 'paragraph') {
+      text = lines(p.text).join(' ')
+    } else if (p.type === 'quote') {
+      const body = lines(p.text).join(' ')
+      text = body && p.label ? `${asSentence(speakableLine(p.label))} ${body}` : body
+    } else if (p.type === 'list') {
+      text = p.items.map(speakableLine).filter(Boolean).map(asSentence).join(' ')
+    } else if (p.type === 'table') {
+      text = [p.header, ...p.rows]
+        .map((row) => row.map(speakableLine).filter(Boolean).join(', '))
+        .filter(Boolean)
+        .map(asSentence)
+        .join(' ')
+    }
+    if (text) units.push({ key, kind: 'text', text })
+  })
+  closeExercise()
+  return units
+}
+
+export function markdownToSpeakable(md: string): string {
+  return markdownSpeechUnits(md, 'md')
+    .map((u) => u.text)
+    .join('\n\n')
 }
 
 function tidy(s: string): string {
@@ -86,18 +148,34 @@ function tidy(s: string): string {
     .join('\n\n')
 }
 
+/** Every spoken unit of the lesson: the title, then each TEXT block's paragraphs in sortOrder. */
+export function buildSpeechUnits(blocks: AudioTextBlock[], title?: string): SpeechUnit[] {
+  const units: SpeechUnit[] = []
+  const t = title?.trim()
+  if (t) units.push({ key: 'title', kind: 'title', label: t, text: asSentence(speakableLine(t) || t) })
+  const sorted = [...blocks].sort((a, z) => a.sortOrder - z.sortOrder)
+  sorted.forEach((b, i) => {
+    if (b.type !== 'TEXT' || !b.content || typeof b.content !== 'object') return
+    const c = b.content as { content?: unknown; format?: unknown }
+    if (typeof c.content !== 'string') return
+    const prefix = b.id ?? `block${i}`
+    if (c.format === 'html') {
+      htmlToSpeakable(c.content)
+        .split(/\n{2,}/)
+        .filter(Boolean)
+        .forEach((text, j) => units.push({ key: `${prefix}:html${j}`, kind: 'text', text }))
+    } else {
+      units.push(...markdownSpeechUnits(c.content, prefix))
+    }
+  })
+  return units
+}
+
 /** All TEXT blocks in sortOrder, as one speakable string (paragraphs separated by blank lines). */
 export function buildLessonSpeech(blocks: AudioTextBlock[], title?: string): string {
-  const parts: string[] = []
-  if (title?.trim()) parts.push(asSentence(title))
-  for (const b of [...blocks].sort((a, z) => a.sortOrder - z.sortOrder)) {
-    if (b.type !== 'TEXT' || !b.content || typeof b.content !== 'object') continue
-    const c = b.content as { content?: unknown; format?: unknown }
-    if (typeof c.content !== 'string') continue
-    const text = c.format === 'html' ? htmlToSpeakable(c.content) : markdownToSpeakable(c.content)
-    if (text) parts.push(text)
-  }
-  return parts.join('\n\n')
+  return buildSpeechUnits(blocks, title)
+    .map((u) => u.text)
+    .join('\n\n')
 }
 
 export function speechHash(text: string): string {
@@ -148,3 +226,5 @@ export function estimateDurationSec(text: string): number {
   const words = text.split(/\s+/).filter(Boolean).length
   return Math.max(1, Math.round((words / 150) * 60))
 }
+
+export { DEFAULT_TTS_INSTRUCTIONS, DEFAULT_TTS_VOICE, supportsTtsInstructions, ttsInstructions } from './tts-voice'

@@ -18,6 +18,10 @@ export default async function LessonViewerPage({ params }: PageProps) {
   const { courseId, lessonId } = await params
   const result = await getLessonContent(lessonId)
 
+  // Not joined yet, or a week that has not opened: the course page explains why.
+  if (result.error === 'Locked' || result.error === 'Not enrolled in this course') {
+    redirect(`/coach/learning/${courseId}`)
+  }
   if (result.error || !result.lesson) {
     notFound()
   }
@@ -36,6 +40,9 @@ export default async function LessonViewerPage({ params }: PageProps) {
       navigation={result.navigation}
       audio={audioView.audio}
       listen={audioView.listen}
+      curriculum={result.curriculum}
+      exercises={result.exercises}
+      readOnly={result.readOnly}
     />
   )
 }

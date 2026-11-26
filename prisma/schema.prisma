@@ -31,21 +31,21 @@ enum UserStatus {
 }
 
 model User {
-  id         String     @id @default(cuid())
-  email      String     @unique
-  password   String
-  role       UserRole   @default(COACH)
+  id               String     @id @default(cuid())
+  email            String     @unique
+  password         String
+  role             UserRole   @default(COACH)
   // Other roles this login can switch to (ADMIN, COACH, AMBASSADOR). `role` is always the highest one held,
   // so "all admins" queries still find them; the active view lives in the session (see role-view.ts).
-  extraRoles UserRole[] @default([])
-  status     UserStatus @default(ACTIVE)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  extraRoles       UserRole[] @default([])
+  status           UserStatus @default(ACTIVE)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
   // Admin person page: last successful sign-in, and last time they used the app (updated at most every 10 minutes).
-  lastLoginAt DateTime?
-  lastSeenAt  DateTime?
+  lastLoginAt      DateTime?
+  lastSeenAt       DateTime?
   // Off = no emails about unread direct messages (bell and phone notices still come). Set from the menu under their name.
-  messageEmailsOff Boolean @default(false)
+  messageEmailsOff Boolean    @default(false)
 
   // Relations
   coachProfile        CoachProfile?
@@ -76,6 +76,9 @@ model User {
   supportMessagesSent     SupportMessage[]      @relation("SupportSender")
   supportMessagesAssigned SupportMessage[]      @relation("SupportAssignee")
   supportReplies          SupportReply[]        @relation("SupportReplyAuthor")
+  // Course exercises: this learner's answers / comments this person left on someone's answers.
+  lmsExerciseAnswers      LMSExerciseAnswer[]
+  lmsExerciseComments     LMSExerciseComment[]  @relation("LMSExerciseCommentAuthor")
 
   @@index([role, status])
   @@map("users")
@@ -400,6 +403,7 @@ enum LMSContentType {
   TEXT
   QUIZ
   DOCUMENT
+  EXERCISE // typed answers: { intro?, prompts: [{ id, kind: text|single|multi, label, options? }] }
 }
 
 enum LMSProgressStatus {
@@ -425,6 +429,14 @@ model LMSCourse {
 
   // Estimated duration in minutes
   estimatedDuration Int?
+
+  // Course landing page + catalog (2026-11-25)
+  category String? // one catalog category, e.g. "Leadership"
+  tags     String[] @default([])
+  outcomes String[] @default([]) // "What you'll learn" lines
+  audience String?  @db.Text // "Who it's for"
+  // Optional drip: module N opens (N-1) x dripDays after enrolment. Null = everything open.
+  dripDays Int?
 
   // Sorting
   sortOrder Int @default(0)
@@ -515,9 +527,47 @@ model LMSContentBlock {
   updatedAt DateTime @updatedAt
 
   // Relations
-  progress LMSContentProgress[]
+  progress        LMSContentProgress[]
+  exerciseAnswers LMSExerciseAnswer[]
 
   @@map("lms_content_blocks")
+}
+
+// One learner's answers to one EXERCISE block. Seen only by the learner, their coach and admins
+// (rules in src/lib/lms/answer-access.ts).
+model LMSExerciseAnswer {
+  id             String          @id @default(cuid())
+  contentBlockId String
+  contentBlock   LMSContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  answers     Json // { [promptId]: string | string[] }
+  completedAt DateTime? // set when every prompt has an answer
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comments LMSExerciseComment[]
+
+  @@unique([contentBlockId, userId])
+  @@index([userId])
+  @@map("lms_exercise_answers")
+}
+
+// A short comment from the learner's coach or an admin on an exercise answer.
+model LMSExerciseComment {
+  id       String            @id @default(cuid())
+  answerId String
+  answer   LMSExerciseAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  authorId String
+  author   User              @relation("LMSExerciseCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body     String            @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([answerId])
+  @@map("lms_exercise_comments")
 }
 
 model LMSEnrollment {
@@ -3458,7 +3508,6 @@ model CostItem {
   @@map("cost_items")
 }
 
-
 // ============================================
 // AMBASSADOR WEEK (groups, meetings, register, portfolio, lesson audio) - added 2026-11-22
 // ============================================
@@ -3472,8 +3521,8 @@ model AmbassadorGroup {
   name           String
   meetingWeekday Int // 0 = Sunday ... 6 = Saturday, in `timezone`
   meetingTime    String // "18:00", 24-hour, in `timezone`
-  timezone       String  @default("America/New_York")
-  durationMin    Int     @default(60)
+  timezone       String   @default("America/New_York")
+  durationMin    Int      @default(60)
   meetingLink    String?
   location       String?
   startDate      DateTime // first meeting date (week 1)
@@ -3485,8 +3534,8 @@ model AmbassadorGroup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members  AmbassadorGroupMember[]
-  sessions GroupSession[]
+  members   AmbassadorGroupMember[]
+  sessions  GroupSession[]
   portfolio PortfolioSubmission[]
 
   @@index([coachId])
@@ -3577,6 +3626,8 @@ model LessonAudio {
   url         String?
   durationSec Int?
   voice       String?
+  /// Start time and length of each spoken paragraph: { v: 1, segments: [...] } (src/lib/lessons/audio-segments.ts). Null on audio made before 2026-11-25.
+  segments    Json?
   status      String   @default("PENDING") // PENDING | READY | FAILED
   error       String?  @db.Text
   createdAt   DateTime @default(now())

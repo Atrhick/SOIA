@@ -1183,6 +1183,18 @@ const courseStats = await getCourseAnalytics()
 // Returns: enrollments, completion rates, avg progress per course
 ```
 
+**Course platform upgrade (2026-11-25):**
+- **Catalog** (`learning-catalog-client.tsx`): "Continue learning" cards go straight to the next unfinished lesson (`nextLessonId` in `src/lib/lms/course-rules.ts`, honours drip); My courses / All courses tabs, search, category chips; separate empty states for "nothing published" and "no match".
+- **Course page** (`course-view-client.tsx`): category, outcomes ("What you'll learn", `LMSCourse.outcomes`), audience ("Who it's for"), prerequisites ("Before you start"), curriculum by week with lengths, exercise counts, locks; Start / Continue / certificate.
+- **Lesson page** (`lesson-viewer-client.tsx`): all blocks in order on one page; TEXT still renders through `LessonText` (`src/components/learning/lesson-text.tsx`, keeps `data-audio-key` for the audio highlighting); curriculum sidebar on desktop and a "Contents" drawer on phones (`src/components/learning/course/curriculum-nav.tsx`); course progress bar; reading time; "Mark complete and continue" goes to the next lesson or, on the last one, the certificate.
+- **Exercises**: content type `EXERCISE` (`{ intro?, prompts: [{ id, kind: text|single|multi, label, options? }] }`, rules in `src/lib/lms/exercise.ts`). Answers in `LMSExerciseAnswer` (one row per learner per block, autosaved by `saveExerciseAnswer`; completing every prompt completes the block). Coach/admin comments in `LMSExerciseComment`. Who can see/change/comment: `src/lib/lms/answer-access.ts` (learner; the ambassador's own coach in COACH view; admins. An admin viewing as someone can read, never change or comment). Tested.
+- **Coach**: `/coach/learning/team` (each ambassador's progress) and `/coach/learning/team/[userId]/[courseId]` (answers + comments). **Admin**: `/admin/lms/[courseId]/learners[/userId]`, "Preview as learner" at `/admin/lms/preview/[courseId][/lessonId]` (read-only, drafts too), up/down reorder for modules, lessons and blocks, Settings for category, tags, outcomes, audience, drip days, courses to finish first.
+- **Completion**: `updateCourseProgress` keeps the first `completedAt` and sets `certificateIssuedAt` once; certificate page `/{coach|ambassador}/learning/[courseId]/certificate` (print / save as PDF).
+- **Drip**: `LMSCourse.dripDays` = module N opens (N-1) x dripDays after enrolment; locked lessons redirect to the course page.
+- **Onboarding**: joining any LMS course ticks the ambassador task "Enroll in a Class" (CLASS_SELECTION) via `markClassSelectionDone` (`src/lib/lms/server.ts`), shared with the old classes system.
+- **Markdown import**: `/admin/lms/import` (folder or files, preview first, creates a DRAFT) or `npx tsx scripts/lms/import-course.ts <folder> [--apply] [--remote-ok]`. Format: optional `course.md` (title, description, `## What you'll learn`, `## Who it's for`, `## Details` with `Category:`, `Tags:`, `Roles:`, `Drip days:`); every other file = one module in filename order, `#` = module title, `##` = lesson; a `###` section with `[Write here]`, `[Choose one]` or `[Choose all that apply]` becomes an exercise (question = text above the marker, options = list lines under it). Parser `src/lib/lms/markdown-import.ts`, tested. Imports do not queue lesson audio; make it from the editor.
+- Safe markdown parser for lesson text: `src/lib/lms/markdown.ts` (no raw HTML; links limited to http(s), mailto, site-relative).
+
 **Migration Script:**
 To migrate from old Course model to new LMS:
 ```bash

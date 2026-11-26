@@ -6,30 +6,23 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
+  Award,
   BookOpen,
+  CheckCircle,
+  ChevronDown,
+  Circle,
   Clock,
   Layers,
-  Play,
-  CheckCircle,
-  Circle,
-  ChevronDown,
-  ChevronRight,
-  Lock,
-  Video,
-  FileText,
-  FileQuestion,
-  File,
-  Trophy,
   Loader2,
+  Lock,
+  PenLine,
+  Play,
+  Target,
+  Users,
+  X,
 } from 'lucide-react'
 import { enrollInCourse } from '@/lib/actions/lms/enrollment'
-
-interface ContentBlock {
-  id: string
-  title: string | null
-  type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT'
-  sortOrder: number
-}
+import { formatMinutes } from '@/lib/lms/course-rules'
 
 interface Lesson {
   id: string
@@ -38,11 +31,8 @@ interface Lesson {
   estimatedDuration: number | null
   sortOrder: number
   contentBlockCount: number
-  contentBlocks: ContentBlock[]
-  progress: {
-    status: string
-    completedAt: string | null
-  }
+  exerciseCount: number
+  progress: { status: string; completedAt: string | null }
 }
 
 interface Module {
@@ -50,6 +40,8 @@ interface Module {
   title: string
   description: string | null
   sortOrder: number
+  opensAt: string | null
+  isOpen: boolean
   lessons: Lesson[]
 }
 
@@ -59,6 +51,14 @@ interface Course {
   description: string | null
   thumbnail: string | null
   estimatedDuration: number | null
+  category: string | null
+  tags: string[]
+  outcomes: string[]
+  audience: string | null
+  dripDays: number | null
+  isPreview: boolean
+  prerequisites: { id: string; title: string; completed: boolean }[]
+  nextLessonId: string | null
   modules: Module[]
   enrollment: {
     id: string
@@ -66,7 +66,8 @@ interface Course {
     progressPercentage: number
     completedAt: string | null
     lastAccessedAt: string | null
-    totalTimeSpent: number
+    enrolledAt: string
+    certificateIssuedAt: string | null
   } | null
 }
 
@@ -75,326 +76,330 @@ interface CourseViewClientProps {
   basePath?: string
 }
 
-const contentTypeIcons = {
-  VIDEO: Video,
-  TEXT: FileText,
-  QUIZ: FileQuestion,
-  DOCUMENT: File,
-}
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
 export function CourseViewClient({ course, basePath = '/coach/learning' }: CourseViewClientProps) {
   const router = useRouter()
   const [isEnrolling, setIsEnrolling] = useState(false)
-  const [error, setError] = useState('')
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(
-    new Set(course.modules.map((m) => m.id))
-  )
+  const [error, setError] = useState<string | null>(null)
+  const [openModules, setOpenModules] = useState<Set<string>>(() => {
+    // Open the week holding the next lesson (or the first week).
+    const withNext = course.modules.find((m) => m.lessons.some((l) => l.id === course.nextLessonId))
+    return new Set([withNext?.id ?? course.modules[0]?.id].filter(Boolean) as string[])
+  })
 
-  const isEnrolled = !!course.enrollment
-  const totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0)
-  const completedLessons = course.modules.reduce(
-    (acc, m) => acc + m.lessons.filter((l) => l.progress.status === 'COMPLETED').length,
-    0
-  )
+  const preview = course.isPreview
+  const enrollment = course.enrollment
+  const allLessons = course.modules.flatMap((m) => m.lessons)
+  const totalLessons = allLessons.length
+  const completedLessons = allLessons.filter((l) => l.progress.status === 'COMPLETED').length
+  const exerciseCount = allLessons.reduce((a, l) => a + l.exerciseCount, 0)
+  const nextLesson = allLessons.find((l) => l.id === course.nextLessonId) ?? null
+  const prereqsMissing = course.prerequisites.filter((p) => !p.completed)
+  const completed = enrollment?.status === 'COMPLETED'
+  const lessonHref = (id: string) => `${basePath}/${course.id}/${id}`
 
-  const toggleModule = (moduleId: string) => {
-    setExpandedModules((prev) => {
+  const toggle = (id: string) =>
+    setOpenModules((prev) => {
       const next = new Set(prev)
-      if (next.has(moduleId)) {
-        next.delete(moduleId)
-      } else {
-        next.add(moduleId)
-      }
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
-  }
 
   const handleEnroll = async () => {
     setIsEnrolling(true)
-    setError('')
-
+    setError(null)
     try {
       const result = await enrollInCourse(course.id)
       if (result.error) {
         setError(result.error)
       } else {
-        router.refresh()
+        const first = course.modules[0]?.lessons[0]
+        if (first) router.push(lessonHref(first.id))
+        else router.refresh()
       }
     } catch {
-      setError('Failed to enroll')
+      setError('Could not join the course. Check your connection and try again.')
     } finally {
       setIsEnrolling(false)
     }
   }
 
-  const formatDuration = (minutes: number | null) => {
-    if (!minutes) return null
-    if (minutes < 60) return `${minutes} min`
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
-  }
-
-  // Find the first incomplete lesson for "Continue" button
-  const findNextLesson = (): Lesson | null => {
-    for (const lmsModule of course.modules) {
-      for (const lesson of lmsModule.lessons) {
-        if (lesson.progress.status !== 'COMPLETED') {
-          return lesson
-        }
-      }
-    }
-    return course.modules[0]?.lessons[0] || null
-  }
-
-  const nextLesson = findNextLesson()
+  const primaryBtn =
+    'inline-flex min-h-[48px] w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2 disabled:opacity-60'
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <Link
-          href={basePath}
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Learning
-        </Link>
-      </div>
+      <Link
+        href={preview ? `/admin/lms/${course.id}` : basePath}
+        className="inline-flex min-h-[44px] items-center gap-2 text-gray-700 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        {preview ? 'Back to editor' : 'All courses'}
+      </Link>
 
-      {/* Course Hero */}
-      <div className="bg-white rounded-lg border overflow-hidden">
+      {preview && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          Preview: this is the course page learners see{course.modules.length ? '' : ' (add a week to see the curriculum)'}. Joining is turned off here.
+        </div>
+      )}
+
+      {/* Hero */}
+      <section className="overflow-hidden rounded-xl border bg-white">
         <div className="md:flex">
-          {/* Thumbnail */}
-          <div className="md:w-1/3 h-48 md:h-auto bg-gray-100 relative">
-            {course.thumbnail ? (
-              <Image
-                src={course.thumbnail}
-                alt={course.title || 'Course thumbnail'}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 33vw"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <BookOpen className="h-16 w-16 text-gray-300" />
+          {course.thumbnail && (
+            <div className="relative h-40 bg-gray-100 sm:h-52 md:h-auto md:w-1/3">
+              <Image src={course.thumbnail} alt="" fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
+            </div>
+          )}
+          <div className="min-w-0 p-5 sm:p-6 md:flex-1">
+            {course.category && (
+              <p className="mb-2 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-800">
+                {course.category}
+              </p>
+            )}
+            <h1 className="mb-2 text-2xl font-bold text-gray-900 sm:text-3xl">{course.title}</h1>
+            {course.description && <p className="mb-4 whitespace-pre-line text-gray-700">{course.description}</p>}
+
+            <ul className="mb-5 flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-700">
+              <li className="flex items-center gap-1">
+                <Layers className="h-4 w-4" aria-hidden="true" />
+                {(() => {
+                  // Count real weeks ("Week 1: ..."); a "Getting started" part isn't a week. Other courses say sections.
+                  const weeks = course.modules.filter((m) => /^\s*week\s+\d+/i.test(m.title)).length
+                  const n = weeks || course.modules.length
+                  return `${n} ${weeks ? (n === 1 ? 'week' : 'weeks') : n === 1 ? 'section' : 'sections'}`
+                })()}
+              </li>
+              <li className="flex items-center gap-1">
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
+                {totalLessons} lessons
+              </li>
+              {exerciseCount > 0 && (
+                <li className="flex items-center gap-1">
+                  <PenLine className="h-4 w-4" aria-hidden="true" />
+                  {exerciseCount} exercises
+                </li>
+              )}
+              {formatMinutes(course.estimatedDuration) && (
+                <li className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" aria-hidden="true" />
+                  {formatMinutes(course.estimatedDuration)} in total
+                </li>
+              )}
+            </ul>
+
+            {error && (
+              <div role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">
+                <span>{error}</span>
+                <button type="button" onClick={() => setError(null)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-red-100" aria-label="Dismiss">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             )}
-          </div>
 
-          {/* Info */}
-          <div className="md:w-2/3 p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{course.title}</h1>
-            {course.description && (
-              <p className="text-gray-600 mb-4">{course.description}</p>
-            )}
-
-            {/* Stats */}
-            <div className="flex flex-wrap gap-4 mb-6 text-sm text-gray-500">
-              <span className="flex items-center gap-1">
-                <Layers className="h-4 w-4" />
-                {course.modules.length} modules
-              </span>
-              <span className="flex items-center gap-1">
-                <BookOpen className="h-4 w-4" />
-                {totalLessons} lessons
-              </span>
-              {course.estimatedDuration && (
-                <span className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  {formatDuration(course.estimatedDuration)}
-                </span>
-              )}
-            </div>
-
-            {/* Progress or Enroll */}
-            {isEnrolled ? (
+            {preview ? (
+              course.modules[0]?.lessons[0] && (
+                <Link href={lessonHref(course.modules[0].lessons[0].id)} className={primaryBtn}>
+                  <Play className="h-5 w-5" /> Preview the first lesson
+                </Link>
+              )
+            ) : enrollment ? (
               <div className="space-y-4">
-                {/* Progress Bar */}
                 <div>
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-600">Your Progress</span>
+                  <div className="mb-1 flex justify-between text-sm">
+                    <span className="text-gray-700">Your progress</span>
                     <span className="font-semibold text-gray-900">
-                      {course.enrollment!.progressPercentage}% ({completedLessons}/{totalLessons} lessons)
+                      {completedLessons} of {totalLessons} lessons
                     </span>
                   </div>
-                  <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-3 w-full overflow-hidden rounded-full bg-gray-200"
+                    role="progressbar"
+                    aria-label="Your progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={enrollment.progressPercentage}
+                  >
                     <div
-                      className={`h-full transition-all ${
-                        course.enrollment!.status === 'COMPLETED' ? 'bg-green-500' : 'bg-blue-500'
-                      }`}
-                      style={{ width: `${course.enrollment!.progressPercentage}%` }}
+                      className={`h-full rounded-full ${completed ? 'bg-green-600' : 'bg-blue-600'}`}
+                      style={{ width: `${enrollment.progressPercentage}%` }}
                     />
                   </div>
                 </div>
-
-                {/* Action Button */}
-                {course.enrollment!.status === 'COMPLETED' ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <Trophy className="h-5 w-5" />
-                      <span className="font-semibold">Course Completed!</span>
-                    </div>
+                {completed ? (
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                    <Link href={`${basePath}/${course.id}/certificate`} className={primaryBtn.replace('bg-blue-700', 'bg-green-700').replace('hover:bg-blue-800', 'hover:bg-green-800')}>
+                      <Award className="h-5 w-5" /> View your certificate
+                    </Link>
                     {nextLesson && (
-                      <Link
-                        href={`${basePath}/${course.id}/${nextLesson.id}`}
-                        className="text-blue-600 hover:text-blue-700 text-sm"
-                      >
-                        Review Course
+                      <Link href={lessonHref(nextLesson.id)} className="inline-flex min-h-[44px] items-center justify-center px-3 font-medium text-blue-800 hover:underline">
+                        Review the course
                       </Link>
                     )}
                   </div>
                 ) : nextLesson ? (
-                  <Link
-                    href={`${basePath}/${course.id}/${nextLesson.id}`}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                  >
-                    <Play className="h-5 w-5" />
-                    {course.enrollment!.status === 'NOT_STARTED' ? 'Start Course' : 'Continue Learning'}
+                  <Link href={lessonHref(nextLesson.id)} className={primaryBtn}>
+                    <Play className="h-5 w-5 shrink-0" />
+                    <span className="min-w-0 truncate">
+                      {completedLessons === 0 ? 'Start the course' : `Continue: ${nextLesson.title}`}
+                    </span>
                   </Link>
                 ) : null}
               </div>
-            ) : (
-              <div>
-                {error && (
-                  <p className="text-red-600 text-sm mb-3">{error}</p>
-                )}
-                <button
-                  onClick={handleEnroll}
-                  disabled={isEnrolling}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
-                >
-                  {isEnrolling ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Enrolling...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-5 w-5" />
-                      Enroll Now - Free
-                    </>
-                  )}
-                </button>
+            ) : prereqsMissing.length ? (
+              <div className="rounded-lg border bg-gray-50 p-4">
+                <p className="mb-2 flex items-center gap-2 font-semibold text-gray-900">
+                  <Lock className="h-4 w-4" /> Before you start
+                </p>
+                <p className="mb-2 text-sm text-gray-700">Finish these courses first:</p>
+                <ul className="space-y-1">
+                  {course.prerequisites.map((p) => (
+                    <li key={p.id} className="flex items-center gap-2 text-sm">
+                      {p.completed ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-gray-500" />}
+                      <Link href={`${basePath}/${p.id}`} className="text-blue-800 underline">
+                        {p.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               </div>
+            ) : (
+              <button onClick={handleEnroll} disabled={isEnrolling || totalLessons === 0} className={primaryBtn}>
+                {isEnrolling ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
+                {isEnrolling ? 'Joining...' : 'Join the course and start'}
+              </button>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Course Content */}
-      <div className="bg-white rounded-lg border">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-gray-900">Course Content</h2>
+      {(course.outcomes.length > 0 || course.audience) && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {course.outcomes.length > 0 && (
+            <section className="rounded-xl border bg-white p-5 sm:p-6 lg:col-span-2">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
+                <Target className="h-5 w-5 text-blue-700" aria-hidden="true" /> What you&apos;ll learn
+              </h2>
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {course.outcomes.map((o, i) => (
+                  <li key={i} className="flex items-start gap-2 text-gray-800">
+                    <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
+                    <span>{o}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {course.audience && (
+            <section className={`rounded-xl border bg-white p-5 sm:p-6 ${course.outcomes.length ? '' : 'lg:col-span-3'}`}>
+              <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-900">
+                <Users className="h-5 w-5 text-blue-700" aria-hidden="true" /> Who it&apos;s for
+              </h2>
+              <p className="whitespace-pre-line text-gray-800">{course.audience}</p>
+            </section>
+          )}
         </div>
+      )}
 
-        <div className="divide-y">
-          {course.modules.map((module, moduleIndex) => {
-            const moduleLessons = module.lessons.length
-            const moduleCompleted = module.lessons.filter(
-              (l) => l.progress.status === 'COMPLETED'
-            ).length
-
-            return (
-              <div key={module.id}>
-                {/* Module Header */}
-                <button
-                  onClick={() => toggleModule(module.id)}
-                  className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 text-left"
-                >
-                  {expandedModules.has(module.id) ? (
-                    <ChevronDown className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <ChevronRight className="h-5 w-5 text-gray-400" />
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                        Module {moduleIndex + 1}
+      {/* Curriculum */}
+      <section className="rounded-xl border bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b p-4">
+          <h2 className="text-lg font-semibold text-gray-900">Course content</h2>
+          {course.dripDays && (
+            <p className="text-sm text-gray-700">
+              A new week opens every {course.dripDays} {course.dripDays === 1 ? 'day' : 'days'} after you join.
+            </p>
+          )}
+        </div>
+        {course.modules.length === 0 ? (
+          <p className="p-6 text-center text-gray-700">Lessons are being added. Check back soon.</p>
+        ) : (
+          <ol className="divide-y">
+            {course.modules.map((m, mi) => {
+              const done = m.lessons.filter((l) => l.progress.status === 'COMPLETED').length
+              const open = openModules.has(m.id)
+              const minutes = m.lessons.reduce((a, l) => a + (l.estimatedDuration ?? 0), 0)
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(m.id)}
+                    aria-expanded={open}
+                    className="flex min-h-[56px] w-full items-start gap-3 p-4 text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+                  >
+                    <ChevronDown className={`mt-1 h-5 w-5 shrink-0 text-gray-600 transition-transform ${open ? '' : '-rotate-90'}`} aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-gray-900">{m.title || `Week ${mi + 1}`}</span>
+                      {m.description && <span className="mt-1 block text-sm text-gray-700">{m.description}</span>}
+                      <span className="mt-1 block text-sm text-gray-600">
+                        {m.lessons.length} lessons{minutes ? ` · ${formatMinutes(minutes)}` : ''}
+                        {enrollment ? ` · ${done} done` : ''}
+                        {!m.isOpen && m.opensAt ? ` · opens ${shortDate(m.opensAt)}` : ''}
                       </span>
-                      <span className="font-medium text-gray-900">{module.title}</span>
-                    </div>
-                    {module.description && (
-                      <p className="text-sm text-gray-500 mt-1">{module.description}</p>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {moduleCompleted}/{moduleLessons} lessons
-                  </div>
-                </button>
-
-                {/* Lessons */}
-                {expandedModules.has(module.id) && (
-                  <div className="border-t bg-gray-50">
-                    {module.lessons.map((lesson, lessonIndex) => {
-                      const isCompleted = lesson.progress.status === 'COMPLETED'
-                      const isLocked = !isEnrolled
-
-                      return (
-                        <div
-                          key={lesson.id}
-                          className={`flex items-center gap-3 px-4 py-3 pl-12 border-b last:border-b-0 ${
-                            isLocked ? 'opacity-60' : ''
-                          }`}
-                        >
-                          {/* Status Icon */}
-                          <div className="flex-shrink-0">
-                            {isLocked ? (
-                              <Lock className="h-5 w-5 text-gray-400" />
-                            ) : isCompleted ? (
-                              <CheckCircle className="h-5 w-5 text-green-500" />
+                    </span>
+                    {!m.isOpen && <Lock className="mt-1 h-5 w-5 shrink-0 text-gray-500" aria-label="Not open yet" />}
+                  </button>
+                  {open && (
+                    <ol className="border-t bg-gray-50">
+                      {m.lessons.map((l, li) => {
+                        const isDone = l.progress.status === 'COMPLETED'
+                        const canOpen = preview || (!!enrollment && m.isOpen)
+                        const row = (
+                          <>
+                            {canOpen ? (
+                              isDone ? (
+                                <CheckCircle className="h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
+                              ) : (
+                                <Circle className="h-5 w-5 shrink-0 text-gray-400" aria-hidden="true" />
+                              )
                             ) : (
-                              <Circle className="h-5 w-5 text-gray-300" />
+                              <Lock className="h-5 w-5 shrink-0 text-gray-400" aria-hidden="true" />
                             )}
-                          </div>
-
-                          {/* Lesson Info */}
-                          <div className="flex-1 min-w-0">
-                            {isLocked ? (
-                              <span className="text-gray-600">
-                                {lessonIndex + 1}. {lesson.title}
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-gray-900">
+                                {li + 1}. {l.title}
                               </span>
-                            ) : (
-                              <Link
-                                href={`${basePath}/${course.id}/${lesson.id}`}
-                                className="text-gray-900 hover:text-blue-600"
-                              >
-                                {lessonIndex + 1}. {lesson.title}
-                              </Link>
-                            )}
-                            {/* Content type indicators */}
-                            <div className="flex items-center gap-2 mt-1">
-                              {lesson.contentBlocks.map((block) => {
-                                const Icon = contentTypeIcons[block.type]
-                                return (
-                                  <span
-                                    key={block.id}
-                                    className="text-xs text-gray-400 flex items-center gap-1"
-                                  >
-                                    <Icon className="h-3 w-3" />
+                              <span className="flex flex-wrap gap-x-3 text-xs text-gray-600">
+                                {l.estimatedDuration ? <span>{l.estimatedDuration} min</span> : null}
+                                {l.exerciseCount > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <PenLine className="h-3 w-3" aria-hidden="true" />
+                                    {l.exerciseCount} {l.exerciseCount === 1 ? 'exercise' : 'exercises'}
                                   </span>
-                                )
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Duration */}
-                          {lesson.estimatedDuration && (
-                            <span className="text-sm text-gray-400 flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              {lesson.estimatedDuration}m
+                                )}
+                                {isDone && <span className="sr-only">Completed</span>}
+                              </span>
                             </span>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+                            {l.id === course.nextLessonId && !completed && enrollment && (
+                              <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">Up next</span>
+                            )}
+                          </>
+                        )
+                        return (
+                          <li key={l.id} className="border-b last:border-b-0">
+                            {canOpen ? (
+                              <Link
+                                href={lessonHref(l.id)}
+                                className="flex min-h-[52px] items-center gap-3 px-4 py-2 pl-6 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 sm:pl-12"
+                              >
+                                {row}
+                              </Link>
+                            ) : (
+                              <div className="flex min-h-[52px] items-center gap-3 px-4 py-2 pl-6 sm:pl-12">{row}</div>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ol>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </section>
     </div>
   )
 }

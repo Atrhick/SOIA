@@ -13,7 +13,18 @@ export type LessonAudioStatus = {
   status: 'PENDING' | 'READY' | 'FAILED'
   error: string | null
   url: string | null
+  /** Made with paragraph timings (sections + follow-along). False = older audio: remake to add them. */
+  followAlong: boolean
 }
+
+type AudioRow = { lessonId: string; status: string; error: string | null; url: string | null; segments: unknown }
+const toStatus = (r: AudioRow): LessonAudioStatus => ({
+  lessonId: r.lessonId,
+  status: r.status as LessonAudioStatus['status'],
+  error: r.error,
+  url: r.url,
+  followAlong: r.segments !== null && r.segments !== undefined,
+})
 
 /** Admin: status of the audio for these lessons (missing = never made). */
 export async function getLessonAudioStatuses(lessonIds: string[]) {
@@ -23,9 +34,9 @@ export async function getLessonAudioStatuses(lessonIds: string[]) {
   if (!ids.success) return { error: 'Invalid lessons' }
   const rows = await prisma.lessonAudio.findMany({
     where: { lessonId: { in: ids.data } },
-    select: { lessonId: true, status: true, error: true, url: true },
+    select: { lessonId: true, status: true, error: true, url: true, segments: true },
   })
-  return { audio: rows as LessonAudioStatus[] }
+  return { audio: rows.map(toStatus) }
 }
 
 /** Admin: make (or remake) the audio now and wait for the result. */
@@ -44,9 +55,9 @@ export async function makeLessonAudio(lessonId: string) {
   if (lesson) revalidatePath(`/admin/lms/${lesson.module.courseId}`)
   const row = await prisma.lessonAudio.findUnique({
     where: { lessonId: id.data },
-    select: { lessonId: true, status: true, error: true, url: true },
+    select: { lessonId: true, status: true, error: true, url: true, segments: true },
   })
-  return { success: true, audio: row as LessonAudioStatus | null }
+  return { success: true, audio: row ? toStatus(row) : null }
 }
 
 /** Learner: save where they are in the lesson audio. */

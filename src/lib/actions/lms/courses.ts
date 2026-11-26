@@ -214,7 +214,10 @@ export async function updateCourse(courseId: string, formData: FormData) {
     description: (formData.get('description') as string) || undefined,
     thumbnail: (formData.get('thumbnail') as string) || null,
     allowedRoles: JSON.parse((formData.get('allowedRoles') as string) || '[]'),
-    prerequisiteIds: JSON.parse((formData.get('prerequisiteIds') as string) || '[]'),
+    // Left out of the form = keep the saved list (the editor saves prerequisites with updateCourseDetails).
+    prerequisiteIds: formData.has('prerequisiteIds')
+      ? JSON.parse((formData.get('prerequisiteIds') as string) || '[]')
+      : undefined,
     estimatedDuration: formData.get('estimatedDuration')
       ? parseInt(formData.get('estimatedDuration') as string)
       : null,
@@ -236,7 +239,7 @@ export async function updateCourse(courseId: string, formData: FormData) {
         description: validated.data.description,
         thumbnail: validated.data.thumbnail,
         allowedRoles: validated.data.allowedRoles,
-        prerequisiteIds: validated.data.prerequisiteIds || [],
+        prerequisiteIds: validated.data.prerequisiteIds,
         estimatedDuration: validated.data.estimatedDuration,
         sortOrder: validated.data.sortOrder,
       },
@@ -473,5 +476,59 @@ export async function reorderCourses(courseIds: string[]) {
   } catch (error) {
     console.error('Error reordering courses:', error)
     return { error: 'Failed to reorder courses' }
+  }
+}
+
+// ============================================
+// COURSE PAGE DETAILS (catalog + landing page)
+// ============================================
+
+const courseDetailsSchema = z.object({
+  category: z.string().trim().max(60).nullable(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(12),
+  outcomes: z.array(z.string().trim().min(1).max(300)).max(15),
+  audience: z.string().trim().max(2000).nullable(),
+  dripDays: z.number().int().min(1).max(60).nullable(),
+  prerequisiteIds: z.array(z.string().min(1)).max(10),
+})
+
+export type CourseDetailsInput = z.infer<typeof courseDetailsSchema>
+
+/** Category, tags, "What you'll learn", "Who it's for", drip and prerequisites. */
+export async function updateCourseDetails(courseId: string, input: CourseDetailsInput) {
+  const session = await auth()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Unauthorized - Admin only' }
+  }
+  const parsed = courseDetailsSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || 'Check the course details' }
+  }
+  const d = parsed.data
+  try {
+    const prereqs = d.prerequisiteIds.filter((id) => id !== courseId)
+    if (prereqs.length) {
+      const found = await prisma.lMSCourse.count({ where: { id: { in: prereqs } } })
+      if (found !== prereqs.length) return { error: 'One of the courses to finish first no longer exists' }
+    }
+    await prisma.lMSCourse.update({
+      where: { id: courseId },
+      data: {
+        category: d.category || null,
+        tags: Array.from(new Set(d.tags)),
+        outcomes: d.outcomes,
+        audience: d.audience || null,
+        dripDays: d.dripDays,
+        prerequisiteIds: prereqs,
+      },
+    })
+    revalidatePath('/admin/lms')
+    revalidatePath(`/admin/lms/${courseId}`)
+    revalidatePath('/coach/learning')
+    revalidatePath('/ambassador/learning')
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating course details:', error)
+    return { error: 'Failed to save course details' }
   }
 }

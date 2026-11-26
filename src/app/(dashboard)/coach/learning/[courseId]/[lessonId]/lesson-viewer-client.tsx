@@ -20,11 +20,19 @@ import {
 } from 'lucide-react'
 import { updateContentProgress, markLessonComplete } from '@/lib/actions/lms/enrollment'
 import { LessonAudioPlayer, type LessonAudioInfo } from '@/components/learning/lesson-audio-player'
+import { LessonText } from '@/components/learning/lesson-text'
+// Course platform (curriculum, exercises, reading time). Kept apart from the audio code above.
+import { usePathname } from 'next/navigation'
+import { PenLine, Award, X } from 'lucide-react'
+import { ExerciseBlock, type ExerciseState } from '@/components/learning/course/exercise-block'
+import { CurriculumDrawer, CurriculumList, CourseProgressBar, type Curriculum } from '@/components/learning/course/curriculum-nav'
+import { markdownWords, readingMinutes } from '@/lib/lms/markdown'
+import type { ExerciseContent } from '@/lib/lms/exercise'
 
 interface ContentBlock {
   id: string
   title: string | null
-  type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT'
+  type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT' | 'EXERCISE'
   content: {
     url?: string
     provider?: string
@@ -63,7 +71,7 @@ interface Progress {
 
 interface Navigation {
   prevLesson: { id: string; title: string } | null
-  nextLesson: { id: string; title: string } | null
+  nextLesson: { id: string; title: string; locked?: boolean } | null
   currentIndex: number
   totalLessons: number
 }
@@ -75,6 +83,11 @@ interface LessonViewerClientProps {
   basePath?: string
   audio?: LessonAudioInfo | null
   listen?: { positionSec: number; completed: boolean }
+  // Course platform
+  curriculum?: Curriculum
+  exercises?: Record<string, ExerciseState>
+  readOnly?: boolean
+  isPreview?: boolean
 }
 
 const contentTypeIcons = {
@@ -82,11 +95,19 @@ const contentTypeIcons = {
   TEXT: FileText,
   QUIZ: FileQuestion,
   DOCUMENT: File,
+  EXERCISE: PenLine,
 }
 
-export function LessonViewerClient({ lesson, progress, navigation, basePath = '/coach/learning', audio = null, listen }: LessonViewerClientProps) {
+export function LessonViewerClient({ lesson, progress, navigation, basePath = '/coach/learning', audio = null, listen, curriculum, exercises = {}, readOnly = false, isPreview = false }: LessonViewerClientProps) {
   const router = useRouter()
-  const [activeBlockIndex, setActiveBlockIndex] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const lessonHref = (id: string) => `${basePath}/${lesson.courseId}/${id}`
+  const readMinutes = readingMinutes(
+    lesson.contentBlocks.reduce(
+      (n, b) => n + (b.type === 'TEXT' ? markdownWords(b.content.content ?? '') : b.type === 'EXERCISE' ? markdownWords((b.content as ExerciseContent).intro ?? '') : 0),
+      0
+    )
+  )
   const [isUpdating, setIsUpdating] = useState(false)
   const [localProgress, setLocalProgress] = useState<Record<string, { status: string; progressValue: number | null }>>(
     lesson.contentBlocks.reduce((acc, block) => {
@@ -95,14 +116,12 @@ export function LessonViewerClient({ lesson, progress, navigation, basePath = '/
     }, {} as Record<string, { status: string; progressValue: number | null }>)
   )
 
-  const activeBlock = lesson.contentBlocks[activeBlockIndex]
   const isLessonComplete = progress.lessonStatus === 'COMPLETED'
-  const allBlocksComplete = lesson.contentBlocks.every(
-    (block) => localProgress[block.id]?.status === 'COMPLETED'
-  )
 
   const handleMarkBlockComplete = async (blockId: string) => {
+    if (readOnly) return
     setIsUpdating(true)
+    setError(null)
     try {
       const result = await updateContentProgress(blockId, undefined, true)
       if (result.success) {
@@ -110,14 +129,12 @@ export function LessonViewerClient({ lesson, progress, navigation, basePath = '/
           ...prev,
           [blockId]: { status: 'COMPLETED', progressValue: 100 },
         }))
-
-        // Auto-advance to next block if available
-        if (activeBlockIndex < lesson.contentBlocks.length - 1) {
-          setActiveBlockIndex(activeBlockIndex + 1)
-        }
+        if (result.lessonComplete) router.refresh()
+      } else if (result.error) {
+        setError(result.error)
       }
-    } catch (error) {
-      console.error('Error marking complete:', error)
+    } catch {
+      setError('Could not save your progress. Check your connection and try again.')
     } finally {
       setIsUpdating(false)
     }
@@ -153,13 +170,24 @@ export function LessonViewerClient({ lesson, progress, navigation, basePath = '/
     }
   }
 
+  // "Mark complete and continue": finishes the lesson, then goes to the next one (or the certificate).
   const handleMarkLessonComplete = async () => {
+    if (readOnly) return
     setIsUpdating(true)
+    setError(null)
     try {
-      await markLessonComplete(lesson.id)
-      router.refresh()
-    } catch (error) {
-      console.error('Error marking lesson complete:', error)
+      const result = await markLessonComplete(lesson.id)
+      if ('error' in result && result.error) {
+        setError(result.error)
+      } else if ('courseCompleted' in result && result.courseCompleted) {
+        router.push(`${basePath}/${lesson.courseId}/certificate`)
+      } else if (navigation.nextLesson && !navigation.nextLesson.locked) {
+        router.push(lessonHref(navigation.nextLesson.id))
+      } else {
+        router.refresh()
+      }
+    } catch {
+      setError('Could not save your progress. Check your connection and try again.')
     } finally {
       setIsUpdating(false)
     }
@@ -180,56 +208,84 @@ export function LessonViewerClient({ lesson, progress, navigation, basePath = '/
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+      <div className="bg-white border-b sticky top-16 z-10">
+        <div className="max-w-5xl mx-auto px-4 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <Link
-                href={`${basePath}/${lesson.courseId}`}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                href={isPreview ? `/admin/lms/${lesson.courseId}` : `${basePath}/${lesson.courseId}`}
+                className="flex min-h-[44px] items-center gap-2 text-gray-700 hover:text-gray-900"
               >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Back to Course</span>
+                <ArrowLeft className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">{isPreview ? 'Back to editor' : 'Course'}</span>
+                <span className="sr-only sm:hidden">Back to course</span>
               </Link>
-              <div className="hidden md:block h-6 w-px bg-gray-200" />
-              <div className="hidden md:block">
-                <p className="text-sm text-gray-500">{lesson.courseTitle}</p>
-                <p className="text-sm font-medium text-gray-900">{lesson.moduleTitle}</p>
+              <div className="min-w-0">
+                <p className="truncate text-xs text-gray-600">{lesson.courseTitle}</p>
+                <p className="truncate text-sm font-medium text-gray-900">{lesson.moduleTitle}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-500">
+            <div className="flex shrink-0 items-center gap-2 text-sm">
+              {curriculum ? (
+                <div className="lg:hidden">
+                  <CurriculumDrawer curriculum={curriculum} currentLessonId={lesson.id} lessonHref={lessonHref} />
+                </div>
+              ) : null}
+              <span className={`text-gray-600 ${curriculum ? 'hidden lg:inline' : ''}`}>
                 Lesson {navigation.currentIndex} of {navigation.totalLessons}
               </span>
-              {isLessonComplete && (
-                <span className="flex items-center gap-1 text-green-600 font-medium">
-                  <CheckCircle className="h-4 w-4" />
-                  Complete
-                </span>
-              )}
             </div>
           </div>
+          {curriculum && (
+            <div className="mt-2">
+              <CourseProgressBar curriculum={curriculum} compact />
+            </div>
+          )}
         </div>
       </div>
+
+      {isPreview && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-900">
+          Preview: this is what learners see. Nothing you do here is saved.
+        </div>
+      )}
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         <div className="lg:flex lg:gap-6">
           {/* Main Content */}
-          <div className="lg:flex-1">
+          <div className="min-w-0 lg:flex-1">
             {/* Lesson Title */}
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">{lesson.title}</h1>
               {lesson.description && (
-                <p className="text-gray-600">{lesson.description}</p>
+                <p className="text-gray-700">{lesson.description}</p>
               )}
-              {lesson.estimatedDuration && (
-                <p className="text-sm text-gray-500 mt-2 flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  Estimated: {lesson.estimatedDuration} minutes
-                </p>
-              )}
+              <p className="text-sm text-gray-600 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                {(lesson.estimatedDuration || readMinutes > 0) && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    {lesson.estimatedDuration ? `About ${lesson.estimatedDuration} min` : `${readMinutes} min read`}
+                    {lesson.estimatedDuration && readMinutes > 0 ? ` (${readMinutes} min reading)` : ''}
+                  </span>
+                )}
+                {isLessonComplete && (
+                  <span className="flex items-center gap-1 font-medium text-green-700">
+                    <CheckCircle className="h-4 w-4" />
+                    Completed
+                  </span>
+                )}
+              </p>
             </div>
+
+            {error && (
+              <div role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">
+                <span>{error}</span>
+                <button type="button" onClick={() => setError(null)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-red-100" aria-label="Dismiss">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
 
             {lesson.contentBlocks.some((b) => b.type === 'TEXT') && (
               <LessonAudioPlayer
@@ -241,137 +297,110 @@ export function LessonViewerClient({ lesson, progress, navigation, basePath = '/
               />
             )}
 
-            {/* Content Block Display */}
-            {activeBlock && (
-              <div className="bg-white rounded-lg border mb-6">
-                <ContentBlockViewer
-                  block={activeBlock}
-                  isComplete={localProgress[activeBlock.id]?.status === 'COMPLETED'}
-                  onMarkComplete={() => handleMarkBlockComplete(activeBlock.id)}
-                  onVideoProgress={(pct) => handleVideoProgress(activeBlock.id, pct)}
-                  isUpdating={isUpdating}
+            {/* Content blocks, all in order on one page (reading flow) */}
+            {lesson.contentBlocks.map((block) =>
+              block.type === 'TEXT' ? (
+                <div key={block.id} className="bg-white rounded-lg border mb-6 p-4 sm:p-6">
+                  <TextContent content={block.content} blockId={block.id} />
+                </div>
+              ) : block.type === 'EXERCISE' ? (
+                <ExerciseBlock
+                  key={block.id}
+                  blockId={block.id}
+                  title={block.title}
+                  content={block.content as unknown as ExerciseContent}
+                  initial={exercises[block.id]}
+                  readOnly={readOnly}
+                  readOnlyReason={isPreview ? 'Preview: answers are not saved.' : 'You are viewing as this person, so answers cannot be changed.'}
+                  onCompleted={(lessonDone) => {
+                    setLocalProgress((prev) => ({ ...prev, [block.id]: { status: 'COMPLETED', progressValue: 100 } }))
+                    if (lessonDone) router.refresh()
+                  }}
                 />
-              </div>
-            )}
-
-            {/* Block Navigation */}
-            {lesson.contentBlocks.length > 1 && (
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={() => setActiveBlockIndex(Math.max(0, activeBlockIndex - 1))}
-                  disabled={activeBlockIndex === 0}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Previous
-                </button>
-                <span className="text-sm text-gray-500">
-                  {activeBlockIndex + 1} / {lesson.contentBlocks.length}
-                </span>
-                <button
-                  onClick={() => setActiveBlockIndex(Math.min(lesson.contentBlocks.length - 1, activeBlockIndex + 1))}
-                  disabled={activeBlockIndex === lesson.contentBlocks.length - 1}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
+              ) : (
+                <div key={block.id} className="bg-white rounded-lg border mb-6">
+                  <ContentBlockViewer
+                    block={block}
+                    isComplete={localProgress[block.id]?.status === 'COMPLETED'}
+                    onMarkComplete={() => handleMarkBlockComplete(block.id)}
+                    onVideoProgress={(pct) => handleVideoProgress(block.id, pct)}
+                    isUpdating={isUpdating || readOnly}
+                  />
+                </div>
+              )
             )}
 
             {/* Lesson Actions */}
-            <div className="flex items-center justify-between border-t pt-6">
-              <button
-                onClick={goToPrevLesson}
-                disabled={!navigation.prevLesson}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {navigation.prevLesson ? (
-                  <span className="hidden sm:inline">{navigation.prevLesson.title}</span>
-                ) : (
-                  <span>Previous</span>
-                )}
-              </button>
-
-              {!isLessonComplete && allBlocksComplete && (
+            <div className="border-t pt-6 space-y-4">
+              {!readOnly && !isLessonComplete && (
                 <button
                   onClick={handleMarkLessonComplete}
                   disabled={isUpdating}
-                  className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-green-700 px-6 py-3 font-semibold text-white hover:bg-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2 disabled:opacity-60"
                 >
-                  {isUpdating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4" />
-                  )}
-                  Complete Lesson
+                  {isUpdating ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
+                  {navigation.nextLesson ? 'Mark complete and continue' : 'Mark complete and finish the course'}
                 </button>
               )}
+              {curriculum?.courseCompleted && !isPreview && (
+                <Link
+                  href={`${basePath}/${lesson.courseId}/certificate`}
+                  className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border-2 border-green-700 px-6 py-3 font-semibold text-green-800 hover:bg-green-50"
+                >
+                  <Award className="h-5 w-5" />
+                  View your certificate
+                </Link>
+              )}
 
-              <button
-                onClick={goToNextLesson}
-                disabled={!navigation.nextLesson}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                  navigation.nextLesson
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'text-gray-400 cursor-not-allowed'
-                }`}
-              >
+              <div className="flex items-stretch justify-between gap-3">
+                <button
+                  onClick={goToPrevLesson}
+                  disabled={!navigation.prevLesson}
+                  className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ArrowLeft className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{navigation.prevLesson ? <><span className="sm:hidden">Previous</span><span className="hidden sm:inline">{navigation.prevLesson.title}</span></> : 'Previous'}</span>
+                </button>
+
                 {navigation.nextLesson ? (
-                  <>
-                    <span className="hidden sm:inline">{navigation.nextLesson.title}</span>
-                    <span className="sm:hidden">Next</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
+                  <button
+                    onClick={goToNextLesson}
+                    disabled={navigation.nextLesson.locked}
+                    className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="truncate">
+                      <span className="sm:hidden">{navigation.nextLesson.locked ? 'Next week opens soon' : 'Next'}</span>
+                      <span className="hidden sm:inline">{navigation.nextLesson.locked ? 'Next week opens soon' : navigation.nextLesson.title}</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0" />
+                  </button>
                 ) : (
-                  <span>End of Course</span>
+                  <Link
+                    href={isPreview ? `/admin/lms/${lesson.courseId}` : `${basePath}/${lesson.courseId}`}
+                    className="flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Course overview
+                  </Link>
                 )}
-              </button>
-            </div>
-          </div>
-
-          {/* Sidebar - Content List */}
-          <div className="hidden lg:block lg:w-72">
-            <div className="bg-white rounded-lg border sticky top-20">
-              <div className="p-4 border-b">
-                <h3 className="font-semibold text-gray-900">Lesson Content</h3>
-              </div>
-              <div className="divide-y max-h-[60vh] overflow-y-auto">
-                {lesson.contentBlocks.map((block, index) => {
-                  const Icon = contentTypeIcons[block.type]
-                  const isActive = index === activeBlockIndex
-                  const isComplete = localProgress[block.id]?.status === 'COMPLETED'
-
-                  return (
-                    <button
-                      key={block.id}
-                      onClick={() => setActiveBlockIndex(index)}
-                      className={`w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 ${
-                        isActive ? 'bg-blue-50' : ''
-                      }`}
-                    >
-                      <div className={`flex-shrink-0 ${isComplete ? 'text-green-500' : 'text-gray-400'}`}>
-                        {isComplete ? (
-                          <CheckCircle className="h-5 w-5" />
-                        ) : (
-                          <Circle className="h-5 w-5" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4 text-gray-400" />
-                          <span className={`text-sm truncate ${isActive ? 'font-medium text-blue-600' : 'text-gray-700'}`}>
-                            {block.title || block.type}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
               </div>
             </div>
           </div>
+
+          {/* Sidebar - whole course curriculum (desktop; phones use the Contents drawer) */}
+          {curriculum && (
+            <div className="hidden lg:block lg:w-72 lg:shrink-0">
+              <div className="bg-white rounded-lg border sticky top-40">
+                <div className="p-4 border-b">
+                  <h2 className="font-semibold text-gray-900 mb-2">Course contents</h2>
+                  <CourseProgressBar curriculum={curriculum} />
+                </div>
+                <div className="max-h-[65vh] overflow-y-auto p-2">
+                  <CurriculumList curriculum={curriculum} currentLessonId={lesson.id} lessonHref={lessonHref} />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -444,7 +473,7 @@ function ContentBlockViewer({
           />
         )}
         {block.type === 'TEXT' && (
-          <TextContent content={block.content} />
+          <TextContent content={block.content} blockId={block.id} />
         )}
         {block.type === 'QUIZ' && (
           <QuizContent content={block.content} />
@@ -523,38 +552,21 @@ function VideoContent({
 }
 
 // Text Content Component
-function TextContent({ content }: { content: ContentBlock['content'] }) {
+function TextContent({ content, blockId }: { content: ContentBlock['content']; blockId: string }) {
   if (!content.content) {
     return <p className="text-gray-500">No content provided</p>
   }
 
-  // Simple markdown-like rendering (could be enhanced with a proper markdown library)
-  return (
-    <div className="prose prose-sm max-w-none">
-      {content.content.split('\n').map((paragraph, index) => {
-        if (paragraph.startsWith('# ')) {
-          return <h1 key={index} className="text-2xl font-bold mt-4 mb-2">{paragraph.slice(2)}</h1>
-        }
-        if (paragraph.startsWith('## ')) {
-          return <h2 key={index} className="text-xl font-bold mt-4 mb-2">{paragraph.slice(3)}</h2>
-        }
-        if (paragraph.startsWith('### ')) {
-          return <h3 key={index} className="text-lg font-bold mt-3 mb-2">{paragraph.slice(4)}</h3>
-        }
-        if (paragraph.startsWith('- ')) {
-          return <li key={index} className="ml-4">{paragraph.slice(2)}</li>
-        }
-        if (paragraph.trim() === '') {
-          return <br key={index} />
-        }
-        return <p key={index} className="mb-3">{paragraph}</p>
-      })}
-    </div>
-  )
+  // Paragraphs carry data-audio-key so the lesson audio can highlight and jump to them.
+  if (content.format === 'html') {
+    return <div className="whitespace-pre-line text-gray-800">{content.content.replace(/<[^>]+>/g, '')}</div>
+  }
+  return <LessonText blockId={blockId} markdown={content.content} />
 }
 
 // Quiz Content Component
 function QuizContent({ content }: { content: ContentBlock['content'] }) {
+  const surveysBase = usePathname()?.startsWith('/ambassador') ? '/ambassador/surveys' : '/coach/surveys'
   if (!content.surveyId) {
     return <p className="text-gray-500">No quiz linked</p>
   }
@@ -565,7 +577,7 @@ function QuizContent({ content }: { content: ContentBlock['content'] }) {
       <h3 className="font-semibold text-gray-900 mb-2">Quiz</h3>
       <p className="text-gray-600 mb-4">Complete this quiz to continue</p>
       <Link
-        href={`/coach/surveys/${content.surveyId}`}
+        href={`${surveysBase}/${content.surveyId}`}
         className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
       >
         Start Quiz

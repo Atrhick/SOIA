@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { buildLessonSpeech, chunkSpeech, speechHash, markdownToSpeakable, htmlToSpeakable, estimateDurationSec } from './audio-text'
+import {
+  buildLessonSpeech,
+  buildSpeechUnits,
+  chunkSpeech,
+  speechHash,
+  markdownToSpeakable,
+  markdownSpeechUnits,
+  htmlToSpeakable,
+  estimateDurationSec,
+  EXERCISE_CUE,
+  DEFAULT_TTS_INSTRUCTIONS,
+  ttsInstructions,
+} from './audio-text'
 
 describe('markdownToSpeakable', () => {
   it('keeps headings as sentences and strips formatting, links and images', () => {
@@ -53,5 +65,51 @@ describe('chunkSpeech', () => {
   })
   it('estimates duration', () => {
     expect(estimateDurationSec('word '.repeat(150))).toBe(60)
+  })
+})
+
+describe('workbook speech rules', () => {
+  it('drops [Write here] / [Choose one] placeholder lines and underscores', () => {
+    const md = 'What do you value most?\n\n[Write here]\n\n**My answer:** [Write here]\n\n- [Choose one]\n- ________\n\nNext idea.'
+    const out = markdownToSpeakable(md)
+    expect(out).not.toMatch(/write here|choose one|_/i)
+    expect(out).toContain('What do you value most?')
+    expect(out).toContain('My answer:')
+    expect(out).toContain('Next idea.')
+  })
+  it('strips markdown symbols, tables and checkboxes', () => {
+    const out = markdownToSpeakable('> **Tip:** stay *calm*\n\n| Day | Goal |\n|---|---|\n| Mon | Call #1 |\n\n- [ ] Ask a friend\n\n~~old~~ `code`')
+    expect(out).not.toMatch(/[*#|>`~[\]]/)
+    expect(out).toContain('Tip. stay calm')
+    expect(out).toContain('Day, Goal. Mon, Call number 1.')
+    expect(out).toContain('Ask a friend.')
+  })
+  it('exercise heading: says "Exercise." then the prompt, and the pause cue after the prompt', () => {
+    const md = '### Exercise: Your three values\n\nList three values that guide you.\n\n[Write here]\n\n## Next part\n\nMore text.'
+    const units = markdownSpeechUnits(md, 'b1')
+    expect(units[0]).toMatchObject({ key: 'b1:0', kind: 'heading', level: 3, label: 'Exercise: Your three values', text: 'Exercise. Your three values.' })
+    expect(units[1].text).toBe(`List three values that guide you. ${EXERCISE_CUE}`)
+    expect(units[2]).toMatchObject({ kind: 'heading', text: 'Next part.' })
+    expect(units[3].text).toBe('More text.')
+  })
+  it('exercise with only a placeholder puts the cue on the heading; one at the end of the block still gets it', () => {
+    expect(markdownSpeechUnits('### Exercise:\n\n[Write here]', 'b')[0].text).toBe(`Exercise. ${EXERCISE_CUE}`)
+    const u = markdownSpeechUnits('### Exercise 2 - Reflect\n\nHow did it go?', 'b')
+    expect(u.at(-1)?.text).toBe(`How did it go? ${EXERCISE_CUE}`)
+  })
+  it('keys match the parser paragraph numbers (blank/placeholder paragraphs are skipped, not renumbered)', () => {
+    const units = buildSpeechUnits([{ id: 'blk', type: 'TEXT', sortOrder: 0, content: { content: '# A\n\n[Write here]\n\nB text', format: 'markdown' } }], 'Title')
+    expect(units.map((u) => u.key)).toEqual(['title', 'blk:0', 'blk:2'])
+    expect(units[0]).toMatchObject({ kind: 'title', label: 'Title', text: 'Title.' })
+  })
+})
+
+describe('voice instructions', () => {
+  it('sends the default to gpt-*-tts models only', () => {
+    expect(ttsInstructions('gpt-4o-mini-tts', undefined)).toBe(DEFAULT_TTS_INSTRUCTIONS)
+    expect(ttsInstructions('gpt-4o-mini-tts', 'Be calm.')).toBe('Be calm.')
+    expect(ttsInstructions('gpt-4o-mini-tts', '  ')).toBeUndefined()
+    expect(ttsInstructions('tts-1', undefined)).toBeUndefined()
+    expect(ttsInstructions('tts-1-hd', 'Be calm.')).toBeUndefined()
   })
 })

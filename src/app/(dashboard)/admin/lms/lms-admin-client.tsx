@@ -20,6 +20,7 @@ import {
   Layers,
   MoreVertical,
   BarChart3,
+  Upload,
 } from 'lucide-react'
 import {
   deleteCourse,
@@ -175,7 +176,14 @@ export function LMSAdminClient({ courses, stats }: LMSAdminClientProps) {
           <h1 className="text-2xl font-bold text-gray-900">LMS Courses</h1>
           <p className="text-gray-600">Create and manage learning courses for coaches and ambassadors</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/lms/import"
+            className="flex items-center gap-2 px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
+          >
+            <Upload className="h-4 w-4" />
+            Import from markdown
+          </Link>
           <Link
             href="/admin/lms/analytics"
             className="flex items-center gap-2 px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"

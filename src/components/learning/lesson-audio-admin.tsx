@@ -45,7 +45,9 @@ export function LessonAudioAdmin({ lessonId }: { lessonId: string }) {
   const status = working || audio?.status === 'PENDING'
     ? 'Being made...'
     : audio?.status === 'READY'
-      ? 'Ready'
+      ? audio.followAlong
+        ? 'Ready'
+        : 'Ready (made before follow-along: remake to add sections and highlighting)'
       : audio?.status === 'FAILED'
         ? `Couldn't make it: ${audio.error || 'unknown reason'}`
         : loaded

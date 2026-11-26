@@ -186,6 +186,7 @@ const coachNavSections: NavSection[] = [
     icon: BookOpen,
     items: [
       { href: '/coach/learning', label: 'Learning', icon: GraduationCap },
+      { href: '/coach/learning/team', label: "Ambassadors' learning", icon: Users },
       { href: '/coach/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
     ],
   },

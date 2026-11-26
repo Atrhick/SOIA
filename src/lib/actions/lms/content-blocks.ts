@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { queueLessonAudio } from '@/lib/lessons/audio'
+import { exerciseContentSchema } from '@/lib/lms/exercise'
 
 // ============================================
 // VALIDATION SCHEMAS
@@ -36,7 +37,7 @@ const documentContentSchema = z.object({
 const createContentBlockSchema = z.object({
   lessonId: z.string().min(1, 'Lesson ID is required'),
   title: z.string().optional(),
-  type: z.enum(['VIDEO', 'TEXT', 'QUIZ', 'DOCUMENT']),
+  type: z.enum(['VIDEO', 'TEXT', 'QUIZ', 'DOCUMENT', 'EXERCISE']),
   content: z.union([videoContentSchema, textContentSchema, quizContentSchema, documentContentSchema, z.record(z.string(), z.unknown())]),
   completionThreshold: z.number().int().min(0).max(100).optional(),
 })
@@ -61,6 +62,8 @@ function validateContent(type: string, content: unknown) {
       return quizContentSchema.safeParse(content)
     case 'DOCUMENT':
       return documentContentSchema.safeParse(content)
+    case 'EXERCISE':
+      return exerciseContentSchema.safeParse(content)
     default:
       return { success: false, error: { issues: [{ message: 'Invalid content type' }] } }
   }
@@ -103,7 +106,7 @@ export async function createContentBlock(formData: FormData) {
   const data = {
     lessonId: formData.get('lessonId') as string,
     title: (formData.get('title') as string) || undefined,
-    type: formData.get('type') as 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT',
+    type: formData.get('type') as 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT' | 'EXERCISE',
     content,
     completionThreshold: formData.get('completionThreshold')
       ? parseInt(formData.get('completionThreshold') as string)

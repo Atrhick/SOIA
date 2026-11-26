@@ -2,6 +2,7 @@
 
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { markClassSelectionDone } from '@/lib/lms/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -355,28 +356,8 @@ export async function enrollInClass(classId: string) {
       },
     })
 
-    // Check if this completes the class selection task
-    const classSelectionTask = await prisma.ambassadorOnboardingTask.findFirst({
-      where: { type: 'CLASS_SELECTION', isActive: true },
-    })
-
-    if (classSelectionTask) {
-      await prisma.ambassadorOnboardingProgress.upsert({
-        where: {
-          ambassadorId_taskId: { ambassadorId: ambassador.id, taskId: classSelectionTask.id },
-        },
-        update: {
-          status: 'APPROVED',
-          completedAt: new Date(),
-        },
-        create: {
-          ambassadorId: ambassador.id,
-          taskId: classSelectionTask.id,
-          status: 'APPROVED',
-          completedAt: new Date(),
-        },
-      })
-    }
+    // Ticks the onboarding task "Enroll in a Class" (LMS course enrolment ticks it too).
+    await markClassSelectionDone(ambassador.id)
 
     await prisma.auditLog.create({
       data: {

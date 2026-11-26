@@ -27,21 +27,27 @@ import {
   X,
   Check,
   Clock,
+  PenLine,
+  ArrowUp,
+  ArrowDown,
+  Users,
 } from 'lucide-react'
-import { updateCourse, publishCourse, unpublishCourse } from '@/lib/actions/lms/courses'
-import { createModule, updateModule, deleteModule } from '@/lib/actions/lms/modules'
-import { createLesson, updateLesson, deleteLesson } from '@/lib/actions/lms/lessons'
+import { updateCourse, publishCourse, unpublishCourse, updateCourseDetails } from '@/lib/actions/lms/courses'
+import { createModule, updateModule, deleteModule, reorderModules } from '@/lib/actions/lms/modules'
+import { createLesson, updateLesson, deleteLesson, reorderLessons } from '@/lib/actions/lms/lessons'
 import {
   createContentBlock,
   updateContentBlock,
   deleteContentBlock,
+  reorderContentBlocks,
 } from '@/lib/actions/lms/content-blocks'
+import { ExerciseEditor } from '@/components/learning/course/exercise-editor'
 
 // Types
 interface ContentBlock {
   id: string
   title: string | null
-  type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT'
+  type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT' | 'EXERCISE'
   content: Record<string, unknown>
   completionThreshold: number | null
   sortOrder: number
@@ -74,6 +80,12 @@ interface Course {
   estimatedDuration: number | null
   modules: Module[]
   enrollmentCount: number
+  category: string | null
+  tags: string[]
+  outcomes: string[]
+  audience: string | null
+  dripDays: number | null
+  prerequisiteIds: string[]
 }
 
 interface AvailableSurvey {
@@ -86,6 +98,16 @@ interface AvailableSurvey {
 interface CourseEditorClientProps {
   course: Course
   availableSurveys: AvailableSurvey[]
+  otherCourses?: { id: string; title: string }[]
+}
+
+/** Swap item i with its neighbour; returns the new id order (or null at the ends). */
+function moved(ids: string[], i: number, d: -1 | 1): string[] | null {
+  const j = i + d
+  if (j < 0 || j >= ids.length) return null
+  const next = [...ids]
+  ;[next[i], next[j]] = [next[j], next[i]]
+  return next
 }
 
 const contentTypeIcons = {
@@ -93,6 +115,7 @@ const contentTypeIcons = {
   TEXT: FileText,
   QUIZ: FileQuestion,
   DOCUMENT: File,
+  EXERCISE: PenLine,
 }
 
 const contentTypeLabels = {
@@ -100,9 +123,10 @@ const contentTypeLabels = {
   TEXT: 'Text',
   QUIZ: 'Quiz',
   DOCUMENT: 'Document',
+  EXERCISE: 'Exercise',
 }
 
-export function CourseEditorClient({ course, availableSurveys }: CourseEditorClientProps) {
+export function CourseEditorClient({ course, availableSurveys, otherCourses = [] }: CourseEditorClientProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -124,7 +148,7 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
   const [moduleForm, setModuleForm] = useState({ title: '', description: '' })
   const [lessonForm, setLessonForm] = useState({ title: '', description: '', duration: '' })
   const [contentForm, setContentForm] = useState<{
-    type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT'
+    type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT' | 'EXERCISE'
     title: string
     content: Record<string, unknown>
     threshold: string
@@ -142,7 +166,27 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
     thumbnail: course.thumbnail || '',
     allowedRoles: course.allowedRoles,
     estimatedDuration: course.estimatedDuration?.toString() || '',
+    category: course.category || '',
+    tags: course.tags.join(', '),
+    outcomes: course.outcomes.join('\n'),
+    audience: course.audience || '',
+    dripDays: course.dripDays?.toString() || '',
+    prerequisiteIds: course.prerequisiteIds,
   })
+
+  const handleReorder = async (run: () => Promise<{ error?: string; success?: boolean }>) => {
+    setIsSubmitting(true)
+    setError('')
+    try {
+      const r = await run()
+      if (r.error) setError(r.error)
+      else router.refresh()
+    } catch {
+      setError('Failed to change the order')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) => {
@@ -192,8 +236,19 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
       }
 
       const result = await updateCourse(course.id, formData)
-      if (result.error) {
-        setError(result.error)
+      const drip = settingsForm.dripDays.trim() ? parseInt(settingsForm.dripDays, 10) : null
+      const details = result.error
+        ? null
+        : await updateCourseDetails(course.id, {
+            category: settingsForm.category.trim() || null,
+            tags: settingsForm.tags.split(',').map((t) => t.trim()).filter(Boolean),
+            outcomes: settingsForm.outcomes.split('\n').map((t) => t.trim()).filter(Boolean),
+            audience: settingsForm.audience.trim() || null,
+            dripDays: drip && drip > 0 ? drip : null,
+            prerequisiteIds: settingsForm.prerequisiteIds,
+          })
+      if (result.error || details?.error) {
+        setError(result.error || details?.error || 'Failed to save settings')
       } else {
         showSuccess('Course settings saved')
         setShowSettings(false)
@@ -577,6 +632,20 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/admin/lms/preview/${course.id}`}
+            className="flex items-center gap-2 px-3 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
+          >
+            <Eye className="h-4 w-4" />
+            Preview as learner
+          </Link>
+          <Link
+            href={`/admin/lms/${course.id}/learners`}
+            className="flex items-center gap-2 px-3 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
+          >
+            <Users className="h-4 w-4" />
+            Learners ({course.enrollmentCount})
+          </Link>
           <button
             onClick={() => setShowSettings(true)}
             className="flex items-center gap-2 px-3 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
@@ -752,7 +821,29 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
                     )}
                   </div>
                   {editingModule !== module.id && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          const ids = moved(course.modules.map((m) => m.id), moduleIndex, -1)
+                          if (ids) handleReorder(() => reorderModules(course.id, ids))
+                        }}
+                        disabled={moduleIndex === 0 || isSubmitting}
+                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30"
+                        aria-label="Move module up"
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const ids = moved(course.modules.map((m) => m.id), moduleIndex, 1)
+                          if (ids) handleReorder(() => reorderModules(course.id, ids))
+                        }}
+                        disabled={moduleIndex === course.modules.length - 1 || isSubmitting}
+                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30"
+                        aria-label="Move module down"
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={() => startEditingModule(module)}
                         className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
@@ -858,7 +949,37 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
                             )}
                           </div>
                           {editingLesson !== lesson.id && (
-                            <div className="flex items-center gap-1 opacity-0 group-hover/lesson:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1">
+                              <Link
+                                href={`/admin/lms/preview/${course.id}/${lesson.id}`}
+                                className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                                aria-label="Preview lesson as learner"
+                                title="Preview as learner"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Link>
+                              <button
+                                onClick={() => {
+                                  const ids = moved(module.lessons.map((l) => l.id), lessonIndex, -1)
+                                  if (ids) handleReorder(() => reorderLessons(module.id, ids))
+                                }}
+                                disabled={lessonIndex === 0 || isSubmitting}
+                                className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30"
+                                aria-label="Move lesson up"
+                              >
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const ids = moved(module.lessons.map((l) => l.id), lessonIndex, 1)
+                                  if (ids) handleReorder(() => reorderLessons(module.id, ids))
+                                }}
+                                disabled={lessonIndex === module.lessons.length - 1 || isSubmitting}
+                                className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30"
+                                aria-label="Move lesson down"
+                              >
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              </button>
                               <button
                                 onClick={() => startEditingLesson(lesson)}
                                 className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
@@ -883,7 +1004,7 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
                             {lesson.contentBlocks.some((block) => block.type === 'TEXT') && (
                               <LessonAudioAdmin lessonId={lesson.id} />
                             )}
-                            {lesson.contentBlocks.map((block) => {
+                            {lesson.contentBlocks.map((block, blockIndex) => {
                               const Icon = contentTypeIcons[block.type]
                               return (
                                 <div
@@ -913,7 +1034,29 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
                                           {contentTypeLabels[block.type]}
                                         </span>
                                       </div>
-                                      <div className="flex items-center gap-1 opacity-0 group-hover/block:opacity-100 transition-opacity">
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={() => {
+                                            const ids = moved(lesson.contentBlocks.map((b) => b.id), blockIndex, -1)
+                                            if (ids) handleReorder(() => reorderContentBlocks(lesson.id, ids))
+                                          }}
+                                          disabled={blockIndex === 0 || isSubmitting}
+                                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30"
+                                          aria-label="Move block up"
+                                        >
+                                          <ArrowUp className="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            const ids = moved(lesson.contentBlocks.map((b) => b.id), blockIndex, 1)
+                                            if (ids) handleReorder(() => reorderContentBlocks(lesson.id, ids))
+                                          }}
+                                          disabled={blockIndex === lesson.contentBlocks.length - 1 || isSubmitting}
+                                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30"
+                                          aria-label="Move block down"
+                                        >
+                                          <ArrowDown className="h-3.5 w-3.5" />
+                                        </button>
                                         <button
                                           onClick={() => startEditingContent(block)}
                                           className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
@@ -1104,6 +1247,88 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
                 </div>
               </div>
               <div>
+                <label htmlFor="set-category" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <input
+                  id="set-category"
+                  type="text"
+                  value={settingsForm.category}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, category: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="e.g. Leadership"
+                />
+              </div>
+              <div>
+                <label htmlFor="set-tags" className="block text-sm font-medium text-gray-700 mb-1">Tags (comma separated)</label>
+                <input
+                  id="set-tags"
+                  type="text"
+                  value={settingsForm.tags}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, tags: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="ambassadors, workbook"
+                />
+              </div>
+              <div>
+                <label htmlFor="set-outcomes" className="block text-sm font-medium text-gray-700 mb-1">What you will learn (one per line)</label>
+                <textarea
+                  id="set-outcomes"
+                  value={settingsForm.outcomes}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, outcomes: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  rows={4}
+                />
+              </div>
+              <div>
+                <label htmlFor="set-audience" className="block text-sm font-medium text-gray-700 mb-1">Who it is for</label>
+                <textarea
+                  id="set-audience"
+                  value={settingsForm.audience}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, audience: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  rows={2}
+                />
+              </div>
+              <div>
+                <label htmlFor="set-drip" className="block text-sm font-medium text-gray-700 mb-1">
+                  Open one module every so many days (leave empty to open everything at once)
+                </label>
+                <input
+                  id="set-drip"
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={settingsForm.dripDays}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, dripDays: e.target.value })}
+                  className="w-full max-w-xs px-3 py-2 border rounded-lg"
+                  placeholder="e.g. 7"
+                />
+              </div>
+              {otherCourses.length > 0 && (
+                <fieldset>
+                  <legend className="block text-sm font-medium text-gray-700 mb-2">Courses to finish first</legend>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {otherCourses.map((c) => (
+                      <label key={c.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded"
+                          checked={settingsForm.prerequisiteIds.includes(c.id)}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              prerequisiteIds: e.target.checked
+                                ? [...settingsForm.prerequisiteIds, c.id]
+                                : settingsForm.prerequisiteIds.filter((id) => id !== c.id),
+                            })
+                          }
+                        />
+                        {c.title}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Estimated Duration (minutes)
                 </label>
@@ -1145,9 +1370,9 @@ export function CourseEditorClient({ course, availableSurveys }: CourseEditorCli
 // ============================================
 
 interface ContentBlockEditorProps {
-  type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT'
+  type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT' | 'EXERCISE'
   form: {
-    type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT'
+    type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'DOCUMENT' | 'EXERCISE'
     title: string
     content: Record<string, unknown>
     threshold: string
@@ -1173,13 +1398,13 @@ function ContentBlockEditor({
   return (
     <div className="flex-1 space-y-3">
       {isNew && (
-        <div className="flex gap-2">
-          {(['VIDEO', 'TEXT', 'QUIZ', 'DOCUMENT'] as const).map((t) => {
+        <div className="flex flex-wrap gap-2">
+          {(['TEXT', 'EXERCISE', 'VIDEO', 'QUIZ', 'DOCUMENT'] as const).map((t) => {
             const Icon = contentTypeIcons[t]
             return (
               <button
                 key={t}
-                onClick={() => setForm({ ...form, type: t, content: {} })}
+                onClick={() => setForm({ ...form, type: t, content: t === 'EXERCISE' ? { prompts: [{ id: 'p1', kind: 'text', label: '' }] } : {} })}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded border text-sm ${
                   form.type === t
                     ? 'border-blue-500 bg-blue-50 text-blue-700'
@@ -1286,6 +1511,10 @@ function ContentBlockEditor({
             </p>
           )}
         </div>
+      )}
+
+      {form.type === 'EXERCISE' && (
+        <ExerciseEditor value={form.content} onChange={(content) => setForm({ ...form, content })} />
       )}
 
       {form.type === 'DOCUMENT' && (
